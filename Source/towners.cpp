@@ -12,6 +12,7 @@
 #include "game_mode.hpp"
 #include "inv.h"
 #include "minitext.h"
+#include "runs_mod.h"
 #include "stores.h"
 #include "tables/textdat.h"
 #include "tables/townerdat.hpp"
@@ -782,6 +783,12 @@ void InitTowners()
 	int16_t i = 0;
 	for (const auto &entry : TownersDataEntries) {
 		if (!IsTownerPresent(entry.type))
+			continue;
+
+		// [RUNS MOD] Drop NPCs that fall outside the compact hub so they don't
+		// render stranded in the voided-out area. (Relocating the essential
+		// vendors/stash into the hub is a follow-up.)
+		if (RunsModEnabled && !IsInsideHub(entry.position.x, entry.position.y))
 			continue;
 
 		auto behaviorIt = TownerBehaviors.find(entry.type);

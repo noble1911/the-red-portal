@@ -11,6 +11,7 @@
 #include "multi.h"
 #include "player.h"
 #include "quests.h"
+#include "runs_mod.h"
 #include "utils/endian_swap.hpp"
 
 namespace devilution {
@@ -243,6 +244,18 @@ void DrlgTPass3()
 		FillTile(60, 70, 71);
 	}
 
+	if (RunsModEnabled) {
+		// [RUNS MOD] Compact hub: void out everything outside the plaza so the
+		// starting area is a small courtyard around the cathedral run portal.
+		// Tune the bounds in runs_mod.h. (NPC relocation into the hub is TBD.)
+		for (int y = 0; y < MAXDUNY; y++) {
+			for (int x = 0; x < MAXDUNX; x++) {
+				if (!IsInsideHub(x, y))
+					dPiece[x][y] = 426;
+			}
+		}
+	}
+
 	InitTownPieces();
 }
 
@@ -363,6 +376,8 @@ void CreateTown(lvl_entry entry)
 
 	if (entry == ENTRY_MAIN) { // New game
 		ViewPosition = { 75, 68 };
+		if (RunsModEnabled) // [RUNS MOD] spawn inside the compact hub
+			ViewPosition = { HubSpawnX, HubSpawnY };
 	} else if (entry == ENTRY_PREV) { // Cathedral
 		ViewPosition = { 25, 31 };
 	} else if (entry == ENTRY_TWARPUP) {
