@@ -30,4 +30,13 @@ constexpr bool IsInsideHub(int x, int y)
 	return x >= HubMinX && x <= HubMaxX && y >= HubMinY && y <= HubMaxY;
 }
 
+// The dungeon level used for a run (M2/M3). A run is a single contained level;
+// kept at 1 (Cathedral) for now. M4 may vary it for depth.
+constexpr int RunLevel = 1;
+
+// Begin a fresh run: give the run level a brand-new seed and clear its cached
+// generation state + visited flag so it regenerates with a new layout on entry.
+// Defined in diablo.cpp. (Single-player for now; co-op seed sync is M3b.)
+void StartNewRun();
+
 } // namespace devilution

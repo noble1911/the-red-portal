@@ -51,6 +51,7 @@
 #include "player.h"
 #include "qol/autopickup.h"
 #include "qol/stash.h"
+#include "runs_mod.h"
 #include "spells.h"
 #include "stores.h"
 #include "towners.h"
@@ -2897,6 +2898,14 @@ void
 StartNewLvl(Player &player, interface_mode fom, int lvl)
 {
 	InitLevelChange(player);
+
+	// [RUNS MOD] Taking the hub portal (only WM_DIABNEXTLVL from town) starts a
+	// fresh run: reseed the run level so each descent is a new layout. Gated to
+	// single-player for now; co-op seed broadcast is M3b.
+	if (&player == MyPlayer && RunsModEnabled && !gbIsMultiplayer
+	    && fom == WM_DIABNEXTLVL && currlevel == 0 && lvl == RunLevel) {
+		StartNewRun();
+	}
 
 	switch (fom) {
 	case WM_DIABNEXTLVL:

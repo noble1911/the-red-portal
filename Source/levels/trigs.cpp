@@ -165,7 +165,10 @@ void InitL1Triggers()
 				trigs[numtrigs]._tmsg = WM_DIABPREVLVL;
 				numtrigs++;
 			}
-			if (dPiece[i][j] == 114) {
+			// [RUNS MOD] A run is a single contained level: skip the down-stairs
+			// trigger so the player can't descend further. The up-stairs above
+			// remain and return to the hub.
+			if (dPiece[i][j] == 114 && !RunsModEnabled) {
 				trigs[numtrigs].position = { i, j };
 				trigs[numtrigs]._tmsg = WM_DIABNEXTLVL;
 				numtrigs++;

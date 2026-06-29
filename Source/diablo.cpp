@@ -98,6 +98,7 @@
 #include "qol/xpbar.h"
 #include "quick_messages.hpp"
 #include "restrict.h"
+#include "runs_mod.h"
 #include "stores.h"
 #include "storm/storm_net.hpp"
 #include "storm/storm_svid.h"
@@ -3077,6 +3078,17 @@ void SetRndSeedForDungeonLevel()
 	} else {
 		SetRndSeed(DungeonSeeds[currlevel]);
 	}
+}
+
+void StartNewRun()
+{
+	// [RUNS MOD] Begin a fresh run. A new seed gives the run level a different
+	// layout; clearing the cached LevelSeeds entry stops the generator from
+	// replaying the previous layout; clearing _pLvlVisited forces regeneration
+	// (single-player otherwise reloads the saved level on re-entry).
+	DungeonSeeds[RunLevel] = GenerateSeed();
+	LevelSeeds[RunLevel] = std::nullopt;
+	MyPlayer->_pLvlVisited[RunLevel] = false;
 }
 
 void LoadGameLevelFirstFlagEntry()
