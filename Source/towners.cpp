@@ -785,22 +785,36 @@ void InitTowners()
 		if (!IsTownerPresent(entry.type))
 			continue;
 
-		// [RUNS MOD] Drop NPCs that fall outside the compact hub so they don't
-		// render stranded in the voided-out area. (Relocating the essential
-		// vendors/stash into the hub is a follow-up.)
-		if (RunsModEnabled && !IsInsideHub(entry.position.x, entry.position.y))
-			continue;
-
 		auto behaviorIt = TownerBehaviors.find(entry.type);
 		if (behaviorIt == TownerBehaviors.end() || behaviorIt->second == nullptr)
 			continue;
 
+		// [RUNS MOD] In the compact hub, keep only the essential vendors and move
+		// them into the plaza courtyard (their Tristram positions are outside the
+		// crop). Everyone else (quest/flavor NPCs, cows) is dropped. Positions are
+		// in the open courtyard south of the cathedral run portal; tune if any
+		// lands on a wall/obstacle.
+		const TownerDataEntry *use = &entry;
+		TownerDataEntry relocated;
+		if (RunsModEnabled) {
+			relocated = entry;
+			switch (entry.type) {
+			case TOWN_SMITH:  relocated.position = { 22, 34 }; break; // Griswold - gear
+			case TOWN_HEALER: relocated.position = { 28, 34 }; break; // Pepin - potions/healing
+			case TOWN_WITCH:  relocated.position = { 20, 37 }; break; // Adria - scrolls/staves
+			case TOWN_STORY:  relocated.position = { 30, 37 }; break; // Cain - identify
+			case TOWN_BMAID:  relocated.position = { 25, 37 }; break; // Gillian - opens the stash
+			default: continue;
+			}
+			use = &relocated;
+		}
+
 		// It's necessary to assign this before invoking townerData.init()
 		// specifically for the cows that need to read this value to fill adjacent tiles
-		dMonster[entry.position.x][entry.position.y] = i + 1;
+		dMonster[use->position.x][use->position.y] = i + 1;
 
 		Towners.emplace_back();
-		InitTownerInfo(Towners.back(), *behaviorIt->second, entry);
+		InitTownerInfo(Towners.back(), *behaviorIt->second, *use);
 		i++;
 	}
 }
