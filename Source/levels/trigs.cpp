@@ -17,6 +17,7 @@
 #include "diablo_msg.hpp"
 #include "game_mode.hpp"
 #include "multi.h"
+#include "runs_mod.h"
 #include "utils/algorithm/container.hpp"
 #include "utils/is_of.hpp"
 #include "utils/language.h"
@@ -111,10 +112,15 @@ void InitTownTriggers()
 {
 	numtrigs = 0;
 
-	// Cathedral
-	trigs[numtrigs].position = { 25, 29 };
-	trigs[numtrigs]._tmsg = WM_DIABNEXTLVL;
-	numtrigs++;
+	if (!RunsModEnabled) {
+		// [RUNS MOD] The fixed cathedral stairs descent is the linear campaign's
+		// entry to dungeon level 1. Run-based mode replaces it with a run portal
+		// (added in M2), so the town hub has no built-in descent trigger.
+		// Cathedral
+		trigs[numtrigs].position = { 25, 29 };
+		trigs[numtrigs]._tmsg = WM_DIABNEXTLVL;
+		numtrigs++;
+	}
 
 	if (IsWarpOpen(DTYPE_CATACOMBS)) {
 		trigs[numtrigs].position = { 49, 21 };

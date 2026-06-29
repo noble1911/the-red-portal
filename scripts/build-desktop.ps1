@@ -16,6 +16,12 @@ if (-not (Test-Path $toolchain)) {
     throw "vcpkg toolchain not found at $toolchain. Set `$env:VCPKG_ROOT or clone+bootstrap vcpkg."
 }
 
+# The devkitPro installer prepends its MSYS2 bin to PATH; that cmake lacks the
+# Visual Studio generators and mangles Windows paths inside vcpkg. Make sure the
+# native (scoop) cmake is found first for the desktop build.
+$nativeCmakeBin = "$env:USERPROFILE\scoop\apps\cmake\current\bin"
+if (Test-Path "$nativeCmakeBin\cmake.exe") { $env:Path = "$nativeCmakeBin;" + $env:Path }
+
 # NOTE: vcpkg pins a baseline commit in vcpkg.json. If you cloned vcpkg shallow,
 # fetch that commit first:  git -C $vcpkg fetch --depth 1 origin <baseline-sha>
 

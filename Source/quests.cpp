@@ -28,6 +28,7 @@
 #include "monster.h"
 #include "options.h"
 #include "panels/ui_panels.hpp"
+#include "runs_mod.h"
 #include "stores.h"
 #include "tables/townerdat.hpp"
 #include "towners.h"
@@ -226,6 +227,14 @@ void InitQuests()
 			quest._qlevel = questData._qdmultlvl;
 			quest._qactive = QUEST_INIT;
 		}
+	}
+
+	if (RunsModEnabled) {
+		// [RUNS MOD] No campaign quests in run-based mode: the town is a pure hub.
+		// Leaves every quest QUEST_NOTAVAIL so quest content and quest-gated town
+		// warps never activate. (The disabled-quest _qvar fixups below still apply.)
+		for (auto &quest : Quests)
+			quest._qactive = QUEST_NOTAVAIL;
 	}
 
 	if (!UseMultiplayerQuests() && *GetOptions().Gameplay.randomizeQuests) {
