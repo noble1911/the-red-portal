@@ -52,6 +52,7 @@
 #include "plrmsg.h"
 #include "portals/validation.hpp"
 #include "quests/validation.hpp"
+#include "runs_mod.h"
 #include "spells.h"
 #include "storm/storm_net.hpp"
 #include "sync.h"
@@ -194,6 +195,7 @@ std::string_view CmdIdString(_cmd_id cmd)
 	case CMD_OPENHIVE: return "CMD_OPENHIVE";
 	case CMD_OPENGRAVE: return "CMD_OPENGRAVE";
 	case CMD_SPAWNMONSTER: return "CMD_SPAWNMONSTER";
+	case CMD_RUNSEED: return "CMD_RUNSEED";
 	case FAKE_CMD_SETID: return "FAKE_CMD_SETID";
 	case FAKE_CMD_DROPID: return "FAKE_CMD_DROPID";
 	case CMD_INVALID: return "CMD_INVALID";
@@ -1998,6 +2000,21 @@ size_t OnNewLevel(const TCmdParam2 &message, Player &player)
 	return sizeof(message);
 }
 
+size_t OnRunSeed(const TCmdParam2 &message, Player &player)
+{
+	// [RUNS MOD] Another client started a run; adopt its seed so we generate the
+	// identical run layout. (The initiating client already applied it locally.)
+	if (gbBufferMsgs == 1) {
+		BufferMessage(player, &message, sizeof(message));
+	} else if (&player != MyPlayer) {
+		const uint32_t seed = (static_cast<uint32_t>(Swap16LE(message.wParam1)) << 16)
+		    | static_cast<uint32_t>(Swap16LE(message.wParam2));
+		ApplyRunSeed(seed);
+	}
+
+	return sizeof(message);
+}
+
 size_t OnWarp(const TCmdParam1 &message, Player &player)
 {
 	const uint16_t portalIdx = Swap16LE(message.wParam1);
@@ -3497,6 +3514,8 @@ size_t ParseCmd(uint8_t pnum, const TCmd *pCmd, size_t maxCmdSize)
 		return OnOpenGrave(*pCmd);
 	case CMD_SPAWNMONSTER:
 		return HandleCmd(OnSpawnMonster, player, pCmd, maxCmdSize);
+	case CMD_RUNSEED:
+		return HandleCmd(OnRunSeed, player, pCmd, maxCmdSize);
 	default:
 		break;
 	}

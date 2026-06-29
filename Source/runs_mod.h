@@ -34,9 +34,14 @@ constexpr bool IsInsideHub(int x, int y)
 // kept at 1 (Cathedral) for now. M4 may vary it for depth.
 constexpr int RunLevel = 1;
 
-// Begin a fresh run: give the run level a brand-new seed and clear its cached
-// generation state + visited flag so it regenerates with a new layout on entry.
-// Defined in diablo.cpp. (Single-player for now; co-op seed sync is M3b.)
+// Begin a fresh run from the hub. In multiplayer, if another player is already in
+// the run it joins their layout instead of reseeding; otherwise it generates a new
+// seed, applies it, and broadcasts CMD_RUNSEED to the other clients. Defined in
+// diablo.cpp.
 void StartNewRun();
+
+// Apply a run seed received from another client (CMD_RUNSEED): set the run level's
+// seed and clear its cached generation state so it regenerates that exact layout.
+void ApplyRunSeed(uint32_t seed);
 
 } // namespace devilution

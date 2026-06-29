@@ -416,6 +416,11 @@ enum _cmd_id : uint8_t {
 	//
 	// body (TCmdSpawnMonster)
 	CMD_SPAWNMONSTER,
+	// [RUNS MOD] Broadcast the seed for the current dungeon run so all clients
+	// generate the identical run layout.
+	//
+	// body (TCmdParam2): wParam1 = seed high 16 bits, wParam2 = seed low 16 bits
+	CMD_RUNSEED,
 	// Fake command; set current player for succeeding mega pkt buffer messages.
 	//
 	// body (TFakeCmdPlr)

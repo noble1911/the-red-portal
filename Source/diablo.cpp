@@ -96,6 +96,7 @@
 #include "qol/stash.h"
 #include "qol/visual_store.h"
 #include "qol/xpbar.h"
+#include "msg.h"
 #include "quick_messages.hpp"
 #include "restrict.h"
 #include "runs_mod.h"
@@ -3080,15 +3081,40 @@ void SetRndSeedForDungeonLevel()
 	}
 }
 
-void StartNewRun()
+void ApplyRunSeed(uint32_t seed)
 {
-	// [RUNS MOD] Begin a fresh run. A new seed gives the run level a different
-	// layout; clearing the cached LevelSeeds entry stops the generator from
-	// replaying the previous layout; clearing _pLvlVisited forces regeneration
-	// (single-player otherwise reloads the saved level on re-entry).
-	DungeonSeeds[RunLevel] = GenerateSeed();
+	// [RUNS MOD] A new seed gives the run level a different layout; clearing the
+	// cached LevelSeeds entry stops the generator from replaying a prior layout;
+	// clearing _pLvlVisited forces regeneration (single-player otherwise reloads
+	// the saved level on re-entry; multiplayer always regenerates).
+	DungeonSeeds[RunLevel] = seed;
 	LevelSeeds[RunLevel] = std::nullopt;
 	MyPlayer->_pLvlVisited[RunLevel] = false;
+}
+
+void StartNewRun()
+{
+	// [RUNS MOD] If a co-op run is already in progress (another player is on the
+	// run level), join it on the already-shared seed rather than reseeding and
+	// desyncing them; just force a fresh regeneration locally.
+	if (gbIsMultiplayer) {
+		for (const Player &other : Players) {
+			if (other.plractive && &other != MyPlayer && other.isOnLevel(RunLevel)) {
+				LevelSeeds[RunLevel] = std::nullopt;
+				MyPlayer->_pLvlVisited[RunLevel] = false;
+				return;
+			}
+		}
+	}
+
+	// Otherwise start a fresh run: pick a new seed, apply it, and (in co-op)
+	// broadcast it so every client builds the identical layout.
+	const uint32_t seed = GenerateSeed();
+	ApplyRunSeed(seed);
+	if (gbIsMultiplayer) {
+		NetSendCmdParam2(true, CMD_RUNSEED,
+		    static_cast<uint16_t>(seed >> 16), static_cast<uint16_t>(seed & 0xFFFF));
+	}
 }
 
 void LoadGameLevelFirstFlagEntry()

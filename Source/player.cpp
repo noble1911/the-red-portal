@@ -2900,9 +2900,10 @@ StartNewLvl(Player &player, interface_mode fom, int lvl)
 	InitLevelChange(player);
 
 	// [RUNS MOD] Taking the hub portal (only WM_DIABNEXTLVL from town) starts a
-	// fresh run: reseed the run level so each descent is a new layout. Gated to
-	// single-player for now; co-op seed broadcast is M3b.
-	if (&player == MyPlayer && RunsModEnabled && !gbIsMultiplayer
+	// fresh run: reseed the run level so each descent is a new layout. In co-op,
+	// StartNewRun broadcasts the seed (or joins an in-progress run) so all clients
+	// build the identical layout.
+	if (&player == MyPlayer && RunsModEnabled
 	    && fom == WM_DIABNEXTLVL && currlevel == 0 && lvl == RunLevel) {
 		StartNewRun();
 	}
