@@ -471,3 +471,9 @@ uwp-project/Assets/ui_art
 /tmp/
 /compile_commands.json
 /tools/tmp
+
+# Claude Code local project data
+.claude/
+
+# Prefetched 3rd-party sources for Switch build (re-downloaded by build script)
+.deps-prefetch/
