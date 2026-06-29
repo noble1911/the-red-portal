@@ -80,6 +80,7 @@
 #include "options.h"
 #include "player.h"
 #include "quests.h"
+#include "runs_mod.h"
 #include "sound_effect_enums.h"
 #include "storm/storm_net.hpp"
 #include "tables/itemdat.h"
@@ -425,6 +426,8 @@ Point GetUniqueMonstPosition(UniqueMonsterType uniqindex)
 	case UniqueMonsterType::BlackJade:
 		return SetPiece.position.megaToWorld() + Displacement { 5, 9 };
 	case UniqueMonsterType::Butcher:
+		if (RunsModEnabled)
+			break; // [RUNS MOD] place at a random valid spot (no chamber set-piece in run mode)
 		return SetPiece.position.megaToWorld() + Displacement { 4, 4 };
 	case UniqueMonsterType::NaKrul:
 		if (UberRow == 0 || UberCol == 0) {
@@ -532,6 +535,12 @@ tl::expected<void, std::string> PlaceUniqueMonsters()
 tl::expected<void, std::string> PlaceQuestMonsters()
 {
 	if (!setlevel) {
+		// [RUNS MOD] Guaranteed boss for the run: The Butcher on the run level,
+		// placed at a random valid spot (deterministic from the level seed, so it
+		// stays in sync across multiplayer clients).
+		if (RunsModEnabled && currlevel == 1) {
+			RETURN_IF_ERROR(PlaceUniqueMonst(UniqueMonsterType::Butcher, 0, 0));
+		}
 		if (Quests[Q_BUTCHER].IsAvailable()) {
 			RETURN_IF_ERROR(PlaceUniqueMonst(UniqueMonsterType::Butcher, 0, 0));
 		}
@@ -3454,6 +3463,9 @@ tl::expected<void, std::string> GetLevelMTypes()
 	}
 
 	if (!setlevel) {
+		// [RUNS MOD] Load the run boss type (The Butcher) on the run level.
+		if (RunsModEnabled && currlevel == 1)
+			RETURN_IF_ERROR(AddMonsterType(MT_CLEAVER, PLACE_SPECIAL));
 		if (Quests[Q_BUTCHER].IsAvailable())
 			RETURN_IF_ERROR(AddMonsterType(MT_CLEAVER, PLACE_SPECIAL));
 		if (Quests[Q_GARBUD].IsAvailable())

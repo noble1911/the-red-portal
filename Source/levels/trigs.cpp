@@ -112,15 +112,14 @@ void InitTownTriggers()
 {
 	numtrigs = 0;
 
-	if (!RunsModEnabled) {
-		// [RUNS MOD] The fixed cathedral stairs descent is the linear campaign's
-		// entry to dungeon level 1. Run-based mode replaces it with a run portal
-		// (added in M2), so the town hub has no built-in descent trigger.
-		// Cathedral
-		trigs[numtrigs].position = { 25, 29 };
-		trigs[numtrigs]._tmsg = WM_DIABNEXTLVL;
-		numtrigs++;
-	}
+	// [RUNS MOD] In run mode this cathedral-entrance trigger is the "run portal":
+	// it starts a dungeon run. For now it routes to dungeon level 1 with a fixed
+	// seed (M2 — prove the round trip); M3 will reseed it per run. In vanilla mode
+	// it is the normal cathedral descent.
+	// Cathedral
+	trigs[numtrigs].position = { 25, 29 };
+	trigs[numtrigs]._tmsg = WM_DIABNEXTLVL;
+	numtrigs++;
 
 	if (IsWarpOpen(DTYPE_CATACOMBS)) {
 		trigs[numtrigs].position = { 49, 21 };
