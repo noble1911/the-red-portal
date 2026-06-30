@@ -3081,39 +3081,57 @@ void SetRndSeedForDungeonLevel()
 	}
 }
 
-void ApplyRunSeed(uint32_t seed)
+int RunDepth = 1;
+bool RunBossDefeated = false;
+
+void AdvanceRunDepth()
+{
+	// [RUNS MOD] Each run goes one level deeper (engine difficulty + loot scale
+	// with dungeon level). Capped to avoid the Diablo arena's special handling.
+	if (RunDepth < MaxRunDepth)
+		RunDepth++;
+}
+
+void ApplyRunSeed(int depth, uint32_t seed)
 {
 	// [RUNS MOD] A new seed gives the run level a different layout; clearing the
 	// cached LevelSeeds entry stops the generator from replaying a prior layout;
 	// clearing _pLvlVisited forces regeneration (single-player otherwise reloads
 	// the saved level on re-entry; multiplayer always regenerates).
-	DungeonSeeds[RunLevel] = seed;
-	LevelSeeds[RunLevel] = std::nullopt;
-	MyPlayer->_pLvlVisited[RunLevel] = false;
+	RunDepth = depth;
+	DungeonSeeds[depth] = seed;
+	LevelSeeds[depth] = std::nullopt;
+	MyPlayer->_pLvlVisited[depth] = false;
 }
 
 void StartNewRun()
 {
+	// [RUNS MOD] A new run starts with its boss undefeated; you must kill it to
+	// progress deeper.
+	RunBossDefeated = false;
+
 	// [RUNS MOD] If a co-op run is already in progress (another player is on the
 	// run level), join it on the already-shared seed rather than reseeding and
 	// desyncing them; just force a fresh regeneration locally.
 	if (gbIsMultiplayer) {
 		for (const Player &other : Players) {
-			if (other.plractive && &other != MyPlayer && other.isOnLevel(RunLevel)) {
-				LevelSeeds[RunLevel] = std::nullopt;
-				MyPlayer->_pLvlVisited[RunLevel] = false;
+			if (other.plractive && &other != MyPlayer && other.isOnLevel(static_cast<uint8_t>(RunDepth))) {
+				LevelSeeds[RunDepth] = std::nullopt;
+				MyPlayer->_pLvlVisited[RunDepth] = false;
 				return;
 			}
 		}
 	}
 
 	// Otherwise start a fresh run: pick a new seed, apply it, and (in co-op)
-	// broadcast it so every client builds the identical layout.
+	// broadcast seed + depth so every client builds the identical layout.
 	const uint32_t seed = GenerateSeed();
-	ApplyRunSeed(seed);
+	const int depth = RunDepth;
+	ApplyRunSeed(depth, seed);
 	if (gbIsMultiplayer) {
-		NetSendCmdParam2(true, CMD_RUNSEED,
-		    static_cast<uint16_t>(seed >> 16), static_cast<uint16_t>(seed & 0xFFFF));
+		NetSendCmdParam4(true, CMD_RUNSEED,
+		    static_cast<uint16_t>(seed >> 16), static_cast<uint16_t>(seed & 0xFFFF),
+		    static_cast<uint16_t>(depth), 0);
 	}
 }
 

@@ -2899,12 +2899,11 @@ StartNewLvl(Player &player, interface_mode fom, int lvl)
 {
 	InitLevelChange(player);
 
-	// [RUNS MOD] Taking the hub portal (only WM_DIABNEXTLVL from town) starts a
-	// fresh run: reseed the run level so each descent is a new layout. In co-op,
-	// StartNewRun broadcasts the seed (or joins an in-progress run) so all clients
-	// build the identical layout.
+	// [RUNS MOD] Taking the hub portal (WM_DIABNEXTLVL from town) starts a fresh
+	// run at the current depth: reseed so the layout is new. In co-op StartNewRun
+	// broadcasts seed + depth (or joins an in-progress run) so clients match.
 	if (&player == MyPlayer && RunsModEnabled
-	    && fom == WM_DIABNEXTLVL && currlevel == 0 && lvl == RunLevel) {
+	    && fom == WM_DIABNEXTLVL && currlevel == 0) {
 		StartNewRun();
 	}
 

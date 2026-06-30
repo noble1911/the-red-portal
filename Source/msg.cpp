@@ -2000,16 +2000,17 @@ size_t OnNewLevel(const TCmdParam2 &message, Player &player)
 	return sizeof(message);
 }
 
-size_t OnRunSeed(const TCmdParam2 &message, Player &player)
+size_t OnRunSeed(const TCmdParam4 &message, Player &player)
 {
-	// [RUNS MOD] Another client started a run; adopt its seed so we generate the
-	// identical run layout. (The initiating client already applied it locally.)
+	// [RUNS MOD] Another client started a run; adopt its depth + seed so we
+	// generate the identical run layout. (The initiator already applied it.)
 	if (gbBufferMsgs == 1) {
 		BufferMessage(player, &message, sizeof(message));
 	} else if (&player != MyPlayer) {
 		const uint32_t seed = (static_cast<uint32_t>(Swap16LE(message.wParam1)) << 16)
 		    | static_cast<uint32_t>(Swap16LE(message.wParam2));
-		ApplyRunSeed(seed);
+		const int depth = Swap16LE(message.wParam3);
+		ApplyRunSeed(depth, seed);
 	}
 
 	return sizeof(message);

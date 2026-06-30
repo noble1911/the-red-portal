@@ -535,10 +535,10 @@ tl::expected<void, std::string> PlaceUniqueMonsters()
 tl::expected<void, std::string> PlaceQuestMonsters()
 {
 	if (!setlevel) {
-		// [RUNS MOD] Guaranteed boss for the run: The Butcher on the run level,
+		// [RUNS MOD] Guaranteed boss for the run: The Butcher on any run level,
 		// placed at a random valid spot (deterministic from the level seed, so it
 		// stays in sync across multiplayer clients).
-		if (RunsModEnabled && currlevel == 1) {
+		if (RunsModEnabled && currlevel >= 1) {
 			RETURN_IF_ERROR(PlaceUniqueMonst(UniqueMonsterType::Butcher, 0, 0));
 		}
 		if (Quests[Q_BUTCHER].IsAvailable()) {
@@ -3463,8 +3463,8 @@ tl::expected<void, std::string> GetLevelMTypes()
 	}
 
 	if (!setlevel) {
-		// [RUNS MOD] Load the run boss type (The Butcher) on the run level.
-		if (RunsModEnabled && currlevel == 1)
+		// [RUNS MOD] Load the run boss type (The Butcher) on any run level.
+		if (RunsModEnabled && currlevel >= 1)
 			RETURN_IF_ERROR(AddMonsterType(MT_CLEAVER, PLACE_SPECIAL));
 		if (Quests[Q_BUTCHER].IsAvailable())
 			RETURN_IF_ERROR(AddMonsterType(MT_CLEAVER, PLACE_SPECIAL));
@@ -4011,6 +4011,12 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 		AddPlrMonstExper(monster.level(sgGameInitInfo.nDifficulty), monster.exp(sgGameInitInfo.nDifficulty), monster.whoHit);
 
 	MonsterKillCounts[monster.type().type]++;
+
+	// [RUNS MOD] Killing the run's guaranteed boss (The Butcher) marks the run
+	// beaten; only then does returning to the hub advance to a deeper run.
+	if (RunsModEnabled && monster.isUnique() && monster.uniqueType == UniqueMonsterType::Butcher)
+		RunBossDefeated = true;
+
 	monster.hitPoints = 0;
 	monster.flags &= ~MFLAG_HIDDEN;
 	SetRndSeed(monster.rndItemSeed);

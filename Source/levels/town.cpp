@@ -376,8 +376,6 @@ void CreateTown(lvl_entry entry)
 
 	if (entry == ENTRY_MAIN) { // New game
 		ViewPosition = { 75, 68 };
-		if (RunsModEnabled) // [RUNS MOD] spawn inside the compact hub
-			ViewPosition = { HubSpawnX, HubSpawnY };
 	} else if (entry == ENTRY_PREV) { // Cathedral
 		ViewPosition = { 25, 31 };
 	} else if (entry == ENTRY_TWARPUP) {
@@ -396,6 +394,12 @@ void CreateTown(lvl_entry entry)
 		if (TWarpFrom == 17) {
 			ViewPosition = { 79, 62 };
 		}
+	}
+
+	if (RunsModEnabled) {
+		// [RUNS MOD] The only town is the compact hub, so always arrive at the hub
+		// spawn -- whether starting a new game or returning from a run (TWARPUP).
+		ViewPosition = { HubSpawnX, HubSpawnY };
 	}
 
 	DrlgTPass3();

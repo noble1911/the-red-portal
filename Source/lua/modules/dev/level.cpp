@@ -16,6 +16,7 @@
 #include "monster.h"
 #include "objects.h"
 #include "player.h"
+#include "runs_mod.h"
 #include "utils/endian_stream.hpp"
 #include "utils/file_util.h"
 
@@ -117,6 +118,19 @@ std::string DebugCmdLevelSeed(std::optional<uint8_t> level)
 	return StrCat(DungeonSeeds[level.value_or(currlevel)]);
 }
 
+// [RUNS MOD] Testing aid: report the run depth, or jump it so the next hub portal
+// goes deep without grinding there legitimately.
+std::string DebugCmdSetRunDepth(std::optional<uint8_t> depth)
+{
+	if (!depth.has_value())
+		return StrCat("Current run depth: ", RunDepth, " / ", MaxRunDepth,
+		    RunBossDefeated ? " (boss defeated)" : " (boss alive)");
+	if (*depth < 1 || *depth > MaxRunDepth)
+		return StrCat("depth out of range (1..", MaxRunDepth, ")");
+	RunDepth = *depth;
+	return StrCat("Run depth set to ", *depth, ". Take the hub portal to start that run.");
+}
+
 } // namespace
 
 sol::table LuaDevLevelModule(sol::state_view &lua)
@@ -126,6 +140,7 @@ sol::table LuaDevLevelModule(sol::state_view &lua)
 	LuaSetDocFn(table, "map", "", "Automap-related commands.", LuaDevLevelMapModule(lua));
 	LuaSetDocFn(table, "reset", "(n: number, seed: number = nil)", "Resets specified level.", &DebugCmdResetLevel);
 	LuaSetDocFn(table, "seed", "(level: number = nil)", "Get the seed of the current or given level.", &DebugCmdLevelSeed);
+	LuaSetDocFn(table, "rundepth", "(n: number = nil)", "[RUNS MOD] Report the run depth, or set it (next hub portal goes there).", &DebugCmdSetRunDepth);
 	LuaSetDocFn(table, "warp", "", "Warp to a level or a custom map.", LuaDevLevelWarpModule(lua));
 	return table;
 }

@@ -416,10 +416,11 @@ enum _cmd_id : uint8_t {
 	//
 	// body (TCmdSpawnMonster)
 	CMD_SPAWNMONSTER,
-	// [RUNS MOD] Broadcast the seed for the current dungeon run so all clients
-	// generate the identical run layout.
+	// [RUNS MOD] Broadcast the seed and depth for the current dungeon run so all
+	// clients generate the identical run layout at the same depth.
 	//
-	// body (TCmdParam2): wParam1 = seed high 16 bits, wParam2 = seed low 16 bits
+	// body (TCmdParam4): wParam1 = seed high 16 bits, wParam2 = seed low 16 bits,
+	//                    wParam3 = run depth (dungeon level), wParam4 = unused
 	CMD_RUNSEED,
 	// Fake command; set current player for succeeding mega pkt buffer messages.
 	//

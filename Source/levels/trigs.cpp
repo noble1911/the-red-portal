@@ -196,7 +196,7 @@ void InitL2Triggers()
 				numtrigs++;
 			}
 
-			if (dPiece[i][j] == 270) {
+			if (dPiece[i][j] == 270 && !RunsModEnabled) { // [RUNS MOD] no descent
 				trigs[numtrigs].position = { i, j };
 				trigs[numtrigs]._tmsg = WM_DIABNEXTLVL;
 				numtrigs++;
@@ -217,7 +217,7 @@ void InitL3Triggers()
 				numtrigs++;
 			}
 
-			if (dPiece[i][j] == 167) {
+			if (dPiece[i][j] == 167 && !RunsModEnabled) { // [RUNS MOD] no descent
 				trigs[numtrigs].position = { i, j };
 				trigs[numtrigs]._tmsg = WM_DIABNEXTLVL;
 				numtrigs++;
@@ -251,7 +251,7 @@ void InitL4Triggers()
 				numtrigs++;
 			}
 
-			if (dPiece[i][j] == 119) {
+			if (dPiece[i][j] == 119 && !RunsModEnabled) { // [RUNS MOD] no descent
 				trigs[numtrigs].position = { i, j };
 				trigs[numtrigs]._tmsg = WM_DIABNEXTLVL;
 				numtrigs++;
@@ -261,7 +261,7 @@ void InitL4Triggers()
 
 	for (WorldTileCoord j = 0; j < MAXDUNY; j++) {
 		for (WorldTileCoord i = 0; i < MAXDUNX; i++) {
-			if (dPiece[i][j] == 369 && Quests[Q_BETRAYER]._qactive == QUEST_DONE) {
+			if (dPiece[i][j] == 369 && !RunsModEnabled && Quests[Q_BETRAYER]._qactive == QUEST_DONE) {
 				trigs[numtrigs].position = { i, j };
 				trigs[numtrigs]._tmsg = WM_DIABNEXTLVL;
 				numtrigs++;
@@ -884,7 +884,10 @@ void CheckTriggers()
 
 		switch (trigs[i]._tmsg) {
 		case WM_DIABNEXTLVL:
-			if (gbIsSpawn && currlevel >= 2) {
+			if (RunsModEnabled && currlevel == 0) {
+				// [RUNS MOD] The hub portal starts a run at the current depth.
+				StartNewLvl(myPlayer, WM_DIABNEXTLVL, RunDepth);
+			} else if (gbIsSpawn && currlevel >= 2) {
 				NetSendCmdLoc(MyPlayerId, true, CMD_WALKXY, { myPlayer.position.tile.x, myPlayer.position.tile.y + 1 });
 				myPlayer.Say(HeroSpeech::NotAChance);
 				InitDiabloMsg(EMSG_NOT_IN_SHAREWARE);
@@ -893,7 +896,17 @@ void CheckTriggers()
 			}
 			break;
 		case WM_DIABPREVLVL:
-			StartNewLvl(myPlayer, trigs[i]._tmsg, currlevel - 1);
+			if (RunsModEnabled) {
+				// [RUNS MOD] The run's up-stairs return to the hub. The next run
+				// goes deeper only if you beat this run's boss. Route via TWARPUP
+				// because PREVLVL only does currlevel-- and can't jump to town.
+				TWarpFrom = currlevel;
+				if (RunBossDefeated)
+					AdvanceRunDepth();
+				StartNewLvl(myPlayer, WM_DIABTWARPUP, 0);
+			} else {
+				StartNewLvl(myPlayer, trigs[i]._tmsg, currlevel - 1);
+			}
 			break;
 		case WM_DIABRTNLVL:
 			StartNewLvl(myPlayer, trigs[i]._tmsg, GetMapReturnLevel());
@@ -935,6 +948,8 @@ void CheckTriggers()
 			break;
 		case WM_DIABTWARPUP:
 			TWarpFrom = currlevel;
+			if (RunsModEnabled && RunBossDefeated) // [RUNS MOD] only advance if the run was beaten
+				AdvanceRunDepth();
 			StartNewLvl(myPlayer, trigs[i]._tmsg, 0);
 			break;
 		default:
