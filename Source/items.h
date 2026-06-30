@@ -500,6 +500,10 @@ void InitItems();
 void CalcPlrItemVals(Player &player, bool Loadgfx);
 void CalcPlrInv(Player &player, bool Loadgfx);
 void InitializeItem(Item &item, _item_indexes itemData);
+
+/** @brief [RUNS MOD] Builds a dungeon scroll that opens a run at the given level. */
+void CreateDungeonScroll(Item &item, int level);
+
 void GenerateNewSeed(Item &item);
 int GetGoldCursor(int value);
 

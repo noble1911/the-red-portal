@@ -9,6 +9,8 @@
 #include <sol/sol.hpp>
 
 #include "diablo.h"
+#include "inv.h"
+#include "items.h"
 #include "levels/gendung.h"
 #include "lua/metadoc.hpp"
 #include "lua/modules/dev/level/map.hpp"
@@ -131,6 +133,19 @@ std::string DebugCmdSetRunDepth(std::optional<uint8_t> depth)
 	return StrCat("Run depth set to ", *depth, ". Take the hub portal to start that run.");
 }
 
+// [RUNS MOD] Testing aid: give the player a dungeon scroll for a given level so
+// the scroll-driven run flow can be tested without a vendor.
+std::string DebugCmdGiveDungeonScroll(uint8_t level)
+{
+	if (level < 1 || level > MaxRunDepth)
+		return StrCat("level out of range (1..", MaxRunDepth, ")");
+	Item item;
+	CreateDungeonScroll(item, level);
+	if (!AutoPlaceItemInInventory(*MyPlayer, item, true))
+		return "No room in inventory.";
+	return StrCat("Gave a Dungeon Scroll (level ", level, ").");
+}
+
 } // namespace
 
 sol::table LuaDevLevelModule(sol::state_view &lua)
@@ -141,6 +156,7 @@ sol::table LuaDevLevelModule(sol::state_view &lua)
 	LuaSetDocFn(table, "reset", "(n: number, seed: number = nil)", "Resets specified level.", &DebugCmdResetLevel);
 	LuaSetDocFn(table, "seed", "(level: number = nil)", "Get the seed of the current or given level.", &DebugCmdLevelSeed);
 	LuaSetDocFn(table, "rundepth", "(n: number = nil)", "[RUNS MOD] Report the run depth, or set it (next hub portal goes there).", &DebugCmdSetRunDepth);
+	LuaSetDocFn(table, "scroll", "(n: number)", "[RUNS MOD] Give a dungeon scroll that opens a level-n run.", &DebugCmdGiveDungeonScroll);
 	LuaSetDocFn(table, "warp", "", "Warp to a level or a custom map.", LuaDevLevelWarpModule(lua));
 	return table;
 }

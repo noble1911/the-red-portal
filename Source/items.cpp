@@ -2967,6 +2967,16 @@ void InitializeItem(Item &item, _item_indexes itemData)
 		item.dwBuff |= CF_HELLFIRE;
 }
 
+void CreateDungeonScroll(Item &item, int level)
+{
+	// [RUNS MOD] Build a dungeon scroll that opens a run at `level`. The level is
+	// stored in the item's create-info (lower 6 bits, CF_LEVEL), which is already
+	// saved and network-synced, so no new item fields are needed.
+	InitializeItem(item, IDI_DUNGEONSCROLL);
+	item._iCreateInfo = static_cast<uint16_t>(level & CF_LEVEL);
+	item._iIdentified = true;
+}
+
 void GenerateNewSeed(Item &item)
 {
 	item._iSeed = AdvanceRndSeed();

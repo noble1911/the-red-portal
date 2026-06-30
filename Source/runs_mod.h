@@ -48,6 +48,10 @@ extern bool RunBossDefeated;
 // run's boss was defeated.
 void AdvanceRunDepth();
 
+// Open a dungeon run at a specific level (used by a dungeon scroll from the hub):
+// sets the run depth and starts the descent. Defined in diablo.cpp.
+void StartDungeonScrollRun(int level);
+
 // Begin a fresh run from the hub. In multiplayer, if another player is already in
 // the run it joins their layout instead of reseeding; otherwise it generates a new
 // seed for the current RunDepth, applies it, and broadcasts CMD_RUNSEED (seed +

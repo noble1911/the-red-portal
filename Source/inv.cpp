@@ -40,6 +40,7 @@
 #include "plrmsg.h"
 #include "qol/stash.h"
 #include "qol/visual_store.h"
+#include "runs_mod.h"
 #include "stores.h"
 #include "towners.h"
 #include "utils/display.h"
@@ -2174,6 +2175,22 @@ bool UseInvItem(int cii)
 
 	if (!player.CanUseItem(*item)) {
 		player.Say(HeroSpeech::ICantUseThisYet);
+		return true;
+	}
+
+	if (item->_iMiscId == IMISC_DUNGEONSCROLL) {
+		// [RUNS MOD] Using a dungeon scroll from the hub opens a run at the level
+		// stored on it and consumes the scroll.
+		if (!player.isOnLevel(0)) {
+			player.Say(HeroSpeech::ThatWontWorkHere);
+			return true;
+		}
+		const int level = item->_iCreateInfo & CF_LEVEL;
+		if (speedlist)
+			player.RemoveSpdBarItem(c);
+		else
+			player.RemoveInvItem(c);
+		StartDungeonScrollRun(level);
 		return true;
 	}
 

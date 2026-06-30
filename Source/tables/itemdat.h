@@ -81,6 +81,7 @@ enum _item_indexes : int16_t { // TODO defines all indexes in AllItemsList
 	IDI_RUNEOFSTONE = 165,
 	IDI_SORCERER_DIABLO,
 	IDI_ARENAPOT,
+	IDI_DUNGEONSCROLL, // [RUNS MOD] must be the LAST row of itemdat.tsv
 
 	IDI_NUM_DEFAULT_ITEMS,
 	IDI_NONE = -1,
@@ -487,6 +488,7 @@ enum item_misc_id : int8_t {
 	IMISC_AURIC,
 	IMISC_NOTE,
 	IMISC_ARENAPOT,
+	IMISC_DUNGEONSCROLL, // [RUNS MOD] opens a dungeon run at the level stored on the item
 	IMISC_INVALID = -1,
 };
 

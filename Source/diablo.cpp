@@ -3135,6 +3135,19 @@ void StartNewRun()
 	}
 }
 
+void StartDungeonScrollRun(int level)
+{
+	// [RUNS MOD] A dungeon scroll opens a run at its stored level. Reuse the run
+	// machinery: set the depth, then descend from the hub (StartNewLvl triggers
+	// StartNewRun, which reseeds and, in co-op, broadcasts the seed + depth).
+	if (level < 1)
+		level = 1;
+	if (level > MaxRunDepth)
+		level = MaxRunDepth;
+	RunDepth = level;
+	StartNewLvl(*MyPlayer, WM_DIABNEXTLVL, RunDepth);
+}
+
 void LoadGameLevelFirstFlagEntry()
 {
 	CloseInventory();
