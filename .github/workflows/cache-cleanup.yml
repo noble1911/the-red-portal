@@ -1,9 +1,10 @@
 name: Delete cache for a closed Pull Request
-on:
-  pull_request:
-    types:
-      - closed
-
+on:  # yamllint disable-line rule:truthy
+  # [RUNS MOD] Fork CI is restricted to releases + manual runs only; we build
+  # locally, so we do not run the full matrix on every push.
+  release:
+    types: [published]
+  workflow_dispatch:
 jobs:
   cleanup:
     runs-on: ubuntu-latest

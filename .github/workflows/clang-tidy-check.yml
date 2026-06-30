@@ -1,14 +1,11 @@
 name: clang-tidy check
 
-on:
-  push:
-    branches:
-      - master
-    paths: ['**.c', '**.cpp', '**.h', '**.hpp', '**.cxx', '**.hxx', '**.cc', '**.hh', '**CMakeLists.txt', 'meson.build', '**.cmake', '.github/workflows/clang-tidy-check.yml']
-  pull_request:
-    types: [ opened, synchronize ]
-    paths: ['**.c', '**.cpp', '**.h', '**.hpp', '**.cxx', '**.hxx', '**.cc', '**.hh', '**CMakeLists.txt', 'meson.build', '**.cmake', '.github/workflows/clang-tidy-check.yml']
-
+on:  # yamllint disable-line rule:truthy
+  # [RUNS MOD] Fork CI is restricted to releases + manual runs only; we build
+  # locally, so we do not run the full matrix on every push.
+  release:
+    types: [published]
+  workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

@@ -1,24 +1,11 @@
 name: macOS arm64
 
-on:
-  push:
-    branches:
-      - master
-    paths-ignore:
-      - '*.md'
-      - 'docs/**'
-  pull_request:
-    types: [opened, synchronize]
-    paths-ignore:
-      - '*.md'
-      - 'docs/**'
+on:  # yamllint disable-line rule:truthy
+  # [RUNS MOD] Fork CI is restricted to releases + manual runs only; we build
+  # locally, so we do not run the full matrix on every push.
   release:
     types: [published]
-    paths-ignore:
-      - '*.md'
-      - 'docs/**'
   workflow_dispatch:
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
