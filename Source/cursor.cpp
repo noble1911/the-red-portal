@@ -38,7 +38,9 @@
 #include "levels/trigs.h"
 #include "missiles.h"
 #include "options.h"
+#include "portal.h"
 #include "qol/itemlabels.h"
+#include "runs_mod.h"
 #include "qol/stash.h"
 #include "qol/visual_store.h"
 #include "towners.h"
@@ -627,7 +629,13 @@ void CheckTown()
 		if (missile._mitype == MissileID::TownPortal) {
 			if (EntranceBoundaryContains(missile.position.tile, cursPosition)) {
 				trigflag = true;
-				InfoString = _("Town Portal");
+				const Portal &portal = Portals[missile._misource];
+				if (RunsModEnabled && portal.fromScroll) {
+					// [RUNS MOD] Dungeon-scroll portals show their destination level.
+					InfoString = fmt::format(fmt::runtime(_("Dungeon Portal (Level {:d})")), portal.level);
+				} else {
+					InfoString = _("Town Portal");
+				}
 				AddInfoBoxString(fmt::format(fmt::runtime(_("from {:s}")), Players[missile._misource]._pName));
 				cursPosition = missile.position.tile;
 			}

@@ -3135,17 +3135,40 @@ void StartNewRun()
 	}
 }
 
-void StartDungeonScrollRun(int level)
+bool SuppressRunReseed = false;
+
+void PrimeScrollRun(int level)
 {
-	// [RUNS MOD] A dungeon scroll opens a run at its stored level. Reuse the run
-	// machinery: set the depth, then descend from the hub (StartNewLvl triggers
-	// StartNewRun, which reseeds and, in co-op, broadcasts the seed + depth).
+	// [RUNS MOD] Prepare a fresh run for a dungeon-scroll portal: give the level a
+	// new seed (new layout) and clear its cached state, without teleporting. The
+	// player enters by stepping into the portal; the dungeon then persists (resume)
+	// until the portal is replaced or closed.
+	if (level < 1)
+		level = 1;
+	if (level > MaxRunDepth)
+		level = MaxRunDepth;
+	RunBossDefeated = false;
+	const uint32_t seed = GenerateSeed();
+	ApplyRunSeed(level, seed); // sets DungeonSeeds/LevelSeeds/_pLvlVisited + RunDepth
+	if (gbIsMultiplayer) {
+		NetSendCmdParam4(true, CMD_RUNSEED,
+		    static_cast<uint16_t>(seed >> 16), static_cast<uint16_t>(seed & 0xFFFF),
+		    static_cast<uint16_t>(level), 0);
+	}
+}
+
+void EnterScrollRun(int level)
+{
+	// [RUNS MOD] Step into the scroll portal: enter the run level WITHOUT reseeding,
+	// so re-entering resumes the same dungeon while the portal stays open.
 	if (level < 1)
 		level = 1;
 	if (level > MaxRunDepth)
 		level = MaxRunDepth;
 	RunDepth = level;
-	StartNewLvl(*MyPlayer, WM_DIABNEXTLVL, RunDepth);
+	SuppressRunReseed = true;
+	StartNewLvl(*MyPlayer, WM_DIABNEXTLVL, level);
+	SuppressRunReseed = false;
 }
 
 void LoadGameLevelFirstFlagEntry()

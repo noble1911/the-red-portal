@@ -25,6 +25,11 @@ constexpr int HubMaxY = 47;
 constexpr int HubSpawnX = 25;
 constexpr int HubSpawnY = 32;
 
+// Where town portals land in the hub (near the vendors) in run mode -- the vanilla
+// Tristram portal spot is outside the cropped plaza. Players are offset along x.
+constexpr int HubPortalX = 30;
+constexpr int HubPortalY = 31;
+
 constexpr bool IsInsideHub(int x, int y)
 {
 	return x >= HubMinX && x <= HubMaxX && y >= HubMinY && y <= HubMaxY;
@@ -48,9 +53,18 @@ extern bool RunBossDefeated;
 // run's boss was defeated.
 void AdvanceRunDepth();
 
-// Open a dungeon run at a specific level (used by a dungeon scroll from the hub):
-// sets the run depth and starts the descent. Defined in diablo.cpp.
-void StartDungeonScrollRun(int level);
+// Prepare a fresh run at `level` for a dungeon-scroll portal: reseed that level
+// (new layout) and prime it, WITHOUT teleporting. Called when the scroll is used.
+// Defined in diablo.cpp.
+void PrimeScrollRun(int level);
+
+// Enter the already-primed scroll-portal run at `level` WITHOUT reseeding, so the
+// dungeon persists (resume) while the portal stays open. Defined in diablo.cpp.
+void EnterScrollRun(int level);
+
+// While true, entering a run level does not reseed it (used for scroll-portal
+// re-entry so the dungeon resumes). Defined in diablo.cpp.
+extern bool SuppressRunReseed;
 
 // Begin a fresh run from the hub. In multiplayer, if another player is already in
 // the run it joins their layout instead of reseeding; otherwise it generates a new

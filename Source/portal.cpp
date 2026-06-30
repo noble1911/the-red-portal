@@ -9,6 +9,7 @@
 #include "missiles.h"
 #include "multi.h"
 #include "player.h"
+#include "runs_mod.h"
 #include "tables/misdat.h"
 
 namespace devilution {
@@ -28,6 +29,15 @@ Point PortalTownPosition[MAXPORTAL] = {
 	{ 61, 40 },
 	{ 63, 40 },
 };
+
+/** [RUNS MOD] Town portals land in the compact hub near the vendors (the vanilla
+ * spot is in the cropped-out void). */
+Point GetPortalTownPos(size_t index)
+{
+	if (RunsModEnabled)
+		return Point { HubPortalX + static_cast<int>(index) * 2, HubPortalY };
+	return PortalTownPosition[index];
+}
 
 } // namespace
 
@@ -67,7 +77,7 @@ void SyncPortals()
 			continue;
 		const Player &player = Players[i];
 		if (leveltype == DTYPE_TOWN)
-			AddPortalMissile(player, PortalTownPosition[i], true);
+			AddPortalMissile(player, GetPortalTownPos(i), true);
 		else {
 			int lvl = currlevel;
 			if (setlevel)
@@ -80,13 +90,14 @@ void SyncPortals()
 
 void AddPortalInTown(const Player &player)
 {
-	AddPortalMissile(player, PortalTownPosition[player.getId()], false);
+	AddPortalMissile(player, GetPortalTownPos(player.getId()), false);
 }
 
 void ActivatePortal(const Player &player, Point position, int lvl, dungeon_type dungeonType, bool isSetLevel)
 {
 	Portal &portal = Portals[player.getId()];
 	portal.open = true;
+	portal.fromScroll = false;
 
 	if (lvl != 0) {
 		portal.position = position;
@@ -94,6 +105,24 @@ void ActivatePortal(const Player &player, Point position, int lvl, dungeon_type 
 		portal.ltype = dungeonType;
 		portal.setlvl = isSetLevel;
 	}
+}
+
+void OpenScrollPortal(const Player &player, int level)
+{
+	// [RUNS MOD] A dungeon scroll opens a portal in the hub leading to a run at
+	// `level`. We reuse the town-portal machinery (visual, persistence across
+	// level loads, co-op sync); stepping into it is intercepted in StartWarpLvl to
+	// start a fresh run rather than a position-based warp, so we don't need a real
+	// dungeon-side position.
+	Portal &portal = Portals[player.getId()];
+	portal.open = true;
+	portal.position = { 0, 0 };
+	portal.level = level;
+	portal.ltype = GetLevelType(level);
+	portal.setlvl = false;
+	portal.fromScroll = true;
+	if (leveltype == DTYPE_TOWN)
+		AddPortalInTown(player);
 }
 
 void DeactivatePortal(const Player &player)
@@ -163,7 +192,7 @@ void GetPortalLevel()
 void GetPortalLvlPos()
 {
 	if (leveltype == DTYPE_TOWN) {
-		ViewPosition = PortalTownPosition[portalindex] + Displacement { 1, 1 };
+		ViewPosition = GetPortalTownPos(portalindex) + Displacement { 1, 1 };
 	} else {
 		ViewPosition = Portals[portalindex].position;
 

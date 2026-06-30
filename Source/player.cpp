@@ -2902,7 +2902,7 @@ StartNewLvl(Player &player, interface_mode fom, int lvl)
 	// [RUNS MOD] Taking the hub portal (WM_DIABNEXTLVL from town) starts a fresh
 	// run at the current depth: reseed so the layout is new. In co-op StartNewRun
 	// broadcasts seed + depth (or joins an in-progress run) so clients match.
-	if (&player == MyPlayer && RunsModEnabled
+	if (&player == MyPlayer && RunsModEnabled && !SuppressRunReseed
 	    && fom == WM_DIABNEXTLVL && currlevel == 0) {
 		StartNewRun();
 	}
@@ -2966,6 +2966,16 @@ void RestartTownLvl(Player &player)
 
 void StartWarpLvl(Player &player, size_t pidx)
 {
+	if (RunsModEnabled && Portals[pidx].fromScroll) {
+		// [RUNS MOD] Step into a dungeon-scroll portal: enter its run level. The
+		// portal stays OPEN (so you can return to shop and co-op partners can
+		// follow), and re-entry resumes the same dungeon (no reseed) until the
+		// portal is replaced or closed.
+		if (&player == MyPlayer)
+			EnterScrollRun(Portals[pidx].level);
+		return;
+	}
+
 	InitLevelChange(player);
 
 	if (gbIsMultiplayer) {

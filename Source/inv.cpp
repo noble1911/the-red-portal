@@ -38,6 +38,7 @@
 #include "panels/ui_panels.hpp"
 #include "player.h"
 #include "plrmsg.h"
+#include "portal.h"
 #include "qol/stash.h"
 #include "qol/visual_store.h"
 #include "runs_mod.h"
@@ -2179,8 +2180,8 @@ bool UseInvItem(int cii)
 	}
 
 	if (item->_iMiscId == IMISC_DUNGEONSCROLL) {
-		// [RUNS MOD] Using a dungeon scroll from the hub opens a run at the level
-		// stored on it and consumes the scroll.
+		// [RUNS MOD] Using a dungeon scroll in the hub opens a portal to a run at
+		// the level stored on it (everyone can step through), and consumes it.
 		if (!player.isOnLevel(0)) {
 			player.Say(HeroSpeech::ThatWontWorkHere);
 			return true;
@@ -2190,7 +2191,10 @@ bool UseInvItem(int cii)
 			player.RemoveSpdBarItem(c);
 		else
 			player.RemoveInvItem(c);
-		StartDungeonScrollRun(level);
+		// Reseed the run once (new layout), then open the portal. Re-entry resumes
+		// the same dungeon until the portal is replaced/closed.
+		PrimeScrollRun(level);
+		OpenScrollPortal(player, level);
 		return true;
 	}
 

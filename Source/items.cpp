@@ -2222,6 +2222,10 @@ StringOrView GetTranslatedItemName(const Item &item)
 	if (item._iMiscId == IMISC_EAR) {
 		return fmt::format(fmt::runtime(_(/* TRANSLATORS: {:s} will be a Character Name */ "Ear of {:s}")), item._iIName);
 	}
+	if (item._iMiscId == IMISC_DUNGEONSCROLL) {
+		// [RUNS MOD] Show the dungeon level (stored in CF_LEVEL) on the scroll.
+		return fmt::format(fmt::runtime(_(/* TRANSLATORS: {:d} is a dungeon level */ "Dungeon Scroll (Level {:d})")), item._iCreateInfo & CF_LEVEL);
+	}
 	if (item._iMiscId > IMISC_OILFIRST && item._iMiscId < IMISC_OILLAST) {
 		for (size_t i = 0; i < 10; i++) {
 			if (OilMagic[i] != item._iMiscId)
@@ -2971,7 +2975,8 @@ void CreateDungeonScroll(Item &item, int level)
 {
 	// [RUNS MOD] Build a dungeon scroll that opens a run at `level`. The level is
 	// stored in the item's create-info (lower 6 bits, CF_LEVEL), which is already
-	// saved and network-synced, so no new item fields are needed.
+	// saved and network-synced, so no new item fields are needed. The displayed
+	// name (with the level) is generated in GetTranslatedItemName.
 	InitializeItem(item, IDI_DUNGEONSCROLL);
 	item._iCreateInfo = static_cast<uint16_t>(level & CF_LEVEL);
 	item._iIdentified = true;
@@ -3537,6 +3542,17 @@ void RecreateItem(const Player &player, Item &item, _item_indexes idx, uint16_t 
 		item._iCreateInfo = icreateinfo;
 		item._ivalue = ivalue;
 		SetPlrHandGoldCurs(item);
+		gbIsHellfire = tmpIsHellfire;
+		return;
+	}
+
+	if (idx == IDI_DUNGEONSCROLL) {
+		// [RUNS MOD] Rebuild a dungeon scroll: the level lives in CF_LEVEL and the
+		// name is derived from it, so it survives save/load and network sync.
+		InitializeItem(item, IDI_DUNGEONSCROLL);
+		item._iSeed = iseed;
+		item._iCreateInfo = icreateinfo;
+		item._iIdentified = true;
 		gbIsHellfire = tmpIsHellfire;
 		return;
 	}

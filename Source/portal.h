@@ -21,6 +21,8 @@ struct Portal {
 	int level;
 	dungeon_type ltype;
 	bool setlvl;
+	/** [RUNS MOD] True if this portal was opened by a dungeon scroll (hub -> run). */
+	bool fromScroll;
 };
 
 extern Portal Portals[MAXPORTAL];
@@ -31,6 +33,8 @@ void AddPortalMissile(const Player &player, Point position, bool sync);
 void SyncPortals();
 void AddPortalInTown(const Player &player);
 void ActivatePortal(const Player &player, Point position, int lvl, dungeon_type lvltype, bool sp);
+/** @brief [RUNS MOD] Opens a dungeon-scroll portal in the hub leading to a run at `level`. */
+void OpenScrollPortal(const Player &player, int level);
 void DeactivatePortal(const Player &player);
 bool PortalOnLevel(const Player &player);
 void RemovePortalMissile(const Player &player);
