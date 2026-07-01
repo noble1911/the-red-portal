@@ -2981,6 +2981,38 @@ void CreateDungeonScroll(Item &item, int level)
 	InitializeItem(item, IDI_DUNGEONSCROLL);
 	item._iCreateInfo = static_cast<uint16_t>(level & CF_LEVEL);
 	item._iIdentified = true;
+	// [RUNS MOD] Price scales with the dungeon level; basic scrolls are cheap so a
+	// fresh character can afford one.
+	item._ivalue = item._iIvalue = level * 50;
+}
+
+bool PlayerHasDungeonScroll(const Player &player)
+{
+	// [RUNS MOD] True if the player is already carrying a dungeon scroll (inventory
+	// or belt) so the hub safety net does not hand out duplicates.
+	for (int i = 0; i < player._pNumInv; i++) {
+		if (player.InvList[i]._iMiscId == IMISC_DUNGEONSCROLL)
+			return true;
+	}
+	for (const Item &beltItem : player.SpdList) {
+		if (!beltItem.isEmpty() && beltItem._iMiscId == IMISC_DUNGEONSCROLL)
+			return true;
+	}
+	return false;
+}
+
+void EnsureStarterDungeonScroll(Player &player)
+{
+	// [RUNS MOD] The scroll is the sole dungeon entry, so guarantee the player always
+	// has at least a basic (level 1) one on hand in the hub. This runs on every town
+	// load but only grants a scroll when the player has none, so it is a soft-lock
+	// safety net rather than a stream of free scrolls.
+	if (PlayerHasDungeonScroll(player))
+		return;
+	Item scroll;
+	CreateDungeonScroll(scroll, 1);
+	scroll.updateRequiredStatsCacheForPlayer(player);
+	AutoPlaceItemInInventory(player, scroll, false);
 }
 
 void GenerateNewSeed(Item &item)

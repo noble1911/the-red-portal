@@ -504,6 +504,12 @@ void InitializeItem(Item &item, _item_indexes itemData);
 /** @brief [RUNS MOD] Builds a dungeon scroll that opens a run at the given level. */
 void CreateDungeonScroll(Item &item, int level);
 
+/** @brief [RUNS MOD] True if the player already carries a dungeon scroll. */
+bool PlayerHasDungeonScroll(const Player &player);
+
+/** @brief [RUNS MOD] Grants a basic dungeon scroll if the player has none (hub safety net). */
+void EnsureStarterDungeonScroll(Player &player);
+
 void GenerateNewSeed(Item &item);
 int GetGoldCursor(int value);
 

@@ -96,6 +96,7 @@
 #include "qol/stash.h"
 #include "qol/visual_store.h"
 #include "qol/xpbar.h"
+#include "items.h"
 #include "msg.h"
 #include "quick_messages.hpp"
 #include "restrict.h"
@@ -3210,6 +3211,10 @@ void LoadGameLevelStores()
 {
 	if (leveltype == DTYPE_TOWN) {
 		SetupTownStores();
+		// [RUNS MOD] Scrolls are the sole dungeon entry, so make sure the player
+		// always leaves the hub with at least a basic one (soft-lock safety net).
+		if (RunsModEnabled)
+			EnsureStarterDungeonScroll(*MyPlayer);
 	} else {
 		FreeStoreMem();
 	}
