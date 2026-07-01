@@ -1824,7 +1824,7 @@ void PrintItemMisc(const Item &item)
 		// tooltip, which auto-sizes to fit. Dungeon scrolls force that box to appear
 		// even when the option is off (see DrawFloatingInfoBox), so the fixed info bar
 		// keeps just the scroll name and hovering reveals the full modifier list.
-		const ScrollModSet mods = RollScrollMods(item._iSeed, item._iCreateInfo & CF_LEVEL);
+		const ScrollModSet mods = RollScrollMods(item._iSeed, DungeonScrollLevel(item), DungeonScrollModCount(item));
 		for (int i = 0; i < mods.count; i++)
 			AddInfoBoxString(DescribeScrollMod(mods.mods[i], /*full=*/true), /*floatingBox=*/true);
 		return;
@@ -2991,7 +2991,9 @@ void CreateDungeonScroll(Item &item, int level)
 	// name (with the level) is generated in GetTranslatedItemName.
 	InitializeItem(item, IDI_DUNGEONSCROLL);
 	GenerateNewSeed(item); // gives the scroll a seed to derive its modifiers from
-	item._iCreateInfo = static_cast<uint16_t>(level & CF_LEVEL);
+	// [RUNS MOD] Store the level (bits 0-5) and modifier count (bits 6-7). The count is
+	// stored explicitly so crafting can add a modifier without rerolling the others.
+	item._iCreateInfo = MakeDungeonScrollCreateInfo(level, RollScrollModCount(item._iSeed, level));
 	item._iIdentified = true;
 	// [RUNS MOD] Price scales with the dungeon level; basic scrolls are cheap so a
 	// fresh character can afford one.
@@ -3555,6 +3557,13 @@ void SpawnItem(Monster &monster, Point position, bool sendmsg, bool spawn /*= fa
 	const int uper = monster.isUnique() ? 15 : 1;
 
 	int8_t mLevel = monster.data().level;
+	// [RUNS MOD] The run boss's base level is fixed and low (the Butcher), so on a deep
+	// run it would drop worse loot than the trash mobs. Scale its loot level with the
+	// run depth (mirrors the curlv*2 item level uniques normally get). Baked into the
+	// item's create-info via the level, so save/load + network recreation stay exact.
+	if (RunsModEnabled && leveltype != DTYPE_TOWN && monster.isUnique()
+	    && monster.uniqueType == RunBossType)
+		mLevel = static_cast<int8_t>(std::clamp(currlevel * 2, static_cast<int>(mLevel), 63));
 	// [RUNS MOD] Scroll "magic find" raises the effective item level so drops roll
 	// higher-quality affixes. This is baked into the item's create-info (via the
 	// level, capped to CF_LEVEL=63) so save/load + network recreation stay exact.

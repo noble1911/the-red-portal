@@ -7,6 +7,7 @@
 
 #include "lighting.h"
 #include "missiles.h"
+#include "msg.h"
 #include "multi.h"
 #include "player.h"
 #include "runs_mod.h"
@@ -112,6 +113,7 @@ bool DungeonPortalOpen = false;
 int DungeonPortalLevel = 1;
 Point DungeonPortalPos = { 0, 0 };
 uint32_t DungeonPortalSeed = 0;
+int DungeonPortalModCount = 1;
 
 void CloseDungeonPortal()
 {
@@ -126,21 +128,33 @@ void CloseDungeonPortal()
 	});
 }
 
-void OpenDungeonPortal(int level, uint32_t scrollSeed)
+void SetDungeonPortalRemote(int level, uint32_t scrollSeed, int modCount)
 {
-	// Open the hub dungeon portal to a run at `level`, reseeding the run once (new
-	// layout). The dungeon then persists/resumes until the portal is replaced or
-	// closed. Uses a RedPortal missile for the visual and a CheckTriggers tile
-	// trigger for entry, so it never touches the per-player town-portal slot.
-	// `scrollSeed` is remembered so the run derives this scroll's exact modifiers.
+	// Set/replace the hub dungeon portal's state locally, including the RedPortal visual.
+	// Used both by the initiator and by co-op peers receiving CMD_OPENDUNGEONPORTAL; it
+	// does NOT reseed the layout (that rides on CMD_RUNSEED) or rebroadcast.
 	CloseDungeonPortal();
 	DungeonPortalOpen = true;
 	DungeonPortalLevel = level;
 	DungeonPortalSeed = scrollSeed;
+	DungeonPortalModCount = modCount;
 	DungeonPortalPos = { HubDungeonPortalX, HubDungeonPortalY };
-	PrimeScrollRun(level);
 	if (leveltype == DTYPE_TOWN)
 		AddMissile(DungeonPortalPos, DungeonPortalPos, Direction::South, MissileID::RedPortal, TARGET_MONSTERS, *MyPlayer, 0, 0);
+}
+
+void OpenDungeonPortal(int level, uint32_t scrollSeed, int modCount)
+{
+	// Open the hub dungeon portal to a run at `level`, reseeding the run once (new
+	// layout). The dungeon then persists/resumes until the portal is replaced or
+	// closed. `scrollSeed`/`modCount` are remembered so the run derives this scroll's
+	// exact modifiers, and are broadcast so co-op peers build the same modified run.
+	SetDungeonPortalRemote(level, scrollSeed, modCount);
+	PrimeScrollRun(level);
+	if (gbIsMultiplayer)
+		NetSendCmdParam4(true, CMD_OPENDUNGEONPORTAL, static_cast<uint16_t>(level),
+		    static_cast<uint16_t>(scrollSeed >> 16), static_cast<uint16_t>(scrollSeed & 0xFFFF),
+		    static_cast<uint16_t>(modCount));
 }
 
 void SyncDungeonPortal()

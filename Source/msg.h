@@ -422,6 +422,16 @@ enum _cmd_id : uint8_t {
 	// body (TCmdParam4): wParam1 = seed high 16 bits, wParam2 = seed low 16 bits,
 	//                    wParam3 = run depth (dungeon level), wParam4 = unused
 	CMD_RUNSEED,
+	// [RUNS MOD] Broadcast the hub dungeon-scroll portal's state so co-op clients apply
+	// the same run modifiers (the layout seed rides on CMD_RUNSEED separately).
+	//
+	// body (TCmdParam4): wParam1 = dungeon level, wParam2 = scroll seed high 16 bits,
+	//                    wParam3 = scroll seed low 16 bits, wParam4 = modifier count
+	CMD_OPENDUNGEONPORTAL,
+	// [RUNS MOD] Broadcast that the hub dungeon-scroll portal was closed.
+	//
+	// body (TCmd)
+	CMD_CLOSEDUNGEONPORTAL,
 	// Fake command; set current player for succeeding mega pkt buffer messages.
 	//
 	// body (TFakeCmdPlr)

@@ -2191,16 +2191,17 @@ bool UseInvItem(int cii)
 			player.Say(HeroSpeech::ThatWontWorkHere);
 			return true;
 		}
-		const int level = item->_iCreateInfo & CF_LEVEL;
+		const int level = DungeonScrollLevel(*item);
 		const uint32_t scrollSeed = item->_iSeed;
+		const int modCount = DungeonScrollModCount(*item);
 		if (speedlist)
 			player.RemoveSpdBarItem(c);
 		else
 			player.RemoveInvItem(c);
 		// Open the hub dungeon portal to this level (reseeds the run once); walk
-		// into it to enter. Independent of town portals. The scroll's seed is passed
-		// so the run applies this scroll's modifiers.
-		OpenDungeonPortal(level, scrollSeed);
+		// into it to enter. Independent of town portals. The scroll's seed + modifier
+		// count are passed so the run applies this scroll's exact modifiers.
+		OpenDungeonPortal(level, scrollSeed, modCount);
 		return true;
 	}
 

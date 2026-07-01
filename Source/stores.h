@@ -69,9 +69,11 @@ enum class TalkID : uint8_t {
 	Tavern,
 	Drunk,
 	Barmaid,
-	// [RUNS MOD] Dedicated dungeon-scroll merchant (buy-only; later also crafting).
+	// [RUNS MOD] Dedicated dungeon-scroll merchant (buy + crafting).
 	DungeonVendor,
 	DungeonVendorBuy,
+	DungeonVendorCraftTarget,   // pick the scroll to craft on
+	DungeonVendorCraftMaterial, // pick the scroll to consume as material
 };
 
 /** Currently active store */

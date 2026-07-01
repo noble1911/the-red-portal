@@ -13,6 +13,7 @@
 
 #include "levels/gendung.h"
 #include "monster.h"
+#include "multi.h"
 #include "portal.h"
 #include "runs_mod.h"
 #include "utils/language.h"
@@ -22,6 +23,17 @@ namespace devilution {
 RunModMultipliers ActiveRunMods;
 
 namespace {
+
+/** [RUNS MOD] Extra boss HP / damage per run level (percent), on top of modifiers. */
+constexpr int BossHpPctPerLevel = 25;
+constexpr int BossDmgPctPerLevel = 12;
+
+/** [RUNS MOD] Reference boss stats (the Butcher's) that every run boss is NORMALIZED to
+ * at level 1, then scaled up by level -- so whichever boss is chosen is level-appropriate
+ * (a Warlord on level 1 is scaled down, a Butcher on level 15 is scaled up). */
+constexpr int ReferenceBossHp = 220;
+constexpr int ReferenceBossMinDmg = 6;
+constexpr int ReferenceBossMaxDmg = 12;
 
 /** A private, self-contained LCG so rolling never disturbs the game RNG. */
 struct ModRng {
@@ -138,20 +150,27 @@ std::string DescribeEffect(Effect effect, int pct, bool full)
 
 } // namespace
 
-ScrollModSet RollScrollMods(uint32_t seed, int level)
+int RollScrollModCount(uint32_t seed, int level)
+{
+	if (level < 1)
+		level = 1;
+	// Use a distinct RNG stream from the affix roll so the two don't interfere.
+	ModRng rng(seed ^ 0x9E3779B9u ^ (static_cast<uint32_t>(level) << 8));
+	// Modifier count: 1 (most common) .. 3 (rare), nudged up a little by level.
+	const int roll = rng.range(0, 99) + level;
+	const int count = roll < 50 ? 1 : (roll < 82 ? 2 : 3);
+	return count > MaxScrollMods ? MaxScrollMods : count;
+}
+
+ScrollModSet RollScrollMods(uint32_t seed, int level, int count)
 {
 	ScrollModSet set;
 	set.count = 0;
 	if (level < 1)
 		level = 1;
+	count = std::clamp(count, 1, MaxScrollMods);
 
 	ModRng rng(seed ^ (static_cast<uint32_t>(level) << 24));
-
-	// Modifier count: 1 (most common) .. 3 (rare), nudged up a little by level.
-	const int roll = rng.range(0, 99) + level;
-	int count = roll < 50 ? 1 : (roll < 82 ? 2 : 3);
-	if (count > MaxScrollMods)
-		count = MaxScrollMods;
 
 	// Pick `count` distinct affixes (partial Fisher-Yates over the affix indices).
 	std::array<int, Affixes.size()> pool;
@@ -202,27 +221,47 @@ void RefreshActiveRunMods()
 	// Modifiers apply only while on the open portal's dungeon level.
 	if (leveltype == DTYPE_TOWN || currlevel != DungeonPortalLevel)
 		return;
-	ActiveRunMods = AggregateRunMods(RollScrollMods(DungeonPortalSeed, DungeonPortalLevel));
+	ActiveRunMods = AggregateRunMods(RollScrollMods(DungeonPortalSeed, DungeonPortalLevel, DungeonPortalModCount));
 }
 
 void ScaleRunMonsters()
 {
-	if (ActiveRunMods.monsterHpPct == 0 && ActiveRunMods.bossHpPct == 0 && ActiveRunMods.monsterDmgPct == 0)
-		return;
+	const int runLevel = std::max(static_cast<int>(currlevel), 1);
+
 	for (size_t i = 0; i < ActiveMonsterCount; i++) {
 		Monster &monster = Monsters[ActiveMonsters[i]];
 		if (monster.isPlayerMinion())
 			continue;
-		int hpPct = ActiveRunMods.monsterHpPct;
-		if (monster.isUnique())
-			hpPct += ActiveRunMods.bossHpPct;
-		if (hpPct != 0) {
-			monster.maxHitPoints = ApplyPct(monster.maxHitPoints, hpPct);
+
+		// [RUNS MOD] The run boss is NORMALIZED to a level-appropriate target: its own
+		// base stats are replaced, so any chosen boss (weak or strong) is scaled to the
+		// current depth. Scroll boss/monster modifiers stack on top; the SP HP-halving
+		// matches the engine's own unique-monster init.
+		if (monster.isUnique() && monster.uniqueType == RunBossType) {
+			int hp = ReferenceBossHp * (100 + (runLevel - 1) * BossHpPctPerLevel) / 100;
+			hp = ApplyPct(hp, ActiveRunMods.bossHpPct + ActiveRunMods.monsterHpPct);
+			if (!gbIsMultiplayer)
+				hp = std::max(hp / 2, 64);
+			monster.maxHitPoints = hp << 6;
+			monster.hitPoints = monster.maxHitPoints;
+
+			const auto bossDmg = [runLevel](int base) {
+				const int d = base * (100 + (runLevel - 1) * BossDmgPctPerLevel) / 100;
+				return static_cast<uint8_t>(std::clamp(ApplyPct(d, ActiveRunMods.monsterDmgPct), 0, 255));
+			};
+			monster.minDamage = monster.minDamageSpecial = bossDmg(ReferenceBossMinDmg);
+			monster.maxDamage = monster.maxDamageSpecial = bossDmg(ReferenceBossMaxDmg);
+			continue;
+		}
+
+		// Regular monsters and any non-boss uniques: apply the scroll's flat modifiers.
+		if (ActiveRunMods.monsterHpPct != 0) {
+			monster.maxHitPoints = ApplyPct(monster.maxHitPoints, ActiveRunMods.monsterHpPct);
 			monster.hitPoints = monster.maxHitPoints;
 		}
 		if (ActiveRunMods.monsterDmgPct != 0) {
-			const auto scaleDmg = [pct = ActiveRunMods.monsterDmgPct](uint8_t dmg) {
-				return static_cast<uint8_t>(std::min(ApplyPct(dmg, pct), 255));
+			const auto scaleDmg = [](uint8_t dmg) {
+				return static_cast<uint8_t>(std::min(ApplyPct(dmg, ActiveRunMods.monsterDmgPct), 255));
 			};
 			monster.minDamage = scaleDmg(monster.minDamage);
 			monster.maxDamage = scaleDmg(monster.maxDamage);

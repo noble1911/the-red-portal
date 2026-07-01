@@ -2137,6 +2137,8 @@ void InitKeymapActions()
 			    }
 		    }
 		    CloseDungeonPortal();
+		    if (gbIsMultiplayer)
+			    NetSendCmd(true, CMD_CLOSEDUNGEONPORTAL);
 		    EventPlrMsg(_("Dungeon portal closed."), UiFlags::ColorWhite);
 	    },
 	    nullptr,

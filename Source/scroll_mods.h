@@ -45,10 +45,16 @@ struct ScrollModSet {
  * @param seed the scroll's item seed (_iSeed)
  * @param level the scroll's dungeon level (drives magnitudes)
  *
+ * @param count how many modifiers to roll (1..MaxScrollMods); picks are positional,
+ *   so a higher count keeps the lower-count affixes and adds more (used by crafting).
+ *
  * Uses a private RNG so it never disturbs the game's RNG state (safe to call from
  * tooltip drawing).
  */
-ScrollModSet RollScrollMods(uint32_t seed, int level);
+ScrollModSet RollScrollMods(uint32_t seed, int level, int count);
+
+/** @brief [RUNS MOD] Rolls how many modifiers a fresh scroll of `level` has (1..3). */
+int RollScrollModCount(uint32_t seed, int level);
 
 /**
  * @brief A one-line "Name: boon, bane" description for tooltips.

@@ -362,7 +362,7 @@ void PrintStoreItem(const Item &item, int l, UiFlags flags, bool cursIndent = fa
 		// [RUNS MOD] Show the scroll's modifiers one per line (compact). Kept narrow so
 		// a line never wraps into the next (two-per-line wrapped and overlapped on the
 		// rare 3-modifier scrolls). A scroll fills at most its four-line row.
-		const ScrollModSet mods = RollScrollMods(item._iSeed, item._iCreateInfo & CF_LEVEL);
+		const ScrollModSet mods = RollScrollMods(item._iSeed, DungeonScrollLevel(item), DungeonScrollModCount(item));
 		for (int i = 0; i < mods.count; i++)
 			AddSText(40, l++, DescribeScrollMod(mods.mods[i], /*full=*/false), flags, false, -1, cursIndent);
 		return;
@@ -939,7 +939,14 @@ void StoreNoRoom()
 	AddSText(0, 14, _("You do not have enough room in inventory"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 }
 
-// [RUNS MOD] --- Dedicated dungeon-scroll merchant (buy-only; later a crafting hub) ---
+// [RUNS MOD] --- Dedicated dungeon-scroll merchant (buy + crafting) ---
+
+// Crafting state (see the crafting functions below): the chosen operation and the
+// inventory slots of the target/material scrolls.
+enum class ScrollCraftOp : uint8_t { Reroll, Upgrade, AddMod };
+ScrollCraftOp CraftOp = ScrollCraftOp::Reroll;
+int CraftTargetInv = -1;
+int CraftMaterialInv = -1;
 
 void StartDungeonVendor()
 {
@@ -948,9 +955,12 @@ void StartDungeonVendor()
 	AddSText(0, 2, _("Dungeon Merchant"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
 	AddSText(0, 9, _("Would you like to:"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
 	AddSText(0, 12, _("Buy dungeon scrolls"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
-	AddSText(0, 18, _("Leave"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	AddSText(0, 14, _("Reroll a scroll's modifiers"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	AddSText(0, 16, _("Upgrade a scroll's level"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	AddSText(0, 18, _("Add a modifier to a scroll"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	AddSText(0, 20, _("Leave"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 	AddSLine(5);
-	CurrentItemIndex = 20;
+	CurrentItemIndex = 22;
 }
 
 void ScrollDungeonVendorBuy(int idx)
@@ -985,7 +995,19 @@ void DungeonVendorEnter()
 	case 12:
 		StartStore(TalkID::DungeonVendorBuy);
 		break;
+	case 14:
+		CraftOp = ScrollCraftOp::Reroll;
+		StartStore(TalkID::DungeonVendorCraftTarget);
+		break;
+	case 16:
+		CraftOp = ScrollCraftOp::Upgrade;
+		StartStore(TalkID::DungeonVendorCraftTarget);
+		break;
 	case 18:
+		CraftOp = ScrollCraftOp::AddMod;
+		StartStore(TalkID::DungeonVendorCraftTarget);
+		break;
+	case 20:
 		ActiveStore = TalkID::None;
 		break;
 	}
@@ -1042,6 +1064,210 @@ void DungeonVendorBuyEnter()
 	StartStore(TalkID::Confirm);
 }
 
+// [RUNS MOD] Scroll crafting: reroll a scroll's modifiers, upgrade its level, or add a
+// modifier -- each for gold plus another scroll consumed as material (so scrolls are a
+// currency). Flow: pick an operation from the menu -> pick the target scroll -> pick the
+// material scroll -> confirm. Requires at least two scrolls.
+
+int CraftGoldCost(const Item &scroll)
+{
+	const int level = std::max(1, DungeonScrollLevel(scroll));
+	switch (CraftOp) {
+	case ScrollCraftOp::Upgrade:
+		return level * 150;
+	case ScrollCraftOp::AddMod:
+		return level * 200;
+	case ScrollCraftOp::Reroll:
+	default:
+		return level * 75;
+	}
+}
+
+// Whether `scroll` can undergo the current operation (upgrade needs headroom in level,
+// add-modifier needs fewer than the max modifiers; reroll is always valid).
+bool CraftValid(const Item &scroll)
+{
+	switch (CraftOp) {
+	case ScrollCraftOp::Upgrade:
+		return DungeonScrollLevel(scroll) < MaxRunDepth;
+	case ScrollCraftOp::AddMod:
+		return DungeonScrollModCount(scroll) < MaxScrollMods;
+	case ScrollCraftOp::Reroll:
+	default:
+		return true;
+	}
+}
+
+std::string_view CraftTargetPrompt()
+{
+	switch (CraftOp) {
+	case ScrollCraftOp::Upgrade:
+		return _("Upgrade which scroll's level?");
+	case ScrollCraftOp::AddMod:
+		return _("Add a modifier to which scroll?");
+	case ScrollCraftOp::Reroll:
+	default:
+		return _("Reroll which scroll's modifiers?");
+	}
+}
+
+int CountDungeonScrolls()
+{
+	const Player &player = *MyPlayer;
+	int n = 0;
+	for (int i = 0; i < player._pNumInv; i++)
+		if (player.InvList[i]._iMiscId == IMISC_DUNGEONSCROLL)
+			n++;
+	return n;
+}
+
+// Fills PlayerItems with the player's dungeon scrolls; if `forCraft` only those valid
+// for the current op, skipping the inventory slot `exceptInv` (the chosen target).
+void BuildScrollList(bool forCraft, int exceptInv)
+{
+	CurrentItemIndex = 0;
+	for (auto &item : PlayerItems)
+		item.clear();
+	const Player &player = *MyPlayer;
+	for (int i = 0; i < player._pNumInv && CurrentItemIndex < 48; i++) {
+		if (i == exceptInv)
+			continue;
+		const Item &inv = player.InvList[i];
+		if (inv._iMiscId != IMISC_DUNGEONSCROLL)
+			continue;
+		if (forCraft && !CraftValid(inv))
+			continue;
+		PlayerItems[CurrentItemIndex] = inv;
+		if (forCraft)
+			PlayerItems[CurrentItemIndex]._ivalue = PlayerItems[CurrentItemIndex]._iIvalue = CraftGoldCost(inv);
+		PlayerItemIndexes[CurrentItemIndex] = i;
+		CurrentItemIndex++;
+	}
+}
+
+void ShowScrollListNotice(std::string_view text)
+{
+	HasScrollbar = false;
+	RenderGold = true;
+	AddSText(20, 1, text, UiFlags::ColorWhitegold, false);
+	AddSLine(3);
+	AddItemListBackButton(/*selectable=*/true);
+}
+
+void StartDungeonVendorCraftTarget()
+{
+	IsTextFullSize = true;
+	if (CountDungeonScrolls() < 2) {
+		CurrentItemIndex = 0;
+		ShowScrollListNotice(_("You need two scrolls to craft (one is consumed)."));
+		return;
+	}
+	BuildScrollList(/*forCraft=*/true, /*exceptInv=*/-1);
+	if (CurrentItemIndex == 0) {
+		ShowScrollListNotice(_("No scroll can be crafted this way."));
+		return;
+	}
+	HasScrollbar = true;
+	ScrollPos = 0;
+	RenderGold = true;
+	AddSText(20, 1, CraftTargetPrompt(), UiFlags::ColorWhitegold, false);
+	AddSLine(3);
+	ScrollVendorStore(PlayerItems, CurrentItemIndex, ScrollPos, false);
+	AddItemListBackButton();
+	NumTextLines = std::max(CurrentItemIndex - 4, 0);
+}
+
+void StartDungeonVendorCraftMaterial()
+{
+	IsTextFullSize = true;
+	BuildScrollList(/*forCraft=*/false, /*exceptInv=*/CraftTargetInv);
+	if (CurrentItemIndex == 0) {
+		ShowScrollListNotice(_("You have no other scroll to use as material."));
+		return;
+	}
+	HasScrollbar = true;
+	ScrollPos = 0;
+	RenderGold = true;
+	AddSText(20, 1, _("Consume which scroll as material?"), UiFlags::ColorWhitegold, false);
+	AddSLine(3);
+	ScrollVendorStore(PlayerItems, CurrentItemIndex, ScrollPos, false);
+	AddItemListBackButton();
+	NumTextLines = std::max(CurrentItemIndex - 4, 0);
+}
+
+void CraftApply()
+{
+	Player &player = *MyPlayer;
+	if (CraftTargetInv < 0 || CraftTargetInv >= player._pNumInv)
+		return;
+	if (CraftMaterialInv < 0 || CraftMaterialInv >= player._pNumInv || CraftMaterialInv == CraftTargetInv)
+		return;
+	Item &target = player.InvList[CraftTargetInv];
+	if (target._iMiscId != IMISC_DUNGEONSCROLL)
+		return;
+
+	TakePlrsMoney(CraftGoldCost(target));
+	switch (CraftOp) {
+	case ScrollCraftOp::Reroll:
+		GenerateNewSeed(target); // new seed => new affixes (same level and count)
+		break;
+	case ScrollCraftOp::Upgrade: {
+		const int newLevel = std::min(DungeonScrollLevel(target) + 1, MaxRunDepth);
+		target._iCreateInfo = MakeDungeonScrollCreateInfo(newLevel, DungeonScrollModCount(target));
+		target._ivalue = target._iIvalue = newLevel * 50;
+		break;
+	}
+	case ScrollCraftOp::AddMod: {
+		const int newCount = std::min(DungeonScrollModCount(target) + 1, MaxScrollMods);
+		target._iCreateInfo = MakeDungeonScrollCreateInfo(DungeonScrollLevel(target), newCount);
+		break;
+	}
+	}
+	player.RemoveInvItem(CraftMaterialInv);
+	CalcPlrInv(player, true);
+}
+
+void DungeonVendorCraftTargetEnter()
+{
+	if (CurrentTextLine == BackButtonLine()) {
+		StartStore(TalkID::DungeonVendor);
+		CurrentTextLine = 14;
+		return;
+	}
+	if (CurrentItemIndex == 0)
+		return; // a notice screen; only the back button is active
+	const int idx = ScrollPos + ((CurrentTextLine - PreviousScrollPos) / 4);
+	if (idx < 0 || idx >= CurrentItemIndex)
+		return;
+	CraftTargetInv = PlayerItemIndexes[idx];
+	StartStore(TalkID::DungeonVendorCraftMaterial);
+}
+
+void DungeonVendorCraftMaterialEnter()
+{
+	if (CurrentTextLine == BackButtonLine()) {
+		StartStore(TalkID::DungeonVendorCraftTarget);
+		return;
+	}
+	if (CurrentItemIndex == 0)
+		return;
+	if (CraftTargetInv < 0 || CraftTargetInv >= MyPlayer->_pNumInv) {
+		StartStore(TalkID::DungeonVendor);
+		return;
+	}
+	const int idx = ScrollPos + ((CurrentTextLine - PreviousScrollPos) / 4);
+	if (idx < 0 || idx >= CurrentItemIndex)
+		return;
+	if (!PlayerCanAfford(CraftGoldCost(MyPlayer->InvList[CraftTargetInv]))) {
+		StartStore(TalkID::NoMoney);
+		return;
+	}
+	CraftMaterialInv = PlayerItemIndexes[idx];
+	OldActiveStore = TalkID::DungeonVendorCraftMaterial;
+	TempItem = MyPlayer->InvList[CraftTargetInv]; // the confirm shows the target scroll
+	StartStore(TalkID::Confirm);
+}
+
 void StoreConfirm(Item &item)
 {
 	StartStore(OldActiveStore);
@@ -1078,6 +1304,20 @@ void StoreConfirm(Item &item)
 		break;
 	case TalkID::SmithRepair:
 		prompt = _("Are you sure you want to repair this item?");
+		break;
+	case TalkID::DungeonVendorCraftMaterial:
+		switch (CraftOp) {
+		case ScrollCraftOp::Upgrade:
+			prompt = _("Upgrade this scroll's level? A scroll is consumed.");
+			break;
+		case ScrollCraftOp::AddMod:
+			prompt = _("Add a modifier to this scroll? A scroll is consumed.");
+			break;
+		case ScrollCraftOp::Reroll:
+		default:
+			prompt = _("Reroll this scroll's modifiers? A scroll is consumed.");
+			break;
+		}
 		break;
 	default:
 		app_fatal(StrCat("Unknown store dialog ", static_cast<int>(OldActiveStore)));
@@ -1961,6 +2201,10 @@ void ConfirmEnter(Item &item)
 		case TalkID::DungeonVendorBuy:
 			DungeonVendorBuyItem(item);
 			break;
+		case TalkID::DungeonVendorCraftMaterial:
+			CraftApply();
+			StartStore(TalkID::DungeonVendor);
+			return;
 		case TalkID::WitchRecharge:
 			WitchRechargeItem(item._iIvalue);
 			break;
@@ -2472,6 +2716,12 @@ void StartStore(TalkID s)
 		if (CurrentItemIndex > 0)
 			StartDungeonVendorBuy();
 		break;
+	case TalkID::DungeonVendorCraftTarget:
+		StartDungeonVendorCraftTarget();
+		break;
+	case TalkID::DungeonVendorCraftMaterial:
+		StartDungeonVendorCraftMaterial();
+		break;
 	case TalkID::NoMoney:
 		StoreNoMoney();
 		break;
@@ -2672,6 +2922,13 @@ void StoreESC()
 		StartStore(TalkID::DungeonVendor);
 		CurrentTextLine = 12;
 		break;
+	case TalkID::DungeonVendorCraftTarget:
+		StartStore(TalkID::DungeonVendor);
+		CurrentTextLine = 14;
+		break;
+	case TalkID::DungeonVendorCraftMaterial:
+		StartStore(TalkID::DungeonVendorCraftTarget);
+		break;
 	case TalkID::HealerBuy:
 		StartStore(TalkID::Healer);
 		CurrentTextLine = 14;
@@ -2871,6 +3128,12 @@ void StoreEnter()
 		break;
 	case TalkID::DungeonVendorBuy:
 		DungeonVendorBuyEnter();
+		break;
+	case TalkID::DungeonVendorCraftTarget:
+		DungeonVendorCraftTargetEnter();
+		break;
+	case TalkID::DungeonVendorCraftMaterial:
+		DungeonVendorCraftMaterialEnter();
 		break;
 	case TalkID::NoMoney:
 	case TalkID::NoRoom:

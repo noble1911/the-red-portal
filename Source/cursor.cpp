@@ -647,7 +647,7 @@ void CheckRportal()
 				if (RunsModEnabled && DungeonPortalOpen) {
 					// [RUNS MOD] the hub dungeon-scroll portal, with its modifiers
 					InfoString = fmt::format(fmt::runtime(_("Dungeon Portal (Level {:d})")), DungeonPortalLevel);
-					const ScrollModSet mods = RollScrollMods(DungeonPortalSeed, DungeonPortalLevel);
+					const ScrollModSet mods = RollScrollMods(DungeonPortalSeed, DungeonPortalLevel, DungeonPortalModCount);
 					for (int i = 0; i < mods.count; i++)
 						AddInfoBoxString(DescribeScrollMod(mods.mods[i]));
 				} else {

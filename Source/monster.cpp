@@ -120,7 +120,32 @@ size_t ActiveMonsterCount;
 int MonsterKillCounts[NUM_MAX_MTYPES];
 bool sgbSaveSoundOn;
 
+// [RUNS MOD] The unique chosen as the current run's boss (varies per run for variety;
+// its stats are normalized to the run level in ScaleRunMonsters). Set in
+// PlaceQuestMonsters; used to identify the boss for scaling, loot and completion.
+UniqueMonsterType RunBossType = UniqueMonsterType::Butcher;
+
 namespace {
+
+// [RUNS MOD] Pool of clean combat bosses that place cleanly as standalone run bosses.
+constexpr UniqueMonsterType RunBossPool[] = {
+	UniqueMonsterType::Butcher,
+	UniqueMonsterType::SkeletonKing,
+	UniqueMonsterType::WarlordOfBlood,
+	UniqueMonsterType::RedVex,
+	UniqueMonsterType::BlackJade,
+};
+
+/**
+ * @brief [RUNS MOD] Deterministically picks the run boss for a level from its dungeon
+ * seed (network-synced, so all clients agree), without consuming the shared RNG.
+ */
+UniqueMonsterType PickRunBoss(int level)
+{
+	uint32_t seed = DungeonSeeds[level] * 2654435761u + static_cast<uint32_t>(level) + 1u;
+	seed = seed * 1103515245u + 12345u;
+	return RunBossPool[(seed >> 16) % (sizeof(RunBossPool) / sizeof(RunBossPool[0]))];
+}
 
 constexpr int NightmareToHitBonus = 85;
 constexpr int HellToHitBonus = 120;
@@ -408,6 +433,9 @@ Point GetUniqueMonstPosition(UniqueMonsterType uniqindex)
 		}
 	}
 
+	// [RUNS MOD] The chosen run boss has no chamber/set-piece in a run, so skip the
+	// set-piece positions below and fall through to a random valid placement.
+	if (!(RunsModEnabled && uniqindex == RunBossType))
 	switch (uniqindex) {
 	case UniqueMonsterType::SnotSpill:
 		return SetPiece.position.megaToWorld() + Displacement { 8, 12 };
@@ -536,11 +564,13 @@ tl::expected<void, std::string> PlaceUniqueMonsters()
 tl::expected<void, std::string> PlaceQuestMonsters()
 {
 	if (!setlevel) {
-		// [RUNS MOD] Guaranteed boss for the run: The Butcher on any run level,
-		// placed at a random valid spot (deterministic from the level seed, so it
-		// stays in sync across multiplayer clients).
+		// [RUNS MOD] Guaranteed boss for the run: a boss chosen for this level (varies
+		// for variety, deterministic from the level seed so it stays in sync across
+		// clients), placed at a random valid spot. Its stats are normalized to the run
+		// level in ScaleRunMonsters, so any boss is level-appropriate.
 		if (RunsModEnabled && currlevel >= 1) {
-			RETURN_IF_ERROR(PlaceUniqueMonst(UniqueMonsterType::Butcher, 0, 0));
+			RunBossType = PickRunBoss(currlevel);
+			RETURN_IF_ERROR(PlaceUniqueMonst(RunBossType, 0, 0));
 		}
 		if (Quests[Q_BUTCHER].IsAvailable()) {
 			RETURN_IF_ERROR(PlaceUniqueMonst(UniqueMonsterType::Butcher, 0, 0));
@@ -3464,9 +3494,9 @@ tl::expected<void, std::string> GetLevelMTypes()
 	}
 
 	if (!setlevel) {
-		// [RUNS MOD] Load the run boss type (The Butcher) on any run level.
+		// [RUNS MOD] Load the run boss type (chosen for this level) on any run level.
 		if (RunsModEnabled && currlevel >= 1)
-			RETURN_IF_ERROR(AddMonsterType(MT_CLEAVER, PLACE_SPECIAL));
+			RETURN_IF_ERROR(AddMonsterType(PickRunBoss(currlevel), PLACE_SPECIAL));
 		if (Quests[Q_BUTCHER].IsAvailable())
 			RETURN_IF_ERROR(AddMonsterType(MT_CLEAVER, PLACE_SPECIAL));
 		if (Quests[Q_GARBUD].IsAvailable())
@@ -4020,7 +4050,7 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 
 	// [RUNS MOD] Killing the run's guaranteed boss (The Butcher) marks the run
 	// beaten; only then does returning to the hub advance to a deeper run.
-	const bool isRunBoss = RunsModEnabled && monster.isUnique() && monster.uniqueType == UniqueMonsterType::Butcher;
+	const bool isRunBoss = RunsModEnabled && monster.isUnique() && monster.uniqueType == RunBossType;
 	if (isRunBoss) {
 		RunBossDefeated = true;
 		// [RUNS MOD] Completing a dungeon restocks the Dungeon Merchant on the next

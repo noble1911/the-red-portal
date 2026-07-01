@@ -196,6 +196,8 @@ std::string_view CmdIdString(_cmd_id cmd)
 	case CMD_OPENGRAVE: return "CMD_OPENGRAVE";
 	case CMD_SPAWNMONSTER: return "CMD_SPAWNMONSTER";
 	case CMD_RUNSEED: return "CMD_RUNSEED";
+	case CMD_OPENDUNGEONPORTAL: return "CMD_OPENDUNGEONPORTAL";
+	case CMD_CLOSEDUNGEONPORTAL: return "CMD_CLOSEDUNGEONPORTAL";
 	case FAKE_CMD_SETID: return "FAKE_CMD_SETID";
 	case FAKE_CMD_DROPID: return "FAKE_CMD_DROPID";
 	case CMD_INVALID: return "CMD_INVALID";
@@ -2016,6 +2018,35 @@ size_t OnRunSeed(const TCmdParam4 &message, Player &player)
 	return sizeof(message);
 }
 
+size_t OnOpenDungeonPortal(const TCmdParam4 &message, Player &player)
+{
+	// [RUNS MOD] Another client opened the hub dungeon-scroll portal; adopt its level,
+	// scroll seed and modifier count so our run applies the same modifiers.
+	if (gbBufferMsgs == 1) {
+		BufferMessage(player, &message, sizeof(message));
+	} else if (&player != MyPlayer) {
+		const int level = Swap16LE(message.wParam1);
+		const uint32_t seed = (static_cast<uint32_t>(Swap16LE(message.wParam2)) << 16)
+		    | static_cast<uint32_t>(Swap16LE(message.wParam3));
+		const int modCount = Swap16LE(message.wParam4);
+		SetDungeonPortalRemote(level, seed, modCount);
+	}
+
+	return sizeof(message);
+}
+
+size_t OnCloseDungeonPortal(const TCmd &cmd, Player &player)
+{
+	// [RUNS MOD] Another client closed the hub dungeon-scroll portal.
+	if (gbBufferMsgs == 1) {
+		BufferMessage(player, &cmd, sizeof(cmd));
+	} else if (&player != MyPlayer) {
+		CloseDungeonPortal();
+	}
+
+	return sizeof(cmd);
+}
+
 size_t OnWarp(const TCmdParam1 &message, Player &player)
 {
 	const uint16_t portalIdx = Swap16LE(message.wParam1);
@@ -3517,6 +3548,10 @@ size_t ParseCmd(uint8_t pnum, const TCmd *pCmd, size_t maxCmdSize)
 		return HandleCmd(OnSpawnMonster, player, pCmd, maxCmdSize);
 	case CMD_RUNSEED:
 		return HandleCmd(OnRunSeed, player, pCmd, maxCmdSize);
+	case CMD_OPENDUNGEONPORTAL:
+		return HandleCmd(OnOpenDungeonPortal, player, pCmd, maxCmdSize);
+	case CMD_CLOSEDUNGEONPORTAL:
+		return OnCloseDungeonPortal(*pCmd, player);
 	default:
 		break;
 	}

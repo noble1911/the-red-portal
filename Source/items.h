@@ -504,6 +504,25 @@ void InitializeItem(Item &item, _item_indexes itemData);
 /** @brief [RUNS MOD] Builds a dungeon scroll that opens a run at the given level. */
 void CreateDungeonScroll(Item &item, int level);
 
+/** @brief [RUNS MOD] Dungeon scroll level (create-info bits 0-5). */
+inline int DungeonScrollLevel(const Item &item)
+{
+	return item._iCreateInfo & CF_LEVEL;
+}
+
+/** @brief [RUNS MOD] Dungeon scroll modifier count (create-info bits 6-7), 1..3. */
+inline int DungeonScrollModCount(const Item &item)
+{
+	const int c = (item._iCreateInfo >> 6) & 0x03;
+	return c < 1 ? 1 : (c > 3 ? 3 : c);
+}
+
+/** @brief [RUNS MOD] Packs a scroll's level (bits 0-5) and modifier count (bits 6-7). */
+inline uint16_t MakeDungeonScrollCreateInfo(int level, int modCount)
+{
+	return static_cast<uint16_t>((level & CF_LEVEL) | ((modCount & 0x03) << 6));
+}
+
 /** @brief [RUNS MOD] Drops a dungeon scroll of the given level near a position. */
 void DropDungeonScroll(int level, Point position, bool sendmsg);
 
