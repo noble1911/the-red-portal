@@ -3105,6 +3105,7 @@ void SetRndSeedForDungeonLevel()
 
 int RunDepth = 1;
 bool RunBossDefeated = false;
+bool DungeonVendorRestockPending = true;
 
 void AdvanceRunDepth()
 {

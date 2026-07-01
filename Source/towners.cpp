@@ -1,13 +1,16 @@
 #include "towners.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <unordered_map>
 
 #include "cursor.h"
 #include "engine/clx_sprite.hpp"
 #include "engine/load_cel.hpp"
+#include "engine/load_cl2.hpp"
 #include "engine/load_file.hpp"
+#include "engine/render/clx_render.hpp"
 #include "engine/random.hpp"
 #include "game_mode.hpp"
 #include "inv.h"
@@ -24,6 +27,8 @@ namespace devilution {
 namespace {
 
 OptionalOwnedClxSpriteSheet CowSprites;
+/** [RUNS MOD] Balrog stand animation used as the dungeon merchant's sprite. */
+OptionalOwnedClxSpriteSheet DungeonVendorSprites;
 int CowMsg;
 int CowClicks;
 
@@ -168,6 +173,30 @@ void InitCows(Towner &towner, const TownerDataEntry &entry)
 	dMonster[offset.x][offset.y] = -cowId;
 	offset = position + Direction::North;
 	dMonster[offset.x][offset.y] = -cowId;
+}
+
+/**
+ * @brief [RUNS MOD] Renders the dungeon merchant as a Balrog.
+ *
+ * Loads the "mega" demon's stand animation and bakes the Balrog color-translation
+ * (balr.trn) into it. Towners are drawn with a plain ClxDraw (no TRN applied at draw
+ * time), so the recolor must be baked into the frames up front.
+ */
+void InitDungeonVendor(Towner &towner, const TownerDataEntry &entry)
+{
+	constexpr uint16_t BalrogWidth = 160;
+	towner._tAnimWidth = BalrogWidth;
+	towner.animOrder = {};
+
+	DungeonVendorSprites.emplace(LoadCl2Sheet("monsters\\mega\\megan", BalrogWidth));
+
+	std::array<uint8_t, 256> trn;
+	LoadFileInMem("monsters\\mega\\balr.trn", trn);
+	std::replace(trn.begin(), trn.end(), static_cast<uint8_t>(255), static_cast<uint8_t>(0));
+
+	ClxSpriteList sprites = (*DungeonVendorSprites)[static_cast<size_t>(entry.direction)];
+	ClxApplyTrans(sprites, trn.data());
+	NewTownerAnim(towner, sprites, static_cast<uint8_t>(sprites.numSprites()), 8);
 }
 
 /**
@@ -703,7 +732,7 @@ const TownerData TownersData[] = {
 	{ TOWN_COWFARM, InitCowFarmer, TalkToCowFarmer   },
 	{ TOWN_FARMER,  nullptr,       TalkToFarmer      },
 	{ TOWN_GIRL,    nullptr,       TalkToGirl        },
-	{ TOWN_DUNGEONVENDOR, nullptr, TalkToDungeonVendor }, // [RUNS MOD]
+	{ TOWN_DUNGEONVENDOR, InitDungeonVendor, TalkToDungeonVendor }, // [RUNS MOD]
 	// clang-format on
 };
 
@@ -820,7 +849,10 @@ void InitTowners()
 					continue;
 				behaviorIt = vendorBehavior;
 				relocated.name = "Dungeon Merchant";
-				relocated.position = { 33, 34 };
+				// Moved straight "north" (up on screen) from {33,36}: on the isometric
+				// grid that means lowering x and y together (keeping x-y constant so he
+				// does not drift sideways).
+				relocated.position = { 30, 33 };
 			} break;
 			default: continue;
 			}
@@ -843,6 +875,7 @@ void FreeTownerGFX()
 		towner.ownedAnim = std::nullopt;
 	}
 	CowSprites = std::nullopt;
+	DungeonVendorSprites = std::nullopt; // [RUNS MOD]
 }
 
 void ProcessTowners()

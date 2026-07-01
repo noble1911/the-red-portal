@@ -4617,19 +4617,21 @@ void SpawnWitch(int lvl)
 
 void SpawnDungeonVendor(int charLevel)
 {
-	// [RUNS MOD] Stock the dedicated dungeon merchant with scrolls spanning a range
-	// around the character's level, so a run can always be started and difficulty
-	// tracks the character. Each scroll rolls its own modifiers (CreateDungeonScroll
-	// assigns a fresh seed), so duplicate levels still differ. Listed low-to-high.
+	// [RUNS MOD] Stock the dungeon merchant with four scrolls at DISTINCT levels around
+	// the character's level (so the difficulty tracks the character and the list has no
+	// confusing duplicate entries). Four items fill the store window exactly, so there
+	// is no scrolling. Each scroll rolls its own modifiers (CreateDungeonScroll assigns
+	// a fresh seed).
 	DungeonVendorItems.clear();
 	if (!RunsModEnabled)
 		return;
 	const int base = std::clamp((charLevel + 1) / 2, 1, MaxRunDepth);
-	static const int offsets[] = { -2, -1, 0, 0, 1, 2, 3 };
-	for (int off : offsets) {
-		const int scrollLevel = std::clamp(base + off, 1, MaxRunDepth);
+	// Start one below the character's level, but keep the top of the range within the
+	// depth cap so all four levels stay distinct.
+	const int lowest = std::clamp(base - 1, 1, MaxRunDepth - 3);
+	for (int i = 0; i < 4; i++) {
 		Item scroll = {};
-		CreateDungeonScroll(scroll, scrollLevel);
+		CreateDungeonScroll(scroll, lowest + i);
 		scroll._iStatFlag = true;
 		DungeonVendorItems.push_back(scroll);
 	}

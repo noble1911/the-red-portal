@@ -54,6 +54,11 @@ extern int RunDepth;
 // new run starts. Defined in diablo.cpp.
 extern bool RunBossDefeated;
 
+// [RUNS MOD] Set when a dungeon is completed (run boss killed); consumed on the next
+// hub load to restock the Dungeon Merchant. Starts true so the vendor stocks on the
+// first hub visit. Defined in diablo.cpp.
+extern bool DungeonVendorRestockPending;
+
 // Advance to the next (deeper) run. Called on return to the hub only when the
 // run's boss was defeated.
 void AdvanceRunDepth();

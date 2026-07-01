@@ -4020,8 +4020,12 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 
 	// [RUNS MOD] Killing the run's guaranteed boss (The Butcher) marks the run
 	// beaten; only then does returning to the hub advance to a deeper run.
-	if (RunsModEnabled && monster.isUnique() && monster.uniqueType == UniqueMonsterType::Butcher)
+	if (RunsModEnabled && monster.isUnique() && monster.uniqueType == UniqueMonsterType::Butcher) {
 		RunBossDefeated = true;
+		// [RUNS MOD] Completing a dungeon restocks the Dungeon Merchant on the next
+		// hub visit.
+		DungeonVendorRestockPending = true;
+	}
 
 	monster.hitPoints = 0;
 	monster.flags &= ~MFLAG_HIDDEN;

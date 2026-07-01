@@ -32,6 +32,7 @@
 #include "panels/info_box.hpp"
 #include "qol/stash.h"
 #include "qol/visual_store.h"
+#include "runs_mod.h"
 #include "scroll_mods.h"
 #include "tables/townerdat.hpp"
 #include "towners.h"
@@ -358,10 +359,12 @@ void AddItemListBackButton(bool selectable = false)
 void PrintStoreItem(const Item &item, int l, UiFlags flags, bool cursIndent = false)
 {
 	if (item._iMiscId == IMISC_DUNGEONSCROLL) {
-		// [RUNS MOD] Show the dungeon scroll's modifiers (one per line) in the store.
+		// [RUNS MOD] Show the scroll's modifiers one per line (compact). Kept narrow so
+		// a line never wraps into the next (two-per-line wrapped and overlapped on the
+		// rare 3-modifier scrolls). A scroll fills at most its four-line row.
 		const ScrollModSet mods = RollScrollMods(item._iSeed, item._iCreateInfo & CF_LEVEL);
 		for (int i = 0; i < mods.count; i++)
-			AddSText(40, l++, DescribeScrollMod(mods.mods[i], /*full=*/true), flags, false, -1, cursIndent);
+			AddSText(40, l++, DescribeScrollMod(mods.mods[i], /*full=*/false), flags, false, -1, cursIndent);
 		return;
 	}
 
@@ -991,12 +994,16 @@ void DungeonVendorEnter()
 void DungeonVendorBuyItem(Item &item)
 {
 	const int idx = OldScrollPos + ((OldTextLine - PreviousScrollPos) / 4);
+	if (idx < 0 || idx >= static_cast<int>(DungeonVendorItems.size()))
+		return;
 	TakePlrsMoney(item._iIvalue);
 	StoreAutoPlace(item, true);
-	// Restock the slot with a fresh scroll of the same level (new modifiers) so the
-	// merchant never runs dry -- this keeps the buy list a fixed size, so its indices
-	// stay valid (a finite, shrinking list crashed when the last scroll was bought).
-	if (idx >= 0 && idx < static_cast<int>(DungeonVendorItems.size())) {
+	// Stock shrinks as you buy, down to a floor of one: while more than one remains,
+	// remove the purchased scroll; the last scroll instead refreshes to a new one, so
+	// a run can always be started. A full restock happens after a dungeon is completed.
+	if (DungeonVendorItems.size() > 1) {
+		DungeonVendorItems.erase(DungeonVendorItems.begin() + idx);
+	} else {
 		Item restock = {};
 		CreateDungeonScroll(restock, item._iCreateInfo & CF_LEVEL);
 		restock._iStatFlag = true;
@@ -1018,6 +1025,8 @@ void DungeonVendorBuyEnter()
 	OldActiveStore = TalkID::DungeonVendorBuy;
 
 	const int idx = ScrollPos + ((CurrentTextLine - PreviousScrollPos) / 4);
+	if (idx < 0 || idx >= static_cast<int>(DungeonVendorItems.size()))
+		return; // clicked an empty line (the list shrank as scrolls were bought)
 
 	if (!PlayerCanAfford(DungeonVendorItems[idx]._iIvalue)) {
 		StartStore(TalkID::NoMoney);
@@ -2288,7 +2297,13 @@ void SetupTownStores()
 	l = std::clamp(l + 2, 6, 16);
 	SpawnSmith(l);
 	SpawnWitch(l);
-	SpawnDungeonVendor(myPlayer.getCharacterLevel());
+	// [RUNS MOD] The Dungeon Merchant's stock persists between hub visits (it only
+	// shrinks as you buy, down to a floor of 1); it fully restocks after a dungeon is
+	// completed, or on the first visit when it has no stock yet.
+	if (DungeonVendorItems.empty() || DungeonVendorRestockPending) {
+		SpawnDungeonVendor(myPlayer.getCharacterLevel());
+		DungeonVendorRestockPending = false;
+	}
 	SpawnHealer(l);
 	SpawnBoy(myPlayer.getCharacterLevel());
 	SpawnPremium(myPlayer);
