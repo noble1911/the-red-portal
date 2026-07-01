@@ -6,6 +6,9 @@ on:  # yamllint disable-line rule:truthy
   release:
     types: [published]
   workflow_dispatch:
+# [RUNS MOD] Allow the release-upload step to attach the package to the release.
+permissions:
+  contents: write
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
