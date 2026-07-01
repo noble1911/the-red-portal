@@ -4612,22 +4612,27 @@ void SpawnWitch(int lvl)
 		WitchItems.push_back(item);
 	}
 
-	// [RUNS MOD] Stock a few dungeon scrolls appropriate to the character's level,
-	// so runs can be started (and difficulty scales with the character) without
-	// finding scrolls. Basic dungeons from the vendor; better ones are found later.
-	if (RunsModEnabled) {
-		const int base = std::clamp((MyPlayer->getCharacterLevel() + 1) / 2, 1, MaxRunDepth);
-		const int scrollLevels[] = { std::max(1, base - 1), base, std::min(MaxRunDepth, base + 2) };
-		for (int scrollLevel : scrollLevels) {
-			Item scroll = {};
-			scroll._iSeed = AdvanceRndSeed();
-			CreateDungeonScroll(scroll, scrollLevel);
-			scroll._iStatFlag = true;
-			WitchItems.push_back(scroll);
-		}
-	}
-
 	SortVendor(WitchItems, PinnedItemCount);
+}
+
+void SpawnDungeonVendor(int charLevel)
+{
+	// [RUNS MOD] Stock the dedicated dungeon merchant with scrolls spanning a range
+	// around the character's level, so a run can always be started and difficulty
+	// tracks the character. Each scroll rolls its own modifiers (CreateDungeonScroll
+	// assigns a fresh seed), so duplicate levels still differ. Listed low-to-high.
+	DungeonVendorItems.clear();
+	if (!RunsModEnabled)
+		return;
+	const int base = std::clamp((charLevel + 1) / 2, 1, MaxRunDepth);
+	static const int offsets[] = { -2, -1, 0, 0, 1, 2, 3 };
+	for (int off : offsets) {
+		const int scrollLevel = std::clamp(base + off, 1, MaxRunDepth);
+		Item scroll = {};
+		CreateDungeonScroll(scroll, scrollLevel);
+		scroll._iStatFlag = true;
+		DungeonVendorItems.push_back(scroll);
+	}
 }
 
 void SpawnBoy(int lvl)

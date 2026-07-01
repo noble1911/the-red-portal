@@ -58,6 +58,8 @@ StaticVector<Item, NumHealerItemsHf> HealerItems;
 
 StaticVector<Item, NumWitchItemsHf> WitchItems;
 
+StaticVector<Item, NumDungeonVendorItems> DungeonVendorItems;
+
 int BoyItemLevel;
 Item BoyItem;
 
@@ -87,6 +89,7 @@ const char *TownerNameForTalkID(TalkID s)
 	case TalkID::Tavern: return "ogden";
 	case TalkID::Drunk: return "farnham";
 	case TalkID::Barmaid: return "gillian";
+	case TalkID::DungeonVendor: return "dungeonvendor";
 	default: return nullptr;
 	}
 }
@@ -933,6 +936,103 @@ void StoreNoRoom()
 	AddSText(0, 14, _("You do not have enough room in inventory"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 }
 
+// [RUNS MOD] --- Dedicated dungeon-scroll merchant (buy-only; later a crafting hub) ---
+
+void StartDungeonVendor()
+{
+	IsTextFullSize = false;
+	HasScrollbar = false;
+	AddSText(0, 2, _("Dungeon Merchant"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+	AddSText(0, 9, _("Would you like to:"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+	AddSText(0, 12, _("Buy dungeon scrolls"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	AddSText(0, 18, _("Leave"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	AddSLine(5);
+	CurrentItemIndex = 20;
+}
+
+void ScrollDungeonVendorBuy(int idx)
+{
+	ScrollVendorStore(DungeonVendorItems, static_cast<int>(DungeonVendorItems.size()), idx);
+}
+
+void StartDungeonVendorBuy()
+{
+	IsTextFullSize = true;
+	HasScrollbar = true;
+	ScrollPos = 0;
+	NumTextLines = 20;
+
+	RenderGold = true;
+	AddSText(20, 1, _("I have these scrolls for sale:"), UiFlags::ColorWhitegold, false);
+	AddSLine(3);
+	ScrollDungeonVendorBuy(ScrollPos);
+	AddItemListBackButton();
+
+	CurrentItemIndex = 0;
+	for (Item &item : DungeonVendorItems) {
+		item._iStatFlag = MyPlayer->CanUseItem(item);
+		CurrentItemIndex++;
+	}
+	NumTextLines = std::max(CurrentItemIndex - 4, 0);
+}
+
+void DungeonVendorEnter()
+{
+	switch (CurrentTextLine) {
+	case 12:
+		StartStore(TalkID::DungeonVendorBuy);
+		break;
+	case 18:
+		ActiveStore = TalkID::None;
+		break;
+	}
+}
+
+void DungeonVendorBuyItem(Item &item)
+{
+	const int idx = OldScrollPos + ((OldTextLine - PreviousScrollPos) / 4);
+	TakePlrsMoney(item._iIvalue);
+	StoreAutoPlace(item, true);
+	// Restock the slot with a fresh scroll of the same level (new modifiers) so the
+	// merchant never runs dry -- this keeps the buy list a fixed size, so its indices
+	// stay valid (a finite, shrinking list crashed when the last scroll was bought).
+	if (idx >= 0 && idx < static_cast<int>(DungeonVendorItems.size())) {
+		Item restock = {};
+		CreateDungeonScroll(restock, item._iCreateInfo & CF_LEVEL);
+		restock._iStatFlag = true;
+		DungeonVendorItems[idx] = restock;
+	}
+	CalcPlrInv(*MyPlayer, true);
+}
+
+void DungeonVendorBuyEnter()
+{
+	if (CurrentTextLine == BackButtonLine()) {
+		StartStore(TalkID::DungeonVendor);
+		CurrentTextLine = 12;
+		return;
+	}
+
+	OldTextLine = CurrentTextLine;
+	OldScrollPos = ScrollPos;
+	OldActiveStore = TalkID::DungeonVendorBuy;
+
+	const int idx = ScrollPos + ((CurrentTextLine - PreviousScrollPos) / 4);
+
+	if (!PlayerCanAfford(DungeonVendorItems[idx]._iIvalue)) {
+		StartStore(TalkID::NoMoney);
+		return;
+	}
+
+	if (!StoreAutoPlace(DungeonVendorItems[idx], false)) {
+		StartStore(TalkID::NoRoom);
+		return;
+	}
+
+	TempItem = DungeonVendorItems[idx];
+	StartStore(TalkID::Confirm);
+}
+
 void StoreConfirm(Item &item)
 {
 	StartStore(OldActiveStore);
@@ -957,6 +1057,7 @@ void StoreConfirm(Item &item)
 	case TalkID::SmithPremiumBuy:
 	case TalkID::WitchBuy:
 	case TalkID::SmithBuy:
+	case TalkID::DungeonVendorBuy:
 		prompt = _("Are you sure you want to buy this item?");
 		break;
 	case TalkID::WitchRecharge:
@@ -1848,6 +1949,9 @@ void ConfirmEnter(Item &item)
 		case TalkID::WitchBuy:
 			WitchBuyItem(item);
 			break;
+		case TalkID::DungeonVendorBuy:
+			DungeonVendorBuyItem(item);
+			break;
 		case TalkID::WitchRecharge:
 			WitchRechargeItem(item._iIvalue);
 			break;
@@ -2184,6 +2288,7 @@ void SetupTownStores()
 	l = std::clamp(l + 2, 6, 16);
 	SpawnSmith(l);
 	SpawnWitch(l);
+	SpawnDungeonVendor(myPlayer.getCharacterLevel());
 	SpawnHealer(l);
 	SpawnBoy(myPlayer.getCharacterLevel());
 	SpawnPremium(myPlayer);
@@ -2344,6 +2449,13 @@ void StartStore(TalkID s)
 		break;
 	case TalkID::WitchRecharge:
 		StartWitchRecharge();
+		break;
+	case TalkID::DungeonVendor:
+		StartDungeonVendor();
+		break;
+	case TalkID::DungeonVendorBuy:
+		if (CurrentItemIndex > 0)
+			StartDungeonVendorBuy();
 		break;
 	case TalkID::NoMoney:
 		StoreNoMoney();
@@ -2506,6 +2618,7 @@ void StoreESC()
 	case TalkID::Tavern:
 	case TalkID::Drunk:
 	case TalkID::Barmaid:
+	case TalkID::DungeonVendor:
 		ActiveStore = TalkID::None;
 		break;
 	case TalkID::Gossip:
@@ -2539,6 +2652,10 @@ void StoreESC()
 	case TalkID::WitchRecharge:
 		StartStore(TalkID::Witch);
 		CurrentTextLine = *GetOptions().Gameplay.visualStoreUI ? 16 : 18;
+		break;
+	case TalkID::DungeonVendorBuy:
+		StartStore(TalkID::DungeonVendor);
+		CurrentTextLine = 12;
 		break;
 	case TalkID::HealerBuy:
 		StartStore(TalkID::Healer);
@@ -2733,6 +2850,12 @@ void StoreEnter()
 		break;
 	case TalkID::WitchRecharge:
 		WitchRechargeEnter();
+		break;
+	case TalkID::DungeonVendor:
+		DungeonVendorEnter();
+		break;
+	case TalkID::DungeonVendorBuy:
+		DungeonVendorBuyEnter();
 		break;
 	case TalkID::NoMoney:
 	case TalkID::NoRoom:

@@ -39,6 +39,9 @@ constexpr int NumWitchItems = 17;
 constexpr int NumWitchItemsHf = 24;
 constexpr int NumWitchPinnedItems = 3;
 
+// [RUNS MOD] Max scrolls the dungeon merchant stocks at once.
+constexpr int NumDungeonVendorItems = 12;
+
 constexpr int NumStoreLines = 104;
 
 enum class TalkID : uint8_t {
@@ -66,6 +69,9 @@ enum class TalkID : uint8_t {
 	Tavern,
 	Drunk,
 	Barmaid,
+	// [RUNS MOD] Dedicated dungeon-scroll merchant (buy-only; later also crafting).
+	DungeonVendor,
+	DungeonVendorBuy,
 };
 
 /** Currently active store */
@@ -92,6 +98,9 @@ extern DVL_API_FOR_TEST StaticVector<Item, NumHealerItemsHf> HealerItems;
 
 /** Items sold by Adria */
 extern DVL_API_FOR_TEST StaticVector<Item, NumWitchItemsHf> WitchItems;
+
+/** [RUNS MOD] Dungeon scrolls sold by the dungeon merchant */
+extern DVL_API_FOR_TEST StaticVector<Item, NumDungeonVendorItems> DungeonVendorItems;
 
 /** Current level of the item sold by Wirt */
 extern DVL_API_FOR_TEST int BoyItemLevel;

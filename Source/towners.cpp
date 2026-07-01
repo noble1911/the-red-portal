@@ -453,6 +453,13 @@ void TalkToBoy(Player & /*player*/, Towner & /*boy*/)
 	StartStore(TalkID::Boy);
 }
 
+void TalkToDungeonVendor(Player & /*player*/, Towner & /*vendor*/)
+{
+	// [RUNS MOD] Opens the dedicated dungeon-scroll store. No gossip line (this NPC
+	// reuses Wirt's sprite but is a distinct merchant with no dialog text).
+	StartStore(TalkID::DungeonVendor);
+}
+
 void TalkToStoryteller(Player &player, Towner & /*storyteller*/)
 {
 	auto &betrayerQuest = Quests[Q_BETRAYER];
@@ -696,6 +703,7 @@ const TownerData TownersData[] = {
 	{ TOWN_COWFARM, InitCowFarmer, TalkToCowFarmer   },
 	{ TOWN_FARMER,  nullptr,       TalkToFarmer      },
 	{ TOWN_GIRL,    nullptr,       TalkToGirl        },
+	{ TOWN_DUNGEONVENDOR, nullptr, TalkToDungeonVendor }, // [RUNS MOD]
 	// clang-format on
 };
 
@@ -804,6 +812,16 @@ void InitTowners()
 			case TOWN_WITCH:  relocated.position = { 20, 37 }; break; // Adria - scrolls/staves
 			case TOWN_STORY:  relocated.position = { 30, 37 }; break; // Cain - identify
 			case TOWN_BMAID:  relocated.position = { 25, 37 }; break; // Gillian - opens the stash
+			case TOWN_PEGBOY: {
+				// Wirt is unused in run mode; repurpose his sprite as the dedicated
+				// dungeon-scroll merchant (own behavior + name, by the dungeon portal).
+				auto vendorBehavior = TownerBehaviors.find(TOWN_DUNGEONVENDOR);
+				if (vendorBehavior == TownerBehaviors.end() || vendorBehavior->second == nullptr)
+					continue;
+				behaviorIt = vendorBehavior;
+				relocated.name = "Dungeon Merchant";
+				relocated.position = { 33, 34 };
+			} break;
 			default: continue;
 			}
 			use = &relocated;

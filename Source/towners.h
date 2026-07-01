@@ -37,6 +37,9 @@ enum _talker_id : uint8_t {
 	TOWN_FARMER,
 	TOWN_GIRL,
 	TOWN_COWFARM,
+	// [RUNS MOD] Dedicated dungeon-scroll merchant. Not loaded from TSV; synthesized
+	// in run mode from Wirt's (TOWN_PEGBOY) sprite. Keep last to preserve TSV values.
+	TOWN_DUNGEONVENDOR,
 	// Note: Enum values are parsed from TSV using magic_enum
 	// The actual count is determined dynamically from TSV data
 };
