@@ -40,6 +40,9 @@ enum _talker_id : uint8_t {
 	// [RUNS MOD] Dedicated dungeon-scroll merchant. Not loaded from TSV; synthesized
 	// in run mode from Wirt's (TOWN_PEGBOY) sprite. Keep last to preserve TSV values.
 	TOWN_DUNGEONVENDOR,
+	// [RUNS MOD] A chest that opens the shared stash (replaces the barmaid NPC).
+	// Synthesized in run mode from Gillian's (TOWN_BMAID) slot.
+	TOWN_STASHCHEST,
 	// Note: Enum values are parsed from TSV using magic_enum
 	// The actual count is determined dynamically from TSV data
 };

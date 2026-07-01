@@ -15,6 +15,7 @@
 #include "game_mode.hpp"
 #include "inv.h"
 #include "minitext.h"
+#include "qol/stash.h"
 #include "runs_mod.h"
 #include "stores.h"
 #include "tables/textdat.h"
@@ -29,6 +30,8 @@ namespace {
 OptionalOwnedClxSpriteSheet CowSprites;
 /** [RUNS MOD] Balrog stand animation used as the dungeon merchant's sprite. */
 OptionalOwnedClxSpriteSheet DungeonVendorSprites;
+/** [RUNS MOD] Chest graphic used as the stash access point. */
+OptionalOwnedClxSpriteList StashChestSprite;
 int CowMsg;
 int CowClicks;
 
@@ -197,6 +200,20 @@ void InitDungeonVendor(Towner &towner, const TownerDataEntry &entry)
 	ClxSpriteList sprites = (*DungeonVendorSprites)[static_cast<size_t>(entry.direction)];
 	ClxApplyTrans(sprites, trn.data());
 	NewTownerAnim(towner, sprites, static_cast<uint8_t>(sprites.numSprites()), 8);
+}
+
+/**
+ * @brief [RUNS MOD] Renders the stash access point as a large (closed) chest, using
+ * the object graphic. Clicking it opens the shared stash (see TalkToStashChest).
+ */
+void InitStashChest(Towner &towner, const TownerDataEntry & /*entry*/)
+{
+	constexpr uint16_t ChestWidth = 96;
+	towner._tAnimWidth = ChestWidth;
+	towner.animOrder = {};
+	StashChestSprite = LoadCel("objects\\chest3", ChestWidth);
+	// Frame 0 is the closed chest; hold it (a single, non-animating frame).
+	NewTownerAnim(towner, *StashChestSprite, 1, 100);
 }
 
 /**
@@ -489,6 +506,15 @@ void TalkToDungeonVendor(Player & /*player*/, Towner & /*vendor*/)
 	StartStore(TalkID::DungeonVendor);
 }
 
+void TalkToStashChest(Player & /*player*/, Towner & /*chest*/)
+{
+	// [RUNS MOD] Opening the chest opens the shared stash directly (this replaces the
+	// barmaid NPC; mirrors the stash-open path from BarmaidEnter).
+	IsStashOpen = true;
+	Stash.RefreshItemStatFlags();
+	invflag = true;
+}
+
 void TalkToStoryteller(Player &player, Towner & /*storyteller*/)
 {
 	auto &betrayerQuest = Quests[Q_BETRAYER];
@@ -733,6 +759,7 @@ const TownerData TownersData[] = {
 	{ TOWN_FARMER,  nullptr,       TalkToFarmer      },
 	{ TOWN_GIRL,    nullptr,       TalkToGirl        },
 	{ TOWN_DUNGEONVENDOR, InitDungeonVendor, TalkToDungeonVendor }, // [RUNS MOD]
+	{ TOWN_STASHCHEST,    InitStashChest,    TalkToStashChest    }, // [RUNS MOD]
 	// clang-format on
 };
 
@@ -840,7 +867,15 @@ void InitTowners()
 			case TOWN_HEALER: relocated.position = { 28, 34 }; break; // Pepin - potions/healing
 			case TOWN_WITCH:  relocated.position = { 20, 37 }; break; // Adria - scrolls/staves
 			case TOWN_STORY:  relocated.position = { 30, 37 }; break; // Cain - identify
-			case TOWN_BMAID:  relocated.position = { 25, 37 }; break; // Gillian - opens the stash
+			case TOWN_BMAID: {
+				// Replace Gillian with a chest that opens the shared stash.
+				auto chestBehavior = TownerBehaviors.find(TOWN_STASHCHEST);
+				if (chestBehavior == TownerBehaviors.end() || chestBehavior->second == nullptr)
+					continue;
+				behaviorIt = chestBehavior;
+				relocated.name = "Stash";
+				relocated.position = { 25, 37 };
+			} break;
 			case TOWN_PEGBOY: {
 				// Wirt is unused in run mode; repurpose his sprite as the dedicated
 				// dungeon-scroll merchant (own behavior + name, by the dungeon portal).
@@ -876,6 +911,7 @@ void FreeTownerGFX()
 	}
 	CowSprites = std::nullopt;
 	DungeonVendorSprites = std::nullopt; // [RUNS MOD]
+	StashChestSprite = std::nullopt;     // [RUNS MOD]
 }
 
 void ProcessTowners()
@@ -884,6 +920,13 @@ void ProcessTowners()
 	for (auto &towner : Towners) {
 		if (towner._ttype == TOWN_DEADGUY) {
 			TownDead(towner);
+		}
+
+		// [RUNS MOD] The stash chest shows its open lid while the stash panel is up
+		// (closed frame 0, open frame +2 -- how the object system opens a chest).
+		if (towner._ttype == TOWN_STASHCHEST) {
+			towner._tAnimFrame = IsStashOpen ? 2 : 0;
+			continue;
 		}
 
 		towner._tAnimCnt++;
