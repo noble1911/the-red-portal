@@ -2119,6 +2119,26 @@ void InitKeymapActions()
 	    [] {
 		    ReorganizeInventory(*MyPlayer);
 	    });
+	// [RUNS MOD] Manually close the hub dungeon-scroll portal (unless someone is inside it).
+	options.Keymapper.AddAction(
+	    "CloseDungeonPortal",
+	    N_("Close Dungeon Portal"),
+	    N_("Closes your open dungeon portal (only when no one is inside it)."),
+	    'K',
+	    [] {
+		    if (!RunsModEnabled || !DungeonPortalOpen)
+			    return;
+		    for (const Player &other : Players) {
+			    if (other.plractive && other.isOnLevel(static_cast<uint8_t>(DungeonPortalLevel))) {
+				    EventPlrMsg(_("Can't close the dungeon portal while someone is inside."), UiFlags::ColorWhite);
+				    return;
+			    }
+		    }
+		    CloseDungeonPortal();
+		    EventPlrMsg(_("Dungeon portal closed."), UiFlags::ColorWhite);
+	    },
+	    nullptr,
+	    CanPlayerTakeAction);
 #ifdef _DEBUG
 	options.Keymapper.AddAction(
 	    "OpenConsole",
