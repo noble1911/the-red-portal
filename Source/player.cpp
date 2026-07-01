@@ -2966,16 +2966,6 @@ void RestartTownLvl(Player &player)
 
 void StartWarpLvl(Player &player, size_t pidx)
 {
-	if (RunsModEnabled && Portals[pidx].fromScroll) {
-		// [RUNS MOD] Step into a dungeon-scroll portal: enter its run level. The
-		// portal stays OPEN (so you can return to shop and co-op partners can
-		// follow), and re-entry resumes the same dungeon (no reseed) until the
-		// portal is replaced or closed.
-		if (&player == MyPlayer)
-			EnterScrollRun(Portals[pidx].level);
-		return;
-	}
-
 	InitLevelChange(player);
 
 	if (gbIsMultiplayer) {

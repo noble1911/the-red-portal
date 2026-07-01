@@ -2191,10 +2191,9 @@ bool UseInvItem(int cii)
 			player.RemoveSpdBarItem(c);
 		else
 			player.RemoveInvItem(c);
-		// Reseed the run once (new layout), then open the portal. Re-entry resumes
-		// the same dungeon until the portal is replaced/closed.
-		PrimeScrollRun(level);
-		OpenScrollPortal(player, level);
+		// Open the hub dungeon portal to this level (reseeds the run once); walk
+		// into it to enter. Independent of town portals.
+		OpenDungeonPortal(level);
 		return true;
 	}
 

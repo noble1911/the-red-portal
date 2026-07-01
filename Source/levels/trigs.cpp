@@ -17,6 +17,7 @@
 #include "diablo_msg.hpp"
 #include "game_mode.hpp"
 #include "multi.h"
+#include "portal.h"
 #include "runs_mod.h"
 #include "utils/algorithm/container.hpp"
 #include "utils/is_of.hpp"
@@ -876,6 +877,13 @@ void CheckTriggers()
 
 	if (myPlayer._pmode != PM_STAND)
 		return;
+
+	// [RUNS MOD] Stepping onto the hub dungeon portal enters its run. The portal
+	// stays open and the dungeon resumes on re-entry until it is replaced/closed.
+	if (RunsModEnabled && DungeonPortalOpen && currlevel == 0 && myPlayer.position.tile == DungeonPortalPos) {
+		EnterScrollRun(DungeonPortalLevel);
+		return;
+	}
 
 	for (int i = 0; i < numtrigs; i++) {
 		if (myPlayer.position.tile != trigs[i].position) {

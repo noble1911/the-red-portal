@@ -3521,6 +3521,7 @@ tl::expected<void, std::string> LoadGameLevel(bool firstflag, lvl_entry lvldir)
 	}
 
 	SyncPortals();
+	SyncDungeonPortal(); // [RUNS MOD] re-spawn the dungeon-portal visual in the hub
 	LoadGameLevelSyncPlayerEntry(lvldir);
 
 	IncProgress();

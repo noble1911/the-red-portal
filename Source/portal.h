@@ -21,11 +21,16 @@ struct Portal {
 	int level;
 	dungeon_type ltype;
 	bool setlvl;
-	/** [RUNS MOD] True if this portal was opened by a dungeon scroll (hub -> run). */
-	bool fromScroll;
 };
 
 extern Portal Portals[MAXPORTAL];
+
+// [RUNS MOD] The dungeon-scroll portal: a single persistent hub portal with its own
+// visual (a RedPortal missile) and entry trigger, fully independent of the per-player
+// town portals, so casting a town portal never disturbs it.
+extern bool DungeonPortalOpen;
+extern int DungeonPortalLevel;
+extern Point DungeonPortalPos;
 
 void InitPortals();
 void SetPortalStats(int i, bool o, Point position, int lvl, dungeon_type lvltype, bool isSetLevel);
@@ -33,9 +38,13 @@ void AddPortalMissile(const Player &player, Point position, bool sync);
 void SyncPortals();
 void AddPortalInTown(const Player &player);
 void ActivatePortal(const Player &player, Point position, int lvl, dungeon_type lvltype, bool sp);
-/** @brief [RUNS MOD] Opens a dungeon-scroll portal in the hub leading to a run at `level`. */
-void OpenScrollPortal(const Player &player, int level);
 void DeactivatePortal(const Player &player);
+/** @brief [RUNS MOD] Open the hub dungeon-scroll portal to a run at `level` (reseeds it). */
+void OpenDungeonPortal(int level);
+/** @brief [RUNS MOD] Close the hub dungeon-scroll portal and remove its visual. */
+void CloseDungeonPortal();
+/** @brief [RUNS MOD] Re-spawn the dungeon-portal visual on hub load if it is open. */
+void SyncDungeonPortal();
 bool PortalOnLevel(const Player &player);
 void RemovePortalMissile(const Player &player);
 void SetCurrentPortal(size_t p);

@@ -629,13 +629,7 @@ void CheckTown()
 		if (missile._mitype == MissileID::TownPortal) {
 			if (EntranceBoundaryContains(missile.position.tile, cursPosition)) {
 				trigflag = true;
-				const Portal &portal = Portals[missile._misource];
-				if (RunsModEnabled && portal.fromScroll) {
-					// [RUNS MOD] Dungeon-scroll portals show their destination level.
-					InfoString = fmt::format(fmt::runtime(_("Dungeon Portal (Level {:d})")), portal.level);
-				} else {
-					InfoString = _("Town Portal");
-				}
+				InfoString = _("Town Portal");
 				AddInfoBoxString(fmt::format(fmt::runtime(_("from {:s}")), Players[missile._misource]._pName));
 				cursPosition = missile.position.tile;
 			}
@@ -649,8 +643,13 @@ void CheckRportal()
 		if (missile._mitype == MissileID::RedPortal) {
 			if (EntranceBoundaryContains(missile.position.tile, cursPosition)) {
 				trigflag = true;
-				InfoString = _("Portal to");
-				AddInfoBoxString(!setlevel ? _("The Unholy Altar") : _("level 15"));
+				if (RunsModEnabled && DungeonPortalOpen) {
+					// [RUNS MOD] the hub dungeon-scroll portal
+					InfoString = fmt::format(fmt::runtime(_("Dungeon Portal (Level {:d})")), DungeonPortalLevel);
+				} else {
+					InfoString = _("Portal to");
+					AddInfoBoxString(!setlevel ? _("The Unholy Altar") : _("level 15"));
+				}
 				cursPosition = missile.position.tile;
 			}
 		}

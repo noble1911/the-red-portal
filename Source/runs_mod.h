@@ -30,6 +30,11 @@ constexpr int HubSpawnY = 32;
 constexpr int HubPortalX = 30;
 constexpr int HubPortalY = 31;
 
+// Where the dungeon-scroll portal appears in the hub (run mode). Its own spot so it
+// never collides with a town portal. Tunable.
+constexpr int HubDungeonPortalX = 33;
+constexpr int HubDungeonPortalY = 32;
+
 constexpr bool IsInsideHub(int x, int y)
 {
 	return x >= HubMinX && x <= HubMaxX && y >= HubMinY && y <= HubMaxY;

@@ -97,7 +97,6 @@ void ActivatePortal(const Player &player, Point position, int lvl, dungeon_type 
 {
 	Portal &portal = Portals[player.getId()];
 	portal.open = true;
-	portal.fromScroll = false;
 
 	if (lvl != 0) {
 		portal.position = position;
@@ -107,22 +106,44 @@ void ActivatePortal(const Player &player, Point position, int lvl, dungeon_type 
 	}
 }
 
-void OpenScrollPortal(const Player &player, int level)
+// [RUNS MOD] --- Dungeon-scroll portal (independent of town portals) ---
+
+bool DungeonPortalOpen = false;
+int DungeonPortalLevel = 1;
+Point DungeonPortalPos = { 0, 0 };
+
+void CloseDungeonPortal()
 {
-	// [RUNS MOD] A dungeon scroll opens a portal in the hub leading to a run at
-	// `level`. We reuse the town-portal machinery (visual, persistence across
-	// level loads, co-op sync); stepping into it is intercepted in StartWarpLvl to
-	// start a fresh run rather than a position-based warp, so we don't need a real
-	// dungeon-side position.
-	Portal &portal = Portals[player.getId()];
-	portal.open = true;
-	portal.position = { 0, 0 };
-	portal.level = level;
-	portal.ltype = GetLevelType(level);
-	portal.setlvl = false;
-	portal.fromScroll = true;
+	DungeonPortalOpen = false;
+	Missiles.remove_if([](Missile &missile) {
+		if (missile._mitype == MissileID::RedPortal && missile.position.tile == DungeonPortalPos) {
+			dFlags[missile.position.tile.x][missile.position.tile.y] &= ~DungeonFlag::Missile;
+			AddUnLight(missile._mlid);
+			return true;
+		}
+		return false;
+	});
+}
+
+void OpenDungeonPortal(int level)
+{
+	// Open the hub dungeon portal to a run at `level`, reseeding the run once (new
+	// layout). The dungeon then persists/resumes until the portal is replaced or
+	// closed. Uses a RedPortal missile for the visual and a CheckTriggers tile
+	// trigger for entry, so it never touches the per-player town-portal slot.
+	CloseDungeonPortal();
+	DungeonPortalOpen = true;
+	DungeonPortalLevel = level;
+	DungeonPortalPos = { HubDungeonPortalX, HubDungeonPortalY };
+	PrimeScrollRun(level);
 	if (leveltype == DTYPE_TOWN)
-		AddPortalInTown(player);
+		AddMissile(DungeonPortalPos, DungeonPortalPos, Direction::South, MissileID::RedPortal, TARGET_MONSTERS, *MyPlayer, 0, 0);
+}
+
+void SyncDungeonPortal()
+{
+	if (DungeonPortalOpen && leveltype == DTYPE_TOWN)
+		AddMissile(DungeonPortalPos, DungeonPortalPos, Direction::South, MissileID::RedPortal, TARGET_MONSTERS, *MyPlayer, 0, 0);
 }
 
 void DeactivatePortal(const Player &player)
