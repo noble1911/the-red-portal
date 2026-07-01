@@ -42,6 +42,15 @@ jobs:
         name: devilutionx_x64.zip
         path: build/devilutionx.zip
 
+    # [RUNS MOD] Attach the Windows package to the GitHub release.
+    - name: Update Release
+      if: ${{ github.event_name == 'release' && !env.ACT }}
+      uses: svenstaro/upload-release-action@v2
+      with:
+        asset_name: devilutionx-windows-x64.zip
+        file: build/devilutionx.zip
+        overwrite: true
+
     - name: Move artifacts to new folder and split exe and other data into two folders
       if: ${{ !env.ACT && github.ref == 'refs/heads/master' && github.event_name != 'pull_request' && github.repository == 'diasurgical/devilutionX'}}
       working-directory: ${{github.workspace}}
