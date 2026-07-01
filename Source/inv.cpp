@@ -1162,6 +1162,11 @@ void InvDrawSlotBack(const Surface &out, Point targetPosition, Size size, item_q
 
 bool CanBePlacedOnBelt(const Player &player, const Item &item)
 {
+	// [RUNS MOD] Dungeon scrolls are used from the hub, not in combat -- keep them
+	// out of the belt so they land in the inventory where players expect them.
+	if (item._iMiscId == IMISC_DUNGEONSCROLL)
+		return false;
+
 	return FitsInBeltSlot(item)
 	    && item._itype != ItemType::Gold
 	    && player.CanUseItem(item)

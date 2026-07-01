@@ -70,6 +70,7 @@
 #include "player.h"
 #include "qol/stash.h"
 #include "quests.h"
+#include "runs_mod.h"
 #include "sound_effect_enums.h"
 #include "spells.h"
 #include "stores.h"
@@ -4551,6 +4552,21 @@ void SpawnWitch(int lvl)
 		item._iIdentified = true;
 
 		WitchItems.push_back(item);
+	}
+
+	// [RUNS MOD] Stock a few dungeon scrolls appropriate to the character's level,
+	// so runs can be started (and difficulty scales with the character) without
+	// finding scrolls. Basic dungeons from the vendor; better ones are found later.
+	if (RunsModEnabled) {
+		const int base = std::clamp((MyPlayer->getCharacterLevel() + 1) / 2, 1, MaxRunDepth);
+		const int scrollLevels[] = { std::max(1, base - 1), base, std::min(MaxRunDepth, base + 2) };
+		for (int scrollLevel : scrollLevels) {
+			Item scroll = {};
+			scroll._iSeed = AdvanceRndSeed();
+			CreateDungeonScroll(scroll, scrollLevel);
+			scroll._iStatFlag = true;
+			WitchItems.push_back(scroll);
+		}
 	}
 
 	SortVendor(WitchItems, PinnedItemCount);
