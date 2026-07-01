@@ -81,6 +81,7 @@
 #include "player.h"
 #include "quests.h"
 #include "runs_mod.h"
+#include "scroll_mods.h"
 #include "sound_effect_enums.h"
 #include "storm/storm_net.hpp"
 #include "tables/itemdat.h"
@@ -4007,8 +4008,13 @@ void M_StartHit(Monster &monster, const Player &player, int dam)
 
 void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 {
-	if (!monster.isPlayerMinion())
-		AddPlrMonstExper(monster.level(sgGameInitInfo.nDifficulty), monster.exp(sgGameInitInfo.nDifficulty), monster.whoHit);
+	if (!monster.isPlayerMinion()) {
+		unsigned exper = monster.exp(sgGameInitInfo.nDifficulty);
+		// [RUNS MOD] Scroll "experience" modifier boosts XP from kills on the run level.
+		if (ActiveRunMods.xpPct != 0)
+			exper = static_cast<unsigned>(ApplyPct(static_cast<int>(exper), ActiveRunMods.xpPct));
+		AddPlrMonstExper(monster.level(sgGameInitInfo.nDifficulty), exper, monster.whoHit);
+	}
 
 	MonsterKillCounts[monster.type().type]++;
 

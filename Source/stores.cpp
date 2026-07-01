@@ -32,6 +32,7 @@
 #include "panels/info_box.hpp"
 #include "qol/stash.h"
 #include "qol/visual_store.h"
+#include "scroll_mods.h"
 #include "tables/townerdat.hpp"
 #include "towners.h"
 #include "utils/format_int.hpp"
@@ -353,6 +354,14 @@ void AddItemListBackButton(bool selectable = false)
 
 void PrintStoreItem(const Item &item, int l, UiFlags flags, bool cursIndent = false)
 {
+	if (item._iMiscId == IMISC_DUNGEONSCROLL) {
+		// [RUNS MOD] Show the dungeon scroll's modifiers (one per line) in the store.
+		const ScrollModSet mods = RollScrollMods(item._iSeed, item._iCreateInfo & CF_LEVEL);
+		for (int i = 0; i < mods.count; i++)
+			AddSText(40, l++, DescribeScrollMod(mods.mods[i], /*full=*/true), flags, false, -1, cursIndent);
+		return;
+	}
+
 	std::string productLine;
 
 	if (item._iIdentified) {

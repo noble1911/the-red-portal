@@ -4,6 +4,7 @@
 #include "engine/render/primitive_render.hpp"
 #include "inv.h"
 #include "levels/trigs.h"
+#include "options.h"
 #include "panels/partypanel.hpp"
 #include "qol/stash.h"
 #include "qol/visual_store.h"
@@ -233,6 +234,26 @@ int GetHoverSpriteHeight()
 	return InventorySlotSizeInPixels.height;
 }
 
+// [RUNS MOD] True if the item currently under the cursor is a dungeon scroll, so its
+// modifier tooltip can force the floating info box on even when the option is off.
+bool HoveredItemIsDungeonScroll()
+{
+	const Player &player = *InspectPlayer;
+	if (pcursinvitem >= INVITEM_HEAD && pcursinvitem < INVITEM_INV_FIRST)
+		return player.InvBody[pcursinvitem - INVITEM_HEAD]._iMiscId == IMISC_DUNGEONSCROLL;
+	if (pcursinvitem >= INVITEM_INV_FIRST && pcursinvitem < INVITEM_INV_FIRST + InventoryGridCells)
+		return player.InvList[pcursinvitem - INVITEM_INV_FIRST]._iMiscId == IMISC_DUNGEONSCROLL;
+	if (pcursinvitem >= INVITEM_BELT_FIRST && pcursinvitem < INVITEM_BELT_FIRST + MaxBeltItems)
+		return player.SpdList[pcursinvitem - INVITEM_BELT_FIRST]._iMiscId == IMISC_DUNGEONSCROLL;
+	if (pcursstashitem != StashStruct::EmptyCell)
+		return Stash.stashList[pcursstashitem]._iMiscId == IMISC_DUNGEONSCROLL;
+	if (pcursstoreitem != -1) {
+		std::span<Item> allItems = GetVisualStoreItems();
+		return allItems[pcursstoreitem]._iMiscId == IMISC_DUNGEONSCROLL;
+	}
+	return false;
+}
+
 int ClampAboveOrBelow(int anchorY, int spriteH, int boxH, int pad, int linePad)
 {
 	const int yAbove = anchorY - spriteH - boxH - pad;
@@ -445,7 +466,13 @@ void DrawFloatingInfoBox(const Surface &out)
 	if (pcursinvitem == -1 && pcursstashitem == StashStruct::EmptyCell && pcursstoreitem == -1 && pcursstorebtn == -1) {
 		FloatingInfoString = StringOrView {};
 		InfoColor = UiFlags::ColorWhite;
+		return;
 	}
+
+	// [RUNS MOD] Dungeon scrolls always get the floating tooltip (their modifier text
+	// does not fit the fixed info bar); other items only when the option is enabled.
+	if (!*GetOptions().Gameplay.floatingInfoBox && !HoveredItemIsDungeonScroll())
+		return;
 
 	if (!FloatingInfoString.empty())
 		PrintFloatingInfo(out);

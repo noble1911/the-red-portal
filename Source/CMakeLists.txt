@@ -29,6 +29,7 @@ set(libdevilutionx_SRCS
   plrmsg.cpp
   portal.cpp
   restrict.cpp
+  scroll_mods.cpp
   sync.cpp
   tmsg.cpp
   towners.cpp

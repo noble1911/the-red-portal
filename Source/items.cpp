@@ -71,6 +71,7 @@
 #include "qol/stash.h"
 #include "quests.h"
 #include "runs_mod.h"
+#include "scroll_mods.h"
 #include "sound_effect_enums.h"
 #include "spells.h"
 #include "stores.h"
@@ -1818,6 +1819,16 @@ void printItemMiscGamepad(const Item &item, bool isOil, bool isCastOnTarget)
 
 void PrintItemMisc(const Item &item)
 {
+	if (item._iMiscId == IMISC_DUNGEONSCROLL) {
+		// [RUNS MOD] Put the scroll's modifiers (full wording) in the floating hover
+		// tooltip, which auto-sizes to fit. Dungeon scrolls force that box to appear
+		// even when the option is off (see DrawFloatingInfoBox), so the fixed info bar
+		// keeps just the scroll name and hovering reveals the full modifier list.
+		const ScrollModSet mods = RollScrollMods(item._iSeed, item._iCreateInfo & CF_LEVEL);
+		for (int i = 0; i < mods.count; i++)
+			AddInfoBoxString(DescribeScrollMod(mods.mods[i], /*full=*/true), /*floatingBox=*/true);
+		return;
+	}
 	if (item._iMiscId == IMISC_EAR) {
 		AddItemInfoBoxString(fmt::format(fmt::runtime(pgettext("player", "Level: {:d}")), item._ivalue));
 		return;
@@ -2979,6 +2990,7 @@ void CreateDungeonScroll(Item &item, int level)
 	// saved and network-synced, so no new item fields are needed. The displayed
 	// name (with the level) is generated in GetTranslatedItemName.
 	InitializeItem(item, IDI_DUNGEONSCROLL);
+	GenerateNewSeed(item); // gives the scroll a seed to derive its modifiers from
 	item._iCreateInfo = static_cast<uint16_t>(level & CF_LEVEL);
 	item._iIdentified = true;
 	// [RUNS MOD] Price scales with the dungeon level; basic scrolls are cheap so a
@@ -3230,6 +3242,11 @@ void GetItemAttrs(Item &item, _item_indexes itemData, int lvl)
 	if (leveltype == DTYPE_HELL)
 		rndv += rndv / 8;
 
+	// [RUNS MOD] Scroll "gold find" modifier boosts dungeon gold piles. The scaled
+	// amount is stored in _ivalue (gold is recreated from its stored value, not
+	// re-rolled), so save/load and network sync stay consistent.
+	rndv = ApplyPct(rndv, ActiveRunMods.goldPct);
+
 	item._ivalue = std::min(rndv, GOLD_MAX_LIMIT);
 	SetPlrHandGoldCurs(item);
 }
@@ -3303,7 +3320,11 @@ void GetSuperItemSpace(Point position, int8_t inum)
 
 _item_indexes RndItemForMonsterLevel(int8_t monsterLevel)
 {
-	if (GenerateRnd(100) > 40)
+	// [RUNS MOD] Scroll "item drops" modifier raises the ~41% base drop chance.
+	int dropCut = 40;
+	if (ActiveRunMods.itemQtyPct > 0)
+		dropCut = std::min(90, ApplyPct(41, ActiveRunMods.itemQtyPct) - 1);
+	if (GenerateRnd(100) > dropCut)
 		return IDI_NONE;
 
 	if (GenerateRnd(100) > 25)
@@ -3517,7 +3538,12 @@ void SpawnItem(Monster &monster, Point position, bool sendmsg, bool spawn /*= fa
 	GetSuperItemSpace(position, ii);
 	const int uper = monster.isUnique() ? 15 : 1;
 
-	const int8_t mLevel = monster.data().level;
+	int8_t mLevel = monster.data().level;
+	// [RUNS MOD] Scroll "magic find" raises the effective item level so drops roll
+	// higher-quality affixes. This is baked into the item's create-info (via the
+	// level, capped to CF_LEVEL=63) so save/load + network recreation stay exact.
+	if (ActiveRunMods.magicFindPct > 0)
+		mLevel = static_cast<int8_t>(std::min(ApplyPct(mLevel, ActiveRunMods.magicFindPct), 63));
 	SetupAllItems(*MyPlayer, item, idx, AdvanceRndSeed(), mLevel, uper, onlygood, false);
 	TryRandomUniqueItem(item, idx, mLevel, uper, onlygood, false);
 	SetupItem(item);

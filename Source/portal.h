@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include <cstdint>
+
 #include "engine/point.hpp"
 #include "levels/gendung.h"
 
@@ -31,6 +33,9 @@ extern Portal Portals[MAXPORTAL];
 extern bool DungeonPortalOpen;
 extern int DungeonPortalLevel;
 extern Point DungeonPortalPos;
+// [RUNS MOD] The seed of the scroll that opened this portal, so the run can
+// recompute the scroll's exact modifiers (kept alongside the layout seed).
+extern uint32_t DungeonPortalSeed;
 
 void InitPortals();
 void SetPortalStats(int i, bool o, Point position, int lvl, dungeon_type lvltype, bool isSetLevel);
@@ -39,8 +44,9 @@ void SyncPortals();
 void AddPortalInTown(const Player &player);
 void ActivatePortal(const Player &player, Point position, int lvl, dungeon_type lvltype, bool sp);
 void DeactivatePortal(const Player &player);
-/** @brief [RUNS MOD] Open the hub dungeon-scroll portal to a run at `level` (reseeds it). */
-void OpenDungeonPortal(int level);
+/** @brief [RUNS MOD] Open the hub dungeon-scroll portal to a run at `level` (reseeds it).
+ * @param scrollSeed the opening scroll's item seed, used to derive the run's modifiers. */
+void OpenDungeonPortal(int level, uint32_t scrollSeed);
 /** @brief [RUNS MOD] Close the hub dungeon-scroll portal and remove its visual. */
 void CloseDungeonPortal();
 /** @brief [RUNS MOD] Re-spawn the dungeon-portal visual on hub load if it is open. */

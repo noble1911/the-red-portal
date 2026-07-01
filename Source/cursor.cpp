@@ -42,6 +42,7 @@
 #include "qol/itemlabels.h"
 #include "runs_mod.h"
 #include "qol/stash.h"
+#include "scroll_mods.h"
 #include "qol/visual_store.h"
 #include "towners.h"
 #include "track.h"
@@ -644,8 +645,11 @@ void CheckRportal()
 			if (EntranceBoundaryContains(missile.position.tile, cursPosition)) {
 				trigflag = true;
 				if (RunsModEnabled && DungeonPortalOpen) {
-					// [RUNS MOD] the hub dungeon-scroll portal
+					// [RUNS MOD] the hub dungeon-scroll portal, with its modifiers
 					InfoString = fmt::format(fmt::runtime(_("Dungeon Portal (Level {:d})")), DungeonPortalLevel);
+					const ScrollModSet mods = RollScrollMods(DungeonPortalSeed, DungeonPortalLevel);
+					for (int i = 0; i < mods.count; i++)
+						AddInfoBoxString(DescribeScrollMod(mods.mods[i]));
 				} else {
 					InfoString = _("Portal to");
 					AddInfoBoxString(!setlevel ? _("The Unholy Altar") : _("level 15"));

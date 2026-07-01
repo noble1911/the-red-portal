@@ -101,6 +101,7 @@
 #include "quick_messages.hpp"
 #include "restrict.h"
 #include "runs_mod.h"
+#include "scroll_mods.h"
 #include "stores.h"
 #include "storm/storm_net.hpp"
 #include "storm/storm_svid.h"
@@ -3241,6 +3242,10 @@ tl::expected<void, std::string> LoadGameLevelDungeon(bool firstflag, lvl_entry l
 		IncProgress();
 
 		RETURN_IF_ERROR(InitMonsters());
+		// [RUNS MOD] Apply the active scroll's monster/boss/damage modifiers to the
+		// freshly generated monsters (the resume path below restores them, already
+		// scaled, from the saved level so it must not re-scale).
+		ScaleRunMonsters();
 		InitItems();
 		CreateThemeRooms();
 
@@ -3498,6 +3503,10 @@ tl::expected<void, std::string> LoadGameLevel(bool firstflag, lvl_entry lvldir)
 	LoadGameLevelResetCursor();
 	SetRndSeedForDungeonLevel();
 	NaKrulTomeSequence = 0;
+
+	// [RUNS MOD] Recompute the active scroll modifiers for the level being loaded
+	// (zeroed off the run level, e.g. in the hub) before monsters/loot are made.
+	RefreshActiveRunMods();
 
 	IncProgress();
 

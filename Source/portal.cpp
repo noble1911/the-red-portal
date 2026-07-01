@@ -111,6 +111,7 @@ void ActivatePortal(const Player &player, Point position, int lvl, dungeon_type 
 bool DungeonPortalOpen = false;
 int DungeonPortalLevel = 1;
 Point DungeonPortalPos = { 0, 0 };
+uint32_t DungeonPortalSeed = 0;
 
 void CloseDungeonPortal()
 {
@@ -125,15 +126,17 @@ void CloseDungeonPortal()
 	});
 }
 
-void OpenDungeonPortal(int level)
+void OpenDungeonPortal(int level, uint32_t scrollSeed)
 {
 	// Open the hub dungeon portal to a run at `level`, reseeding the run once (new
 	// layout). The dungeon then persists/resumes until the portal is replaced or
 	// closed. Uses a RedPortal missile for the visual and a CheckTriggers tile
 	// trigger for entry, so it never touches the per-player town-portal slot.
+	// `scrollSeed` is remembered so the run derives this scroll's exact modifiers.
 	CloseDungeonPortal();
 	DungeonPortalOpen = true;
 	DungeonPortalLevel = level;
+	DungeonPortalSeed = scrollSeed;
 	DungeonPortalPos = { HubDungeonPortalX, HubDungeonPortalY };
 	PrimeScrollRun(level);
 	if (leveltype == DTYPE_TOWN)
