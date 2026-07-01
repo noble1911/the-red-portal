@@ -2998,6 +2998,22 @@ void CreateDungeonScroll(Item &item, int level)
 	item._ivalue = item._iIvalue = level * 50;
 }
 
+void DropDungeonScroll(int level, Point position, bool sendmsg)
+{
+	// [RUNS MOD] Drop a dungeon scroll of `level` on the ground near `position` (used
+	// for run-boss / monster scroll drops that feed the next, deeper run). Placement
+	// and network sync mirror a normal monster item drop.
+	if (ActiveItemCount >= MAXITEMS)
+		return;
+	const int ii = AllocateItem();
+	Item &item = Items[ii];
+	CreateDungeonScroll(item, level);
+	GetSuperItemSpace(position, static_cast<int8_t>(ii));
+	item.setNewAnimation(MyPlayer != nullptr && MyPlayer->pLvlLoad == 0);
+	if (sendmsg)
+		NetSendCmdPItem(false, CMD_DROPITEM, item.position, item);
+}
+
 bool PlayerHasDungeonScroll(const Player &player)
 {
 	// [RUNS MOD] True if the player is already carrying a dungeon scroll (inventory

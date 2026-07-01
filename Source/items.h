@@ -504,6 +504,9 @@ void InitializeItem(Item &item, _item_indexes itemData);
 /** @brief [RUNS MOD] Builds a dungeon scroll that opens a run at the given level. */
 void CreateDungeonScroll(Item &item, int level);
 
+/** @brief [RUNS MOD] Drops a dungeon scroll of the given level near a position. */
+void DropDungeonScroll(int level, Point position, bool sendmsg);
+
 /** @brief [RUNS MOD] True if the player already carries a dungeon scroll. */
 bool PlayerHasDungeonScroll(const Player &player);
 

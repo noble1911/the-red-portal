@@ -4020,11 +4020,24 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 
 	// [RUNS MOD] Killing the run's guaranteed boss (The Butcher) marks the run
 	// beaten; only then does returning to the hub advance to a deeper run.
-	if (RunsModEnabled && monster.isUnique() && monster.uniqueType == UniqueMonsterType::Butcher) {
+	const bool isRunBoss = RunsModEnabled && monster.isUnique() && monster.uniqueType == UniqueMonsterType::Butcher;
+	if (isRunBoss) {
 		RunBossDefeated = true;
 		// [RUNS MOD] Completing a dungeon restocks the Dungeon Merchant on the next
 		// hub visit.
 		DungeonVendorRestockPending = true;
+	}
+
+	// [RUNS MOD] Scroll drops feed the next run: the boss always drops a scroll one
+	// level deeper than the current run, and regular monsters have a small chance to
+	// drop a scroll around the current level. Gated on sendmsg like the normal loot so
+	// co-op only drops (and broadcasts) once.
+	if (RunsModEnabled && sendmsg && leveltype != DTYPE_TOWN && !monster.isPlayerMinion()) {
+		if (isRunBoss) {
+			DropDungeonScroll(std::clamp(static_cast<int>(currlevel) + 1, 1, MaxRunDepth), monster.position.tile, true);
+		} else if (GenerateRnd(100) < 3) {
+			DropDungeonScroll(std::clamp(static_cast<int>(currlevel), 1, MaxRunDepth), monster.position.tile, true);
+		}
 	}
 
 	monster.hitPoints = 0;
