@@ -19,6 +19,7 @@
 #include <fmt/format.h>
 
 #include "DiabloUI/ui_flags.hpp"
+#include "bag.h"
 #include "controls/control_mode.hpp"
 #include "controls/plrctrls.h"
 #include "cursor.h"
@@ -2261,6 +2262,7 @@ void CloseInventory()
 	CloseGoldWithdraw();
 	CloseStash();
 	CloseVisualStore();
+	CloseBag(); // [RUNS MOD] the carried bag closes with the inventory
 	invflag = false;
 }
 

@@ -523,6 +523,7 @@ void pfile_write_hero(SaveWriter &saveWriter, bool writeGameData)
 	if (!gbVanilla) {
 		SaveHotkeys(saveWriter, myPlayer);
 		SaveHeroItems(saveWriter, myPlayer);
+		SaveBag(saveWriter); // [RUNS MOD] save the per-character carried bag
 	}
 }
 

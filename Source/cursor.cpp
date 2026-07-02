@@ -21,6 +21,7 @@
 #include <fmt/format.h>
 
 #include "DiabloUI/diabloui.h"
+#include "bag.h"
 #include "control/control.hpp"
 #include "controls/control_mode.hpp"
 #include "controls/plrctrls.h"
@@ -620,6 +621,7 @@ void InitLevelCursor()
 	ObjectUnderCursor = nullptr;
 	pcursitem = -1;
 	pcursstashitem = StashStruct::EmptyCell;
+	pcursbagitem = BagStruct::EmptyCell; // [RUNS MOD]
 	PlayerUnderCursor = nullptr;
 	ClearCursor();
 }
@@ -814,6 +816,7 @@ void ResetCursorInfo()
 	}
 	pcursinvitem = -1;
 	pcursstashitem = StashStruct::EmptyCell;
+	pcursbagitem = BagStruct::EmptyCell; // [RUNS MOD]
 	pcursstoreitem = -1;
 	pcursstorebtn = -1;
 	PlayerUnderCursor = nullptr;
@@ -849,6 +852,10 @@ bool CheckPanelsAndFlags(Rectangle mainPanel)
 	}
 	if (IsStashOpen && GetLeftPanel().contains(MousePosition)) {
 		pcursstashitem = CheckStashHLight(MousePosition);
+	}
+	if (IsBagOpen && GetBagRect().contains(MousePosition)) {
+		pcursbagitem = CheckBagHLight(MousePosition); // [RUNS MOD]
+		return true; // bag sits over the game world, so suppress world targeting under it
 	}
 	if (IsVisualStoreOpen && GetLeftPanel().contains(MousePosition)) {
 		pcursstoreitem = CheckVisualStoreHLight(MousePosition);

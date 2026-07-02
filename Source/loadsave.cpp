@@ -16,6 +16,7 @@
 #include <expected.hpp>
 
 #include "automap.h"
+#include "bag.h"
 #include "codec.h"
 #include "control/control.hpp"
 #include "cursor.h"
@@ -2700,6 +2701,48 @@ void SaveHeroItems(SaveWriter &saveWriter, Player &player)
 		SaveItem(file, item);
 	for (const Item &item : player.SpdList)
 		SaveItem(file, item);
+}
+
+// [RUNS MOD] The carried bag: a per-character 10x8 grid, saved in the hero archive
+// (single page, no gold). Version byte lets the format evolve.
+constexpr uint8_t BagVersion = 0;
+
+void LoadBag()
+{
+	Bag.clear();
+	LoadHelper file(OpenSaveArchive(gSaveNumber), "herobag");
+	if (!file.IsValid())
+		return;
+	const uint8_t version = file.NextLE<uint8_t>();
+	if (version > BagVersion)
+		return;
+	gbIsHellfireSaveGame = file.NextBool8();
+	const uint32_t itemCount = file.NextLE<uint32_t>();
+	Bag.items.resize(itemCount);
+	for (uint32_t i = 0; i < itemCount; i++)
+		LoadAndValidateItemData(file, Bag.items[i]);
+	for (auto &col : Bag.grid)
+		for (uint16_t &cell : col)
+			cell = file.NextLE<uint16_t>();
+	gbIsHellfireSaveGame = gbIsHellfire;
+	Bag.RefreshItemStatFlags();
+}
+
+void SaveBag(SaveWriter &saveWriter)
+{
+	const int itemSize = (gbIsHellfire ? HellfireItemSaveSize : DiabloItemSaveSize);
+	const size_t size = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint32_t)
+	    + (static_cast<size_t>(itemSize) * Bag.items.size())
+	    + (BagGridSize.width * BagGridSize.height * sizeof(uint16_t));
+	SaveHelper file(saveWriter, "herobag", size);
+	file.WriteLE<uint8_t>(BagVersion);
+	file.WriteLE<uint8_t>(gbIsHellfire ? 1 : 0);
+	file.WriteLE<uint32_t>(static_cast<uint32_t>(Bag.items.size()));
+	for (const Item &item : Bag.items)
+		SaveItem(file, item);
+	for (const auto &col : Bag.grid)
+		for (const uint16_t cell : col)
+			file.WriteLE<uint16_t>(cell);
 }
 
 void SaveStash(SaveWriter &stashWriter)

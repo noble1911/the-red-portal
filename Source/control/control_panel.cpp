@@ -20,6 +20,7 @@
 #include "panels/partypanel.hpp"
 #include "panels/spell_book.hpp"
 #include "panels/spell_icons.hpp"
+#include "bag.h"
 #include "panels/spell_list.hpp"
 #include "pfile.h"
 #include "qol/stash.h"
@@ -60,7 +61,9 @@ const Rectangle &GetRightPanel()
 }
 bool IsLeftPanelOpen()
 {
-	return CharFlag || QuestLogIsOpen || IsStashOpen || IsVisualStoreOpen;
+	// The bag only occupies the left panel in its fallback position; when stacked below the
+	// inventory it lives on the right, so it must not mark the left panel as open. [RUNS MOD]
+	return CharFlag || QuestLogIsOpen || IsStashOpen || IsVisualStoreOpen || (IsBagOpen && BagOnLeftPanel());
 }
 bool IsRightPanelOpen()
 {

@@ -46,5 +46,7 @@ tl::expected<void, std::string> LoadLevel();
 tl::expected<void, std::string> ConvertLevels(SaveWriter &saveWriter);
 void LoadStash();
 void SaveStash(SaveWriter &stashWriter);
+void LoadBag();                       // [RUNS MOD] per-character carried bag
+void SaveBag(SaveWriter &saveWriter); // [RUNS MOD]
 
 } // namespace devilution
