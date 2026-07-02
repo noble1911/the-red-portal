@@ -165,6 +165,37 @@ void CheckBagCut(Point cursorPosition, bool automaticMove)
 	}
 }
 
+} // namespace
+
+bool AutoPlaceItemInBag(const Item &item, bool persistItem)
+{
+	if (!IsItemAllowedInBag(item))
+		return false;
+
+	const Size itemSize = GetInventorySize(item);
+	for (const Point firstSlot : PointsInRectangle(Rectangle { { 0, 0 },
+	         Size { BagGridSize.width - (itemSize.width - 1), BagGridSize.height - (itemSize.height - 1) } })) {
+		bool isSpaceFree = true;
+		for (const Point p : PointsInRectangle(Rectangle { firstSlot, itemSize })) {
+			if (Bag.GetItemIdAtPosition(p) != BagStruct::EmptyCell) {
+				isSpaceFree = false;
+				break;
+			}
+		}
+		if (!isSpaceFree)
+			continue;
+		if (persistItem) {
+			Bag.items.push_back(item);
+			const auto bagIndex = static_cast<uint16_t>(Bag.items.size() - 1);
+			Bag.items[bagIndex].position = firstSlot + Displacement { 0, itemSize.height - 1 };
+			AddItemToBagGrid(firstSlot, bagIndex, itemSize);
+			Bag.dirty = true;
+		}
+		return true;
+	}
+	return false;
+}
+
 void TransferBagItemToInventory(Player &player, uint16_t itemId)
 {
 	if (itemId == BagStruct::EmptyCell)
@@ -179,8 +210,6 @@ void TransferBagItemToInventory(Player &player, uint16_t itemId)
 	PlaySFX(ItemInvSnds[ItemCAnimTbl[item._iCurs]]);
 	Bag.RemoveBagItem(itemId);
 }
-
-} // namespace
 
 bool BagOnLeftPanel()
 {

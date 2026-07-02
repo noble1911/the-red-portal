@@ -41,6 +41,7 @@
 #include "levels/trigs.h"
 #include "minitext.h"
 #include "missiles.h"
+#include "bag.h"
 #include "panels/spell_icons.hpp"
 #include "panels/spell_list.hpp"
 #include "panels/ui_panels.hpp"
@@ -87,6 +88,7 @@ namespace {
 
 int Slot = SLOTXY_INV_FIRST;
 Point ActiveStashSlot = InvalidStashPoint;
+Point ActiveBagSlot = InvalidBagPoint; // [RUNS MOD] controller focus within the bag grid
 Point VisualStoreSlot = { 0, 0 };
 int PreviousInventoryColumn = -1;
 bool BeltReturnsToStash = false;
@@ -912,6 +914,71 @@ void LiftStashItem()
 	SetCursorPos(mousePos);
 }
 
+// [RUNS MOD] Controller helpers for the carried bag, mirroring the stash equivalents.
+Point FindClosestBagSlot(Point mousePos)
+{
+	int shortestDistance = std::numeric_limits<int>::max();
+	Point bestSlot = {};
+	for (const Point point : BagGridRange) {
+		const int distance = mousePos.ManhattanDistance(GetBagSlotCoord(point));
+		if (distance < shortestDistance) {
+			shortestDistance = distance;
+			bestSlot = point;
+		}
+	}
+	return bestSlot;
+}
+
+Point FindFirstBagSlotOnItem(BagStruct::BagCell itemInvId)
+{
+	if (itemInvId == BagStruct::EmptyCell)
+		return InvalidBagPoint;
+	for (const Point point : BagGridRange) {
+		if (Bag.GetItemIdAtPosition(point) == itemInvId)
+			return point;
+	}
+	return InvalidBagPoint;
+}
+
+void LiftBagItem()
+{
+	const Point bagSlot = (ActiveBagSlot != InvalidBagPoint) ? ActiveBagSlot : FindClosestBagSlot(MousePosition);
+
+	const Size cursorSizeInCells = MyPlayer->HoldItem.isEmpty() ? Size { 1, 1 } : GetInventorySize(MyPlayer->HoldItem);
+
+	// Find any item occupying a slot that is currently under the cursor.
+	const BagStruct::BagCell itemUnderCursor = [](Point bagSlot, Size cursorSizeInCells) -> BagStruct::BagCell {
+		if (bagSlot == InvalidBagPoint)
+			return BagStruct::EmptyCell;
+		for (const Point slotUnderCursor : PointsInRectangle(Rectangle { bagSlot, cursorSizeInCells })) {
+			if (slotUnderCursor.x >= BagGridSize.width || slotUnderCursor.y >= BagGridSize.height)
+				continue;
+			const BagStruct::BagCell itemId = Bag.GetItemIdAtPosition(slotUnderCursor);
+			if (itemId != BagStruct::EmptyCell)
+				return itemId;
+		}
+		return BagStruct::EmptyCell;
+	}(bagSlot, cursorSizeInCells);
+
+	const Point jumpSlot = itemUnderCursor == BagStruct::EmptyCell ? bagSlot : FindFirstBagSlotOnItem(itemUnderCursor);
+	CheckBagItem(MousePosition);
+
+	Point mousePos = GetBagSlotCoord(jumpSlot);
+	ActiveBagSlot = jumpSlot;
+	// Center the cursor based on the item we just put down or are holding.
+	Size newSize = { 1, 1 };
+	if (!MyPlayer->HoldItem.isEmpty()) {
+		newSize = GetInventorySize(MyPlayer->HoldItem);
+	} else {
+		const BagStruct::BagCell id = Bag.GetItemIdAtPosition(jumpSlot);
+		if (id != BagStruct::EmptyCell)
+			newSize = GetInventorySize(Bag.items[id]);
+	}
+	mousePos.x += (newSize.width * InventorySlotSizeInPixels.width) / 2;
+	mousePos.y += (newSize.height * InventorySlotSizeInPixels.height) / 2;
+	SetCursorPos(mousePos);
+}
+
 /**
  * @brief Logic for moving within a grid (Stash or Visual Store) with item skipping.
  * @return true if the move was successful within the grid, false if it hit a boundary.
@@ -1641,6 +1708,132 @@ void StashMove(AxisDirection dir)
 	FocusOnInventory();
 }
 
+// [RUNS MOD] D-pad / left-stick navigation for the carried bag. The bag normally sits
+// directly below the inventory, so the inventory<->bag transition is vertical (DOWN from
+// the bottom inventory row enters the bag, UP from the bag top row returns). On short
+// displays the bag falls back to the left-panel position, where the transition is
+// horizontal like the stash (LEFT into the bag, RIGHT back to the inventory).
+void BagMove(AxisDirection dir)
+{
+	static AxisDirectionRepeater repeater(/*min_interval_ms=*/150);
+	dir = repeater.Get(dir);
+	if (dir.x == AxisDirectionX_NONE && dir.y == AxisDirectionY_NONE)
+		return;
+
+	const Item &holdItem = MyPlayer->HoldItem;
+	const bool bagLeft = BagOnLeftPanel();
+	Size itemSize = holdItem.isEmpty() ? Size { 1, 1 } : GetInventorySize(holdItem);
+
+	// If we are in neither grid, focus whichever is closest to the cursor.
+	if (Slot < 0 && ActiveBagSlot == InvalidBagPoint) {
+		const int invSlot = FindClosestInventorySlot(MousePosition, holdItem);
+		const int invDistance = MousePosition.ManhattanDistance(GetSlotCoord(invSlot));
+		const Point bagSlot = FindClosestBagSlot(MousePosition);
+		const int bagDistance = MousePosition.ManhattanDistance(GetBagSlotCoord(bagSlot));
+		if (invDistance <= bagDistance) {
+			InventoryMove(dir);
+			return;
+		}
+		ActiveBagSlot = bagSlot;
+	}
+
+	// Transition from the inventory INTO the bag at the edge facing it.
+	if (Slot >= 0) {
+		int firstSlot = Slot;
+		if (Slot >= SLOTXY_INV_FIRST && Slot <= SLOTXY_INV_LAST && holdItem.isEmpty()) {
+			const int8_t itemId = GetItemIdOnSlot(Slot);
+			if (itemId != 0)
+				firstSlot = FindFirstSlotOnItem(itemId);
+		}
+		if (!bagLeft && dir.y == AxisDirectionY_DOWN) {
+			// Stacked below: the bottom inventory row drops straight into the bag's top row.
+			if (firstSlot >= SLOTXY_INV_ROW4_FIRST && firstSlot <= SLOTXY_INV_ROW4_LAST) {
+				const Point slotCoord = GetSlotCoord(Slot);
+				InvalidateInventorySlot();
+				ActiveBagSlot = FindClosestBagSlot({ slotCoord.x, GetBagSlotCoord({ 0, 0 }).y });
+				ActiveBagSlot.x = std::clamp(ActiveBagSlot.x, 0, BagGridSize.width - itemSize.width);
+				ActiveBagSlot.y = 0;
+				dir.y = AxisDirectionY_NONE;
+			}
+		} else if (bagLeft && dir.x == AxisDirectionX_LEFT) {
+			// Left fallback: leftmost inventory column / body slots cross into the bag.
+			if (IsAnyOf(firstSlot, SLOTXY_HEAD, SLOTXY_HAND_LEFT, SLOTXY_RING_LEFT, SLOTXY_AMULET, SLOTXY_CHEST, SLOTXY_INV_ROW1_FIRST, SLOTXY_INV_ROW2_FIRST, SLOTXY_INV_ROW3_FIRST, SLOTXY_INV_ROW4_FIRST)) {
+				const Point slotCoord = GetSlotCoord(Slot);
+				InvalidateInventorySlot();
+				ActiveBagSlot = FindClosestBagSlot(slotCoord) - Displacement { itemSize.width - 1, 0 };
+				ActiveBagSlot.x = std::clamp(ActiveBagSlot.x, 0, BagGridSize.width - itemSize.width);
+				ActiveBagSlot.y = std::clamp(ActiveBagSlot.y, 0, BagGridSize.height - itemSize.height);
+				dir.x = AxisDirectionX_NONE;
+			}
+		}
+	}
+
+	if (Slot >= 0) {
+		InventoryMove(dir);
+		return;
+	}
+
+	// Navigate within the bag grid, leaving it at the edge facing the inventory.
+	const Size gridSize = BagGridSize;
+	const bool isHoldingItem = !holdItem.isEmpty();
+	Size movingItemSize = isHoldingItem ? GetInventorySize(holdItem) : Size { 1, 1 };
+	if (!isHoldingItem && ActiveBagSlot != InvalidBagPoint) {
+		const BagStruct::BagCell id = Bag.GetItemIdAtPosition(ActiveBagSlot);
+		if (id != BagStruct::EmptyCell)
+			movingItemSize = GetInventorySize(Bag.items[id]);
+	}
+	auto getCellId = [&](Point p) -> int { return Bag.GetItemIdAtPosition(p); };
+
+	auto returnToInventory = [&](Point anchor) {
+		Slot = FindClosestInventorySlot(anchor, holdItem, [](Point mousePos, int slot) {
+			const Point slotPos = GetSlotCoord(slot);
+			return (std::abs(mousePos.y - slotPos.y) * 3) + std::abs(mousePos.x - slotPos.x);
+		});
+		ActiveBagSlot = InvalidBagPoint;
+	};
+
+	if (!bagLeft) {
+		if (dir.y == AxisDirectionY_UP) {
+			if (!GridMove(ActiveBagSlot, dir, gridSize, movingItemSize, isHoldingItem, getCellId)) {
+				const Point bagCoord = GetBagSlotCoord(ActiveBagSlot);
+				returnToInventory({ bagCoord.x, GetRightPanel().position.y + SidePanelSize.height });
+			}
+		} else {
+			GridMove(ActiveBagSlot, dir, gridSize, movingItemSize, isHoldingItem, getCellId);
+		}
+	} else {
+		if (dir.x == AxisDirectionX_RIGHT) {
+			if (!GridMove(ActiveBagSlot, dir, gridSize, movingItemSize, isHoldingItem, getCellId)) {
+				const Point bagCoord = GetBagSlotCoord(ActiveBagSlot);
+				returnToInventory({ GetRightPanel().position.x, bagCoord.y });
+			}
+		} else {
+			GridMove(ActiveBagSlot, dir, gridSize, movingItemSize, isHoldingItem, getCellId);
+		}
+	}
+
+	if (Slot >= 0) {
+		ResetInvCursorPosition();
+		return;
+	}
+
+	if (ActiveBagSlot != InvalidBagPoint) {
+		Point mousePos = GetBagSlotCoord(ActiveBagSlot);
+		if (holdItem.isEmpty()) {
+			const BagStruct::BagCell id = Bag.GetItemIdAtPosition(ActiveBagSlot);
+			if (id != BagStruct::EmptyCell) {
+				itemSize = GetInventorySize(Bag.items[id]);
+				mousePos = GetBagSlotCoord(FindFirstBagSlotOnItem(id));
+			}
+		}
+		mousePos += Displacement { itemSize.width * INV_SLOT_HALF_SIZE_PX, itemSize.height * INV_SLOT_HALF_SIZE_PX };
+		SetCursorPos(mousePos);
+		return;
+	}
+
+	FocusOnInventory();
+}
+
 void HotSpellMove(AxisDirection dir)
 {
 	static AxisDirectionRepeater repeater;
@@ -1796,6 +1989,9 @@ HandleLeftStickOrDPadFn GetLeftStickOrDPadGameUIHandler()
 	}
 	if (IsStashOpen) {
 		return &StashMove;
+	}
+	if (IsBagOpen) { // [RUNS MOD] bag forces invflag on, so check it before the inventory
+		return &BagMove;
 	}
 	if (IsVisualStoreOpen) {
 		return &VisualStoreMove;
@@ -2210,6 +2406,7 @@ void InvalidateInventorySlot()
 {
 	Slot = -1;
 	ActiveStashSlot = InvalidStashPoint;
+	ActiveBagSlot = InvalidBagPoint; // [RUNS MOD]
 }
 
 /**
@@ -2325,6 +2522,8 @@ void PerformPrimaryAction()
 			NewCursor(CURSOR_HAND);
 		} else if (GetRightPanel().contains(MousePosition) || GetMainPanel().contains(MousePosition)) {
 			LiftInventoryItem();
+		} else if (IsBagOpen && GetBagRect().contains(MousePosition)) {
+			LiftBagItem(); // [RUNS MOD]
 		} else if (IsStashOpen && GetLeftPanel().contains(MousePosition)) {
 			LiftStashItem();
 		} else if (IsVisualStoreOpen && GetLeftPanel().contains(MousePosition)) {
@@ -2536,6 +2735,12 @@ void PerformSecondaryAction()
 				TransferItemToInventory(myPlayer, pcursstashitem);
 			} else if (pcursinvitem != -1) {
 				TransferItemToStash(myPlayer, pcursinvitem);
+			}
+		} else if (IsBagOpen) { // [RUNS MOD] quick-transfer between the bag and the inventory
+			if (pcursbagitem != BagStruct::EmptyCell) {
+				TransferBagItemToInventory(myPlayer, pcursbagitem);
+			} else if (pcursinvitem != -1) {
+				TransferItemToBag(myPlayer, pcursinvitem);
 			}
 		} else if (IsVisualStoreOpen) {
 			if (!myPlayer.HoldItem.isEmpty() && GetLeftPanel().contains(MousePosition)) {

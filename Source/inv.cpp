@@ -1652,6 +1652,30 @@ void TransferItemToStash(Player &player, int location)
 		player.RemoveSpdBarItem(location - INVITEM_BELT_FIRST);
 }
 
+// [RUNS MOD] Auto-move an inventory/equipment/belt item into the carried bag.
+void TransferItemToBag(Player &player, int location)
+{
+	if (location == -1) {
+		return;
+	}
+
+	const Item &item = GetInventoryItem(player, location);
+	if (!AutoPlaceItemInBag(item, true)) {
+		player.SaySpecific(HeroSpeech::WhereWouldIPutThis);
+		return;
+	}
+
+	PlaySFX(ItemInvSnds[ItemCAnimTbl[item._iCurs]]);
+
+	if (location < INVITEM_INV_FIRST) {
+		RemoveEquipment(player, static_cast<inv_body_loc>(location), false);
+		CalcPlrInv(player, true);
+	} else if (location <= INVITEM_INV_LAST)
+		player.RemoveInvItem(location - INVITEM_INV_FIRST);
+	else
+		player.RemoveSpdBarItem(location - INVITEM_BELT_FIRST);
+}
+
 void CheckInvItem(bool isShiftHeld, bool isCtrlHeld)
 {
 	if (IsInspectingPlayer())

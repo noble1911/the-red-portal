@@ -22,6 +22,8 @@
 
 namespace devilution {
 
+struct Player;
+
 inline constexpr Size BagGridSize { 10, 8 };
 inline constexpr PointsInRectangle<int> BagGridRange { { { 0, 0 }, BagGridSize } };
 
@@ -81,5 +83,10 @@ uint16_t CheckBagHLight(Point mousePosition);
 void OpenBag();
 /** @brief [RUNS MOD] Closes the bag. */
 void CloseBag();
+/** @brief Places an item into the first free bag position; returns false if it does not fit.
+ * When persistItem is false the bag is not modified (fit test only). */
+bool AutoPlaceItemInBag(const Item &item, bool persistItem);
+/** @brief Auto-moves a bag item into the inventory (used by the controller quick-transfer). */
+void TransferBagItemToInventory(Player &player, uint16_t itemId);
 
 } // namespace devilution

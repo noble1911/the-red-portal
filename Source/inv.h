@@ -192,6 +192,7 @@ void inv_update_rem_item(Player &player, inv_body_loc iv);
 void CheckInvSwap(Player &player, const Item &item, int invGridIndex);
 void CheckInvRemove(Player &player, int invGridIndex);
 void TransferItemToStash(Player &player, int location);
+void TransferItemToBag(Player &player, int location); // [RUNS MOD]
 void CheckInvItem(bool isShiftHeld = false, bool isCtrlHeld = false);
 
 /**
