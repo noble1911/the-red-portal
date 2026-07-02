@@ -35,6 +35,7 @@
 #include "pfile.h"
 #include "tables/playerdat.hpp"
 #include "utils/enum_traits.h"
+#include "runs_mod.h"
 #include "utils/language.h"
 #include "utils/sdl_geometry.h"
 #include "utils/str_cat.hpp"
@@ -370,7 +371,12 @@ void SelheroLoadSelect(size_t value)
 		return;
 	}
 
-	if (!selhero_isMultiPlayer) {
+	if (!selhero_isMultiPlayer && RunsModEnabled) {
+		// [RUNS MOD] Difficulty is chosen per-run via dungeon scrolls, not before the game
+		// starts, so skip the single-player difficulty-selection screen entirely and begin
+		// at Normal. The hub is always Normal; each scroll drives its run's difficulty.
+		nDifficulty = DIFF_NORMAL;
+	} else if (!selhero_isMultiPlayer) {
 		// This is part of a dangerous hack to enable difficulty selection in single-player.
 		// FIXME: Dialogs should not refer to each other's variables.
 

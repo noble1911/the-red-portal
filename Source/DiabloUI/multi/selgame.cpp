@@ -33,6 +33,7 @@
 #include "menu.h"
 #include "multi.h"
 #include "options.h"
+#include "runs_mod.h"
 #include "storm/storm_net.hpp"
 #include "utils/language.h"
 #include "utils/str_cat.hpp"
@@ -348,6 +349,14 @@ void selgame_GameSelection_Select(size_t value)
 	case 0:
 	case 1: {
 		title = _("Create Game").data();
+
+		if (RunsModEnabled) {
+			// [RUNS MOD] Difficulty comes from dungeon scrolls, not a pre-game pick; skip
+			// the difficulty screen and create at Normal, going straight to game speed.
+			nDifficulty = DIFF_NORMAL;
+			selgame_GameSpeedSelection();
+			return;
+		}
 
 		const SDL_Rect rect4 = { (Sint16)(uiPosition.x + 299), (Sint16)(uiPosition.y + 211), 295, 35 };
 		vecSelGameDialog.push_back(std::make_unique<UiArtText>(_("Select Difficulty").data(), rect4, UiFlags::AlignCenter | UiFlags::FontSize30 | UiFlags::ColorUiSilver, 3));
