@@ -212,6 +212,12 @@ void InitMonsterTRN(CMonster &monst)
 		}
 
 		AnimStruct &anim = monst.anims[i];
+		// [RUNS MOD] A monster type can lack graphics for some animation slots
+		// (hasAnim(i) == false leaves sprites empty); there is nothing to recolour, so
+		// skip it. Without this, any such type with a .trn file asserts on load
+		// (value_data_ != nullptr) -- surfaced by the varied run bosses.
+		if (!anim.sprites)
+			continue;
 		if (anim.sprites->isSheet()) {
 			ClxApplyTrans(ClxSpriteSheet { anim.sprites->sheet() }, colorTranslations.data());
 		} else {
@@ -4056,17 +4062,36 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 		// [RUNS MOD] Completing a dungeon restocks the Dungeon Merchant on the next
 		// hub visit.
 		DungeonVendorRestockPending = true;
+		// [RUNS MOD] Clearing the DEEPEST level's boss unlocks the next difficulty tier
+		// (Normal -> Nightmare -> Hell), tracked per character in pDiabloKillLevel (stored
+		// as clearedDifficulty + 1, matching vanilla's Diablo-kill difficulty gate).
+		if (currlevel >= MaxRunDepth) {
+			Player &mp = *MyPlayer;
+			const auto cleared = static_cast<uint8_t>(sgGameInitInfo.nDifficulty + 1);
+			if (mp.pDiabloKillLevel < cleared) {
+				mp.pDiabloKillLevel = cleared;
+				// Reward the unlock with a fresh level-1 scroll of the newly unlocked
+				// difficulty so the harder tier can be started right away.
+				if (sendmsg && sgGameInitInfo.nDifficulty < DIFF_HELL)
+					DropDungeonScroll(1, monster.position.tile, sgGameInitInfo.nDifficulty + 1, true);
+			}
+		}
 	}
 
 	// [RUNS MOD] Scroll drops feed the next run: the boss always drops a scroll one
 	// level deeper than the current run, and regular monsters have a small chance to
-	// drop a scroll around the current level. Gated on sendmsg like the normal loot so
-	// co-op only drops (and broadcasts) once.
+	// drop a scroll around the current level. Dropped scrolls match the run's difficulty,
+	// with a small chance to bump one tier when a higher difficulty is already unlocked --
+	// the organic way to pick up your first harder-tier scrolls. Gated on sendmsg like the
+	// normal loot so co-op only drops (and broadcasts) once.
 	if (RunsModEnabled && sendmsg && leveltype != DTYPE_TOWN && !monster.isPlayerMinion()) {
+		const int runDiff = sgGameInitInfo.nDifficulty;
+		const int maxUnlocked = std::min<int>(MyPlayer->pDiabloKillLevel, DIFF_HELL);
+		const int dropDiff = (runDiff < maxUnlocked && GenerateRnd(100) < 20) ? runDiff + 1 : runDiff;
 		if (isRunBoss) {
-			DropDungeonScroll(std::clamp(static_cast<int>(currlevel) + 1, 1, MaxRunDepth), monster.position.tile, true);
+			DropDungeonScroll(std::clamp(static_cast<int>(currlevel) + 1, 1, MaxRunDepth), monster.position.tile, dropDiff, true);
 		} else if (GenerateRnd(100) < 3) {
-			DropDungeonScroll(std::clamp(static_cast<int>(currlevel), 1, MaxRunDepth), monster.position.tile, true);
+			DropDungeonScroll(std::clamp(static_cast<int>(currlevel), 1, MaxRunDepth), monster.position.tile, dropDiff, true);
 		}
 	}
 

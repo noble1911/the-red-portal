@@ -502,7 +502,7 @@ void CalcPlrInv(Player &player, bool Loadgfx);
 void InitializeItem(Item &item, _item_indexes itemData);
 
 /** @brief [RUNS MOD] Builds a dungeon scroll that opens a run at the given level. */
-void CreateDungeonScroll(Item &item, int level);
+void CreateDungeonScroll(Item &item, int level, int difficulty = 0);
 
 /** @brief [RUNS MOD] Dungeon scroll level (create-info bits 0-5). */
 inline int DungeonScrollLevel(const Item &item)
@@ -510,21 +510,31 @@ inline int DungeonScrollLevel(const Item &item)
 	return item._iCreateInfo & CF_LEVEL;
 }
 
-/** @brief [RUNS MOD] Dungeon scroll modifier count (create-info bits 6-7), 1..3. */
+/** @brief [RUNS MOD] Dungeon scroll modifier count (create-info bits 6-7), 1..3.
+ * This doubles as the scroll's rarity tier: 1 = Common, 2 = Magic, 3 = Rare. */
 inline int DungeonScrollModCount(const Item &item)
 {
 	const int c = (item._iCreateInfo >> 6) & 0x03;
 	return c < 1 ? 1 : (c > 3 ? 3 : c);
 }
 
-/** @brief [RUNS MOD] Packs a scroll's level (bits 0-5) and modifier count (bits 6-7). */
-inline uint16_t MakeDungeonScrollCreateInfo(int level, int modCount)
+/** @brief [RUNS MOD] Dungeon scroll difficulty (create-info bits 8-9):
+ * 0 = Normal, 1 = Nightmare, 2 = Hell. Drives the engine difficulty for the run. */
+inline int DungeonScrollDifficulty(const Item &item)
 {
-	return static_cast<uint16_t>((level & CF_LEVEL) | ((modCount & 0x03) << 6));
+	const int d = (item._iCreateInfo >> 8) & 0x03;
+	return d > 2 ? 2 : d;
 }
 
-/** @brief [RUNS MOD] Drops a dungeon scroll of the given level near a position. */
-void DropDungeonScroll(int level, Point position, bool sendmsg);
+/** @brief [RUNS MOD] Packs a scroll's level (bits 0-5), modifier count (bits 6-7) and
+ * difficulty (bits 8-9) into the create-info word. */
+inline uint16_t MakeDungeonScrollCreateInfo(int level, int modCount, int difficulty = 0)
+{
+	return static_cast<uint16_t>((level & CF_LEVEL) | ((modCount & 0x03) << 6) | ((difficulty & 0x03) << 8));
+}
+
+/** @brief [RUNS MOD] Drops a dungeon scroll of the given level+difficulty near a position. */
+void DropDungeonScroll(int level, Point position, int difficulty, bool sendmsg);
 
 /** @brief [RUNS MOD] True if the player already carries a dungeon scroll. */
 bool PlayerHasDungeonScroll(const Player &player);

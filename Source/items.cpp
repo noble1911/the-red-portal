@@ -2235,8 +2235,24 @@ StringOrView GetTranslatedItemName(const Item &item)
 		return fmt::format(fmt::runtime(_(/* TRANSLATORS: {:s} will be a Character Name */ "Ear of {:s}")), item._iIName);
 	}
 	if (item._iMiscId == IMISC_DUNGEONSCROLL) {
-		// [RUNS MOD] Show the dungeon level (stored in CF_LEVEL) on the scroll.
-		return fmt::format(fmt::runtime(_(/* TRANSLATORS: {:d} is a dungeon level */ "Dungeon Scroll (Level {:d})")), item._iCreateInfo & CF_LEVEL);
+		// [RUNS MOD] Show the level, rarity (from the modifier count) and difficulty on
+		// the scroll, e.g. "Rare Nightmare Dungeon Scroll (Level 8)".
+		const int level = item._iCreateInfo & CF_LEVEL;
+		std::string prefix;
+		if (DungeonScrollModCount(item) >= 3)
+			prefix = _(/* TRANSLATORS: dungeon scroll rarity */ "Rare");
+		else if (DungeonScrollModCount(item) == 2)
+			prefix = _(/* TRANSLATORS: dungeon scroll rarity */ "Magic");
+		const int difficulty = DungeonScrollDifficulty(item);
+		if (difficulty == 1 || difficulty == 2) {
+			if (!prefix.empty())
+				prefix += ' ';
+			prefix += difficulty == 1 ? _(/* TRANSLATORS: dungeon scroll difficulty */ "Nightmare")
+			                          : _(/* TRANSLATORS: dungeon scroll difficulty */ "Hell");
+		}
+		if (prefix.empty())
+			return fmt::format(fmt::runtime(_(/* TRANSLATORS: {:d} is a dungeon level */ "Dungeon Scroll (Level {:d})")), level);
+		return fmt::format(fmt::runtime(_(/* TRANSLATORS: {:s} is a rarity/difficulty prefix, {:d} a dungeon level */ "{:s} Dungeon Scroll (Level {:d})")), prefix, level);
 	}
 	if (item._iMiscId > IMISC_OILFIRST && item._iMiscId < IMISC_OILLAST) {
 		for (size_t i = 0; i < 10; i++) {
@@ -2422,6 +2438,18 @@ uint8_t GetOutlineColor(const Item &item, bool checkReq)
 		return ICOL_RED;
 	if (item._itype == ItemType::Gold)
 		return ICOL_YELLOW;
+	if (item._iMiscId == IMISC_DUNGEONSCROLL) {
+		// [RUNS MOD] Colour dungeon scrolls by difficulty: white Normal, blue Nightmare,
+		// gold Hell -- a quick danger read on the ground and in the inventory.
+		switch (DungeonScrollDifficulty(item)) {
+		case 1:
+			return ICOL_BLUE;
+		case 2:
+			return ICOL_YELLOW;
+		default:
+			return ICOL_WHITE;
+		}
+	}
 	if (item._iMagical == ITEM_QUALITY_MAGIC)
 		return ICOL_BLUE;
 	if (item._iMagical == ITEM_QUALITY_UNIQUE)
@@ -2983,33 +3011,34 @@ void InitializeItem(Item &item, _item_indexes itemData)
 		item.dwBuff |= CF_HELLFIRE;
 }
 
-void CreateDungeonScroll(Item &item, int level)
+void CreateDungeonScroll(Item &item, int level, int difficulty)
 {
-	// [RUNS MOD] Build a dungeon scroll that opens a run at `level`. The level is
-	// stored in the item's create-info (lower 6 bits, CF_LEVEL), which is already
-	// saved and network-synced, so no new item fields are needed. The displayed
-	// name (with the level) is generated in GetTranslatedItemName.
+	// [RUNS MOD] Build a dungeon scroll that opens a run at `level` and `difficulty`.
+	// Level, modifier count (rarity) and difficulty all live in the item's create-info,
+	// which is already saved and network-synced, so no new item fields are needed. The
+	// displayed name (level/rarity/difficulty) is generated in GetTranslatedItemName.
 	InitializeItem(item, IDI_DUNGEONSCROLL);
 	GenerateNewSeed(item); // gives the scroll a seed to derive its modifiers from
-	// [RUNS MOD] Store the level (bits 0-5) and modifier count (bits 6-7). The count is
-	// stored explicitly so crafting can add a modifier without rerolling the others.
-	item._iCreateInfo = MakeDungeonScrollCreateInfo(level, RollScrollModCount(item._iSeed, level));
+	// [RUNS MOD] Store the level (bits 0-5), modifier count/rarity (bits 6-7) and
+	// difficulty (bits 8-9). The count is stored explicitly so crafting can add a
+	// modifier without rerolling the others.
+	item._iCreateInfo = MakeDungeonScrollCreateInfo(level, RollScrollModCount(item._iSeed, level), difficulty);
 	item._iIdentified = true;
 	// [RUNS MOD] Price scales with the dungeon level; basic scrolls are cheap so a
 	// fresh character can afford one.
 	item._ivalue = item._iIvalue = level * 50;
 }
 
-void DropDungeonScroll(int level, Point position, bool sendmsg)
+void DropDungeonScroll(int level, Point position, int difficulty, bool sendmsg)
 {
-	// [RUNS MOD] Drop a dungeon scroll of `level` on the ground near `position` (used
-	// for run-boss / monster scroll drops that feed the next, deeper run). Placement
-	// and network sync mirror a normal monster item drop.
+	// [RUNS MOD] Drop a dungeon scroll of `level`/`difficulty` on the ground near
+	// `position` (used for run-boss / monster scroll drops that feed the next run).
+	// Placement and network sync mirror a normal monster item drop.
 	if (ActiveItemCount >= MAXITEMS)
 		return;
 	const int ii = AllocateItem();
 	Item &item = Items[ii];
-	CreateDungeonScroll(item, level);
+	CreateDungeonScroll(item, level, difficulty);
 	GetSuperItemSpace(position, static_cast<int8_t>(ii));
 	item.setNewAnimation(MyPlayer != nullptr && MyPlayer->pLvlLoad == 0);
 	if (sendmsg)

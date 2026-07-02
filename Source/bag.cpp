@@ -298,6 +298,15 @@ void CloseBag()
 
 void DrawBag(const Surface &out)
 {
+	// [RUNS MOD] Unlike the town-only stash, the bag is carried and can be opened in
+	// dungeons -- but its art is freed on every level transition (FreeGameMem) and only
+	// reloaded on town entry (InitBag). Reload it on demand so drawing it outside town
+	// does not dereference an empty optional (assert value_data_ != nullptr).
+	if (!BagPanelArt)
+		InitBag();
+	if (!BagPanelArt)
+		return; // headless / load failed
+
 	const Point panel = GetBagPanelPosition();
 	RenderClxSprite(out, (*BagPanelArt)[0], panel);
 

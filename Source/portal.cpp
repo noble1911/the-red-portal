@@ -114,6 +114,7 @@ int DungeonPortalLevel = 1;
 Point DungeonPortalPos = { 0, 0 };
 uint32_t DungeonPortalSeed = 0;
 int DungeonPortalModCount = 1;
+int DungeonPortalDifficulty = 0;
 
 void CloseDungeonPortal()
 {
@@ -128,7 +129,7 @@ void CloseDungeonPortal()
 	});
 }
 
-void SetDungeonPortalRemote(int level, uint32_t scrollSeed, int modCount)
+void SetDungeonPortalRemote(int level, uint32_t scrollSeed, int modCount, int difficulty)
 {
 	// Set/replace the hub dungeon portal's state locally, including the RedPortal visual.
 	// Used both by the initiator and by co-op peers receiving CMD_OPENDUNGEONPORTAL; it
@@ -138,23 +139,26 @@ void SetDungeonPortalRemote(int level, uint32_t scrollSeed, int modCount)
 	DungeonPortalLevel = level;
 	DungeonPortalSeed = scrollSeed;
 	DungeonPortalModCount = modCount;
+	DungeonPortalDifficulty = difficulty;
 	DungeonPortalPos = { HubDungeonPortalX, HubDungeonPortalY };
 	if (leveltype == DTYPE_TOWN)
 		AddMissile(DungeonPortalPos, DungeonPortalPos, Direction::South, MissileID::RedPortal, TARGET_MONSTERS, *MyPlayer, 0, 0);
 }
 
-void OpenDungeonPortal(int level, uint32_t scrollSeed, int modCount)
+void OpenDungeonPortal(int level, uint32_t scrollSeed, int modCount, int difficulty)
 {
 	// Open the hub dungeon portal to a run at `level`, reseeding the run once (new
 	// layout). The dungeon then persists/resumes until the portal is replaced or
-	// closed. `scrollSeed`/`modCount` are remembered so the run derives this scroll's
-	// exact modifiers, and are broadcast so co-op peers build the same modified run.
-	SetDungeonPortalRemote(level, scrollSeed, modCount);
+	// closed. `scrollSeed`/`modCount`/`difficulty` are remembered so the run derives this
+	// scroll's exact modifiers and difficulty, and are broadcast so co-op peers build the
+	// same modified run. Difficulty is packed into the modifier-count param's high bits
+	// (both are tiny) to fit the 4-parameter message.
+	SetDungeonPortalRemote(level, scrollSeed, modCount, difficulty);
 	PrimeScrollRun(level);
 	if (gbIsMultiplayer)
 		NetSendCmdParam4(true, CMD_OPENDUNGEONPORTAL, static_cast<uint16_t>(level),
 		    static_cast<uint16_t>(scrollSeed >> 16), static_cast<uint16_t>(scrollSeed & 0xFFFF),
-		    static_cast<uint16_t>(modCount));
+		    static_cast<uint16_t>((modCount & 0x0F) | ((difficulty & 0x03) << 4)));
 }
 
 void SyncDungeonPortal()

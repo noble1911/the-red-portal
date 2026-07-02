@@ -2028,8 +2028,10 @@ size_t OnOpenDungeonPortal(const TCmdParam4 &message, Player &player)
 		const int level = Swap16LE(message.wParam1);
 		const uint32_t seed = (static_cast<uint32_t>(Swap16LE(message.wParam2)) << 16)
 		    | static_cast<uint32_t>(Swap16LE(message.wParam3));
-		const int modCount = Swap16LE(message.wParam4);
-		SetDungeonPortalRemote(level, seed, modCount);
+		const uint16_t packed = Swap16LE(message.wParam4);
+		const int modCount = packed & 0x0F;
+		const int difficulty = (packed >> 4) & 0x03;
+		SetDungeonPortalRemote(level, seed, modCount, difficulty);
 	}
 
 	return sizeof(message);

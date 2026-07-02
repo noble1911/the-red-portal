@@ -1213,13 +1213,13 @@ void CraftApply()
 		break;
 	case ScrollCraftOp::Upgrade: {
 		const int newLevel = std::min(DungeonScrollLevel(target) + 1, MaxRunDepth);
-		target._iCreateInfo = MakeDungeonScrollCreateInfo(newLevel, DungeonScrollModCount(target));
+		target._iCreateInfo = MakeDungeonScrollCreateInfo(newLevel, DungeonScrollModCount(target), DungeonScrollDifficulty(target));
 		target._ivalue = target._iIvalue = newLevel * 50;
 		break;
 	}
 	case ScrollCraftOp::AddMod: {
 		const int newCount = std::min(DungeonScrollModCount(target) + 1, MaxScrollMods);
-		target._iCreateInfo = MakeDungeonScrollCreateInfo(DungeonScrollLevel(target), newCount);
+		target._iCreateInfo = MakeDungeonScrollCreateInfo(DungeonScrollLevel(target), newCount, DungeonScrollDifficulty(target));
 		break;
 	}
 	}

@@ -216,10 +216,22 @@ RunModMultipliers AggregateRunMods(const ScrollModSet &set)
 void RefreshActiveRunMods()
 {
 	ActiveRunMods = RunModMultipliers {};
-	if (!RunsModEnabled || !DungeonPortalOpen)
-		return;
-	// Modifiers apply only while on the open portal's dungeon level.
-	if (leveltype == DTYPE_TOWN || currlevel != DungeonPortalLevel)
+
+	// [RUNS MOD] Modifiers and difficulty apply only while on the open portal's dungeon
+	// level; the hub (and any non-run level) is always Normal.
+	const bool onRunLevel = RunsModEnabled && DungeonPortalOpen
+	    && leveltype != DTYPE_TOWN && currlevel == DungeonPortalLevel;
+
+	// [RUNS MOD] The scroll's difficulty drives the engine's real Nightmare/Hell scaling
+	// (monster level/HP, resistances/immunities, XP, the Hell player penalty). This runs
+	// before monsters are created on each level load, so a fresh run bakes the right
+	// difficulty; the hub resets to Normal. Each client mirrors its own (synced) portal
+	// state, so co-op stays consistent.
+	sgGameInitInfo.nDifficulty = onRunLevel
+	    ? static_cast<_difficulty>(std::clamp(DungeonPortalDifficulty, 0, static_cast<int>(DIFF_HELL)))
+	    : DIFF_NORMAL;
+
+	if (!onRunLevel)
 		return;
 	ActiveRunMods = AggregateRunMods(RollScrollMods(DungeonPortalSeed, DungeonPortalLevel, DungeonPortalModCount));
 }
