@@ -7,6 +7,7 @@
 
 #include "cursor.h"
 #include "engine/clx_sprite.hpp"
+#include "bag.h"
 #include "engine/load_cel.hpp"
 #include "engine/load_cl2.hpp"
 #include "engine/load_file.hpp"
@@ -513,6 +514,11 @@ void TalkToStashChest(Player & /*player*/, Towner & /*chest*/)
 	IsStashOpen = true;
 	Stash.RefreshItemStatFlags();
 	invflag = true;
+	// Show the carried bag alongside, so items can be ferried stash <-> bag. Stacked
+	// mode only: in the left-panel fallback the bag would occupy the stash's spot
+	// (and OpenBag would close the stash we just opened).
+	if (!BagOnLeftPanel())
+		OpenBag();
 }
 
 void TalkToStoryteller(Player &player, Towner & /*storyteller*/)

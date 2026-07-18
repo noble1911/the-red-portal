@@ -385,6 +385,11 @@ void LeftMouseDown(uint16_t modState)
 				stream_stop();
 			} else if (CharFlag && GetLeftPanel().contains(MousePosition)) {
 				CheckChrBtns();
+			} else if (IsBagShown() && GetBagRect().contains(MousePosition)) {
+				// [RUNS MOD] Checked BEFORE the inventory panel: the stacked bag's first
+				// row overlaps the inventory panel's bottom border band (y 338..352), and
+				// that strip must belong to the bag or clicks there hit dead border.
+				CheckBagItem(MousePosition, isShiftHeld, isCtrlHeld);
 			} else if (invflag && GetRightPanel().contains(MousePosition)) {
 				if (!DropGoldFlag)
 					CheckInvItem(isShiftHeld, isCtrlHeld);
@@ -392,8 +397,6 @@ void LeftMouseDown(uint16_t modState)
 				if (!IsWithdrawGoldOpen)
 					CheckStashItem(MousePosition, isShiftHeld, isCtrlHeld);
 				CheckStashButtonPress(MousePosition);
-			} else if (IsBagOpen && GetBagRect().contains(MousePosition)) {
-				CheckBagItem(MousePosition, isShiftHeld, isCtrlHeld); // [RUNS MOD]
 			} else if (IsVisualStoreOpen && GetLeftPanel().contains(MousePosition)) {
 				if (!MyPlayer->HoldItem.isEmpty()) {
 					CheckVisualStorePaste(MousePosition);

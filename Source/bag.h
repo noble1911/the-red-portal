@@ -83,6 +83,10 @@ Point GetBagPanelPosition();
 Rectangle GetBagRect();
 /** @brief True when the bag is drawn at the left-panel position instead of below the inventory. */
 bool BagOnLeftPanel();
+/** @brief [RUNS MOD] Bag is open AND actually shown/interactive right now. False while the
+ * visual store occupies the bag's left-panel fallback position on short displays; use this
+ * (not IsBagOpen) for click/hover routing so the hidden bag cannot swallow store clicks. */
+bool IsBagShown();
 void InitBag();
 void FreeBagGFX();
 void DrawBag(const Surface &out);

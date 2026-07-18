@@ -2436,6 +2436,10 @@ void BarmaidEnter()
 		IsStashOpen = true;
 		Stash.RefreshItemStatFlags();
 		invflag = true;
+		// [RUNS MOD] Show the carried bag alongside (stacked mode only; see
+		// TalkToStashChest).
+		if (RunsModEnabled && !BagOnLeftPanel())
+			OpenBag();
 		if (ControlMode != ControlTypes::KeyboardAndMouse) {
 			if (pcurs == CURSOR_DISARM)
 				NewCursor(CURSOR_HAND);

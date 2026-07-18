@@ -846,16 +846,18 @@ bool CheckPanelsAndFlags(Rectangle mainPanel)
 	if (DoomFlag) {
 		return true;
 	}
+	// [RUNS MOD] Checked BEFORE the inventory panel: the stacked bag's first row overlaps
+	// the inventory panel's bottom border band (y 338..352); that strip belongs to the bag.
+	if (IsBagShown() && GetBagRect().contains(MousePosition)) {
+		pcursbagitem = CheckBagHLight(MousePosition);
+		return true; // bag sits over the game world, so suppress world targeting under it
+	}
 	if (invflag && GetRightPanel().contains(MousePosition)) {
 		pcursinvitem = CheckInvHLight();
 		return true;
 	}
 	if (IsStashOpen && GetLeftPanel().contains(MousePosition)) {
 		pcursstashitem = CheckStashHLight(MousePosition);
-	}
-	if (IsBagOpen && GetBagRect().contains(MousePosition)) {
-		pcursbagitem = CheckBagHLight(MousePosition); // [RUNS MOD]
-		return true; // bag sits over the game world, so suppress world targeting under it
 	}
 	if (IsVisualStoreOpen && GetLeftPanel().contains(MousePosition)) {
 		pcursstoreitem = CheckVisualStoreHLight(MousePosition);

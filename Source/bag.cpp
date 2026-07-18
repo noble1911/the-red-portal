@@ -80,6 +80,19 @@ bool IsItemAllowedInBag(const Item &item)
 void CheckBagPaste(Point cursorPosition)
 {
 	Player &player = *MyPlayer;
+	// [RUNS MOD] Gold never lives in the bag: the gold total and every spending path
+	// scan the inventory only, so bag gold would be money vendors cannot see. Since the
+	// bag renders as an extension of the inventory, honor the drop gesture anyway by
+	// merging the gold into the inventory's stacks; any remainder that does not fit
+	// stays on the cursor.
+	if (player.HoldItem._itype == ItemType::Gold) {
+		if (GoldAutoPlace(player, player.HoldItem)) {
+			PlaySFX(SfxID::ItemGold);
+			player.HoldItem.clear();
+			NewCursor(player.HoldItem);
+		}
+		return;
+	}
 	if (!IsItemAllowedInBag(player.HoldItem))
 		return;
 
@@ -233,6 +246,11 @@ constexpr int InvLastRowBottom = 338;
 constexpr int InvBottomBorderHeight = 14; // 352 - 338
 } // namespace
 
+bool IsBagShown()
+{
+	return IsBagOpen && !(IsVisualStoreOpen && BagOnLeftPanel());
+}
+
 bool BagOnLeftPanel()
 {
 	// The bag extends the inventory panel downward when there is vertical room above the
@@ -307,13 +325,17 @@ void FreeBagGFX()
 
 void OpenBag()
 {
-	// Bag is a left-side panel shown alongside the inventory; close the other left
-	// panels so only one is visible at a time.
 	invflag = true;
 	IsBagOpen = true;
-	CharFlag = false;
-	QuestLogIsOpen = false;
-	IsStashOpen = false;
+	// [RUNS MOD] Left panels conflict only when the bag itself needs the left-panel
+	// fallback (short displays). Stacked below the inventory it coexists with the
+	// stash, character and quest panels -- notably, the stash + bag together is how
+	// items get ferried between long-term storage and the carried overflow.
+	if (BagOnLeftPanel()) {
+		CharFlag = false;
+		QuestLogIsOpen = false;
+		IsStashOpen = false;
+	}
 	Bag.RefreshItemStatFlags();
 }
 

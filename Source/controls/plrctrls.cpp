@@ -2735,6 +2735,10 @@ void PerformSecondaryAction()
 		} else if (IsStashOpen) {
 			if (pcursstashitem != StashStruct::EmptyCell) {
 				TransferItemToInventory(myPlayer, pcursstashitem);
+			} else if (pcursbagitem != BagStruct::EmptyCell) {
+				// [RUNS MOD] The bag is open next to the stash; hop the item to the
+				// inventory (a second press there sends it on to the stash).
+				TransferBagItemToInventory(myPlayer, pcursbagitem);
 			} else if (pcursinvitem != -1) {
 				TransferItemToStash(myPlayer, pcursinvitem);
 			}
