@@ -47,8 +47,11 @@ jobs:
           cp -r ./build/mods package/mods
           cd package && zip -r ../the-red-portal-switch.zip .
 
+      # [RUNS MOD] Non-fatal: the release asset below is what matters; a full Actions
+      # artifact-storage quota must not abort the job before it is attached.
       - name: Upload Package
         if: ${{ !env.ACT }}
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: the-red-portal-switch
