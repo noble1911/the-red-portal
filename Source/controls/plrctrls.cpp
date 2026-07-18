@@ -41,7 +41,6 @@
 #include "levels/trigs.h"
 #include "minitext.h"
 #include "missiles.h"
-#include "bag.h"
 #include "panels/spell_icons.hpp"
 #include "panels/spell_list.hpp"
 #include "panels/ui_panels.hpp"
@@ -88,7 +87,6 @@ namespace {
 
 int Slot = SLOTXY_INV_FIRST;
 Point ActiveStashSlot = InvalidStashPoint;
-Point ActiveBagSlot = InvalidBagPoint; // [RUNS MOD] controller focus within the bag grid
 Point VisualStoreSlot = { 0, 0 };
 int PreviousInventoryColumn = -1;
 bool BeltReturnsToStash = false;
@@ -686,6 +684,24 @@ int GetItemIdOnSlot(int slot)
 	return 0;
 }
 
+/** @brief [RUNS MOD] True for the leftmost slot of any (possibly extended) inventory row. */
+bool IsInvSlotRowStart(int slot)
+{
+	return slot >= SLOTXY_INV_FIRST && slot <= SLOTXY_INV_LAST && (slot - SLOTXY_INV_FIRST) % INV_ROW_SLOT_SIZE == 0;
+}
+
+/** @brief [RUNS MOD] True for the rightmost slot of any (possibly extended) inventory row. */
+bool IsInvSlotRowEnd(int slot)
+{
+	return slot >= SLOTXY_INV_FIRST && slot <= SLOTXY_INV_LAST && (slot - SLOTXY_INV_FIRST) % INV_ROW_SLOT_SIZE == INV_ROW_SLOT_SIZE - 1;
+}
+
+/** @brief [RUNS MOD] The last usable inventory slot (locked rows are not navigable). */
+int LastUnlockedInvSlot()
+{
+	return SLOTXY_INV_FIRST + UnlockedInventoryGridCells(*MyPlayer) - 1;
+}
+
 /**
  * Get item size (grid size) on the slot specified. Returns 1x1 if none exists.
  */
@@ -817,7 +833,9 @@ int FindClosestInventorySlot(
 			checkCandidateSlot(SLOTXY_AMULET);
 		}
 	}
-	for (int i = SLOTXY_INV_FIRST; i <= SLOTXY_INV_LAST; i++) {
+	// [RUNS MOD] Only the unlocked slots are navigable.
+	const int lastUnlockedSlot = LastUnlockedInvSlot();
+	for (int i = SLOTXY_INV_FIRST; i <= lastUnlockedSlot; i++) {
 		checkCandidateSlot(i);
 	}
 
@@ -911,72 +929,6 @@ void LiftStashItem()
 	mousePos.x += ((cursorSizeInCells.width) * InventorySlotSizeInPixels.width) / 2;
 	mousePos.y += ((cursorSizeInCells.height) * InventorySlotSizeInPixels.height) / 2;
 
-	SetCursorPos(mousePos);
-}
-
-// [RUNS MOD] Controller helpers for the carried bag, mirroring the stash equivalents.
-Point FindClosestBagSlot(Point mousePos)
-{
-	int shortestDistance = std::numeric_limits<int>::max();
-	Point bestSlot = {};
-	// [RUNS MOD] Only unlocked rows are navigable.
-	for (const Point point : PointsInRectangle(Rectangle { { 0, 0 }, Size { BagGridSize.width, Bag.unlockedRows } })) {
-		const int distance = mousePos.ManhattanDistance(GetBagSlotCoord(point));
-		if (distance < shortestDistance) {
-			shortestDistance = distance;
-			bestSlot = point;
-		}
-	}
-	return bestSlot;
-}
-
-Point FindFirstBagSlotOnItem(BagStruct::BagCell itemInvId)
-{
-	if (itemInvId == BagStruct::EmptyCell)
-		return InvalidBagPoint;
-	for (const Point point : BagGridRange) {
-		if (Bag.GetItemIdAtPosition(point) == itemInvId)
-			return point;
-	}
-	return InvalidBagPoint;
-}
-
-void LiftBagItem()
-{
-	const Point bagSlot = (ActiveBagSlot != InvalidBagPoint) ? ActiveBagSlot : FindClosestBagSlot(MousePosition);
-
-	const Size cursorSizeInCells = MyPlayer->HoldItem.isEmpty() ? Size { 1, 1 } : GetInventorySize(MyPlayer->HoldItem);
-
-	// Find any item occupying a slot that is currently under the cursor.
-	const BagStruct::BagCell itemUnderCursor = [](Point bagSlot, Size cursorSizeInCells) -> BagStruct::BagCell {
-		if (bagSlot == InvalidBagPoint)
-			return BagStruct::EmptyCell;
-		for (const Point slotUnderCursor : PointsInRectangle(Rectangle { bagSlot, cursorSizeInCells })) {
-			if (slotUnderCursor.x >= BagGridSize.width || slotUnderCursor.y >= BagGridSize.height)
-				continue;
-			const BagStruct::BagCell itemId = Bag.GetItemIdAtPosition(slotUnderCursor);
-			if (itemId != BagStruct::EmptyCell)
-				return itemId;
-		}
-		return BagStruct::EmptyCell;
-	}(bagSlot, cursorSizeInCells);
-
-	const Point jumpSlot = itemUnderCursor == BagStruct::EmptyCell ? bagSlot : FindFirstBagSlotOnItem(itemUnderCursor);
-	CheckBagItem(MousePosition);
-
-	Point mousePos = GetBagSlotCoord(jumpSlot);
-	ActiveBagSlot = jumpSlot;
-	// Center the cursor based on the item we just put down or are holding.
-	Size newSize = { 1, 1 };
-	if (!MyPlayer->HoldItem.isEmpty()) {
-		newSize = GetInventorySize(MyPlayer->HoldItem);
-	} else {
-		const BagStruct::BagCell id = Bag.GetItemIdAtPosition(jumpSlot);
-		if (id != BagStruct::EmptyCell)
-			newSize = GetInventorySize(Bag.items[id]);
-	}
-	mousePos.x += (newSize.width * InventorySlotSizeInPixels.width) / 2;
-	mousePos.y += (newSize.height * InventorySlotSizeInPixels.height) / 2;
 	SetCursorPos(mousePos);
 }
 
@@ -1079,8 +1031,8 @@ void VisualStoreMove(AxisDirection dir)
 			}
 
 			// If we're in the leftmost column or left side of body, move back to visual store
-			if (IsAnyOf(firstSlot, SLOTXY_HEAD, SLOTXY_HAND_LEFT, SLOTXY_RING_LEFT, SLOTXY_AMULET, SLOTXY_CHEST,
-			        SLOTXY_INV_ROW1_FIRST, SLOTXY_INV_ROW2_FIRST, SLOTXY_INV_ROW3_FIRST, SLOTXY_INV_ROW4_FIRST)) {
+			if (IsAnyOf(firstSlot, SLOTXY_HEAD, SLOTXY_HAND_LEFT, SLOTXY_RING_LEFT, SLOTXY_AMULET, SLOTXY_CHEST)
+			    || IsInvSlotRowStart(firstSlot)) {
 				InvalidateInventorySlot();
 				// Focus on rightmost column of visual store (closest to inventory)
 				// Preserve vertical position based on inventory slot (similar to stash behavior)
@@ -1315,7 +1267,7 @@ void InventoryMove(AxisDirection dir)
 	if (dir.x == AxisDirectionX_LEFT) {
 		if (isHoldingItem) {
 			if (Slot >= SLOTXY_INV_FIRST && Slot <= SLOTXY_BELT_LAST) {
-				if (IsNoneOf(Slot, SLOTXY_INV_ROW1_FIRST, SLOTXY_INV_ROW2_FIRST, SLOTXY_INV_ROW3_FIRST, SLOTXY_INV_ROW4_FIRST, SLOTXY_BELT_FIRST)) {
+				if (!IsInvSlotRowStart(Slot) && Slot != SLOTXY_BELT_FIRST) {
 					Slot -= 1;
 				}
 			} else if (heldItem._itype == ItemType::Ring) {
@@ -1335,13 +1287,13 @@ void InventoryMove(AxisDirection dir)
 			} else if (Slot >= SLOTXY_INV_FIRST && Slot <= SLOTXY_BELT_LAST) {
 				const int8_t itemId = GetItemIdOnSlot(Slot);
 				if (itemId != 0) {
-					for (int i = 1; i < INV_ROW_SLOT_SIZE && !IsAnyOf(Slot - i + 1, SLOTXY_INV_ROW1_FIRST, SLOTXY_INV_ROW2_FIRST, SLOTXY_INV_ROW3_FIRST, SLOTXY_INV_ROW4_FIRST, SLOTXY_BELT_FIRST); i++) {
+					for (int i = 1; i < INV_ROW_SLOT_SIZE && !IsInvSlotRowStart(Slot - i + 1) && Slot - i + 1 != SLOTXY_BELT_FIRST; i++) {
 						if (itemId != GetItemIdOnSlot(Slot - i)) {
 							Slot -= i;
 							break;
 						}
 					}
-				} else if (IsNoneOf(Slot, SLOTXY_INV_ROW1_FIRST, SLOTXY_INV_ROW2_FIRST, SLOTXY_INV_ROW3_FIRST, SLOTXY_INV_ROW4_FIRST, SLOTXY_BELT_FIRST)) {
+				} else if (!IsInvSlotRowStart(Slot) && Slot != SLOTXY_BELT_FIRST) {
 					Slot -= 1;
 				}
 			}
@@ -1349,7 +1301,7 @@ void InventoryMove(AxisDirection dir)
 	} else if (dir.x == AxisDirectionX_RIGHT) {
 		if (isHoldingItem) {
 			if (Slot >= SLOTXY_INV_FIRST && Slot <= SLOTXY_BELT_LAST) {
-				if (IsNoneOf(Slot + itemSize.width - 1, SLOTXY_INV_ROW1_LAST, SLOTXY_INV_ROW2_LAST, SLOTXY_INV_ROW3_LAST, SLOTXY_INV_ROW4_LAST, SLOTXY_BELT_LAST)) {
+				if (!IsInvSlotRowEnd(Slot + itemSize.width - 1) && Slot + itemSize.width - 1 != SLOTXY_BELT_LAST) {
 					Slot += 1;
 				}
 			} else if (heldItem._itype == ItemType::Ring) {
@@ -1369,13 +1321,13 @@ void InventoryMove(AxisDirection dir)
 			} else if (Slot >= SLOTXY_INV_FIRST && Slot <= SLOTXY_BELT_LAST) {
 				const int8_t itemId = GetItemIdOnSlot(Slot);
 				if (itemId != 0) {
-					for (int i = 1; i < INV_ROW_SLOT_SIZE && !IsAnyOf(Slot + i - 1, SLOTXY_INV_ROW1_LAST, SLOTXY_INV_ROW2_LAST, SLOTXY_INV_ROW3_LAST, SLOTXY_INV_ROW4_LAST, SLOTXY_BELT_LAST); i++) {
+					for (int i = 1; i < INV_ROW_SLOT_SIZE && !IsInvSlotRowEnd(Slot + i - 1) && Slot + i - 1 != SLOTXY_BELT_LAST; i++) {
 						if (itemId != GetItemIdOnSlot(Slot + i)) {
 							Slot += i;
 							break;
 						}
 					}
-				} else if (IsNoneOf(Slot, SLOTXY_INV_ROW1_LAST, SLOTXY_INV_ROW2_LAST, SLOTXY_INV_ROW3_LAST, SLOTXY_INV_ROW4_LAST, SLOTXY_BELT_LAST)) {
+				} else if (!IsInvSlotRowEnd(Slot) && Slot != SLOTXY_BELT_LAST) {
 					Slot += 1;
 				}
 			}
@@ -1383,7 +1335,12 @@ void InventoryMove(AxisDirection dir)
 	}
 	if (dir.y == AxisDirectionY_UP) {
 		if (isHoldingItem) {
-			if (Slot >= SLOTXY_INV_ROW2_FIRST) { // general inventory
+			if (Slot >= SLOTXY_BELT_FIRST) {
+				// [RUNS MOD] The belt is no longer contiguous with the grid ids: jump to
+				// the last unlocked inventory row, keeping the column.
+				const int col = std::min<int>(Slot - SLOTXY_BELT_FIRST, INV_ROW_SLOT_SIZE - itemSize.width);
+				Slot = LastUnlockedInvSlot() + 1 - INV_ROW_SLOT_SIZE + col;
+			} else if (Slot >= SLOTXY_INV_ROW2_FIRST) { // general inventory
 				Slot -= INV_ROW_SLOT_SIZE;
 			} else if (Slot >= SLOTXY_INV_FIRST) {
 				if (heldItem._itype == ItemType::Ring) {
@@ -1415,6 +1372,9 @@ void InventoryMove(AxisDirection dir)
 				Slot = SLOTXY_HAND_RIGHT;
 			} else if (Slot == SLOTXY_HAND_RIGHT) {
 				Slot = SLOTXY_AMULET;
+			} else if (Slot >= SLOTXY_BELT_FIRST) {
+				// [RUNS MOD] From the belt jump to the last unlocked inventory row.
+				Slot = LastUnlockedInvSlot() + 1 - INV_ROW_SLOT_SIZE + std::min<int>(Slot - SLOTXY_BELT_FIRST, INV_ROW_SLOT_SIZE - 1);
 			} else if (Slot >= SLOTXY_INV_ROW2_FIRST) {
 				const int8_t itemId = GetItemIdOnSlot(Slot);
 				if (itemId != 0) {
@@ -1441,11 +1401,14 @@ void InventoryMove(AxisDirection dir)
 				Slot = SLOTXY_INV_ROW1_FIRST + (itemSize.width > 1 ? 0 : 1);
 			} else if (Slot == SLOTXY_RING_RIGHT || Slot == SLOTXY_HAND_RIGHT || Slot == SLOTXY_AMULET) {
 				Slot = SLOTXY_INV_ROW1_LAST - 1;
-			} else if (Slot <= (SLOTXY_INV_ROW4_LAST - (itemSize.height * INV_ROW_SLOT_SIZE))) {
+			} else if (Slot <= (LastUnlockedInvSlot() - (itemSize.height * INV_ROW_SLOT_SIZE))) {
 				Slot += INV_ROW_SLOT_SIZE;
-			} else if (Slot <= SLOTXY_INV_LAST && heldItem._itype == ItemType::Misc && itemSize == Size { 1, 1 }) { // forcing only 1x1 misc items
-				if (Slot + INV_ROW_SLOT_SIZE <= SLOTXY_BELT_LAST)
-					Slot += INV_ROW_SLOT_SIZE;
+			} else if (Slot <= LastUnlockedInvSlot() && heldItem._itype == ItemType::Misc && itemSize == Size { 1, 1 }) { // forcing only 1x1 misc items
+				// [RUNS MOD] Past the last unlocked row: jump to the belt slot in the
+				// same column (the first 8 columns line up with the belt).
+				const int col = (Slot - SLOTXY_INV_FIRST) % INV_ROW_SLOT_SIZE;
+				if (col < MaxBeltItems)
+					Slot = SLOTXY_BELT_FIRST + col;
 			}
 		} else {
 			if (Slot == SLOTXY_HEAD) {
@@ -1472,16 +1435,22 @@ void InventoryMove(AxisDirection dir)
 			} else if (Slot == SLOTXY_HAND_RIGHT) {
 				Slot = SLOTXY_RING_RIGHT;
 			} else if (Slot <= SLOTXY_INV_LAST) {
+				// [RUNS MOD] Step past any rows still covered by the hovered item; when
+				// the move would leave the unlocked grid, jump to the belt instead (the
+				// first 8 columns line up with the belt slots).
+				const int lastUnlockedSlot = LastUnlockedInvSlot();
 				const int8_t itemId = GetItemIdOnSlot(Slot);
+				int step = 1;
 				if (itemId != 0) {
-					for (int i = 1; i < 5 && Slot + i * INV_ROW_SLOT_SIZE <= SLOTXY_BELT_LAST; i++) {
-						if (itemId != GetItemIdOnSlot(Slot + (i * INV_ROW_SLOT_SIZE))) {
-							Slot += i * INV_ROW_SLOT_SIZE;
-							break;
-						}
-					}
-				} else if (Slot + INV_ROW_SLOT_SIZE <= SLOTXY_BELT_LAST) {
-					Slot += INV_ROW_SLOT_SIZE;
+					while (Slot + step * INV_ROW_SLOT_SIZE <= lastUnlockedSlot && GetItemIdOnSlot(Slot + step * INV_ROW_SLOT_SIZE) == itemId)
+						step++;
+				}
+				if (Slot + step * INV_ROW_SLOT_SIZE <= lastUnlockedSlot) {
+					Slot += step * INV_ROW_SLOT_SIZE;
+				} else {
+					const int col = (Slot - SLOTXY_INV_FIRST) % INV_ROW_SLOT_SIZE;
+					if (col < MaxBeltItems)
+						Slot = SLOTXY_BELT_FIRST + col;
 				}
 			}
 		}
@@ -1615,7 +1584,8 @@ void StashMove(AxisDirection dir)
 
 		// If we're in the leftmost column (or hovering over an item on the left side of the inventory) or
 		//  left side of the body and we're moving left we need to move into the closest stash column
-		if (IsAnyOf(firstSlot, SLOTXY_HEAD, SLOTXY_HAND_LEFT, SLOTXY_RING_LEFT, SLOTXY_AMULET, SLOTXY_CHEST, SLOTXY_INV_ROW1_FIRST, SLOTXY_INV_ROW2_FIRST, SLOTXY_INV_ROW3_FIRST, SLOTXY_INV_ROW4_FIRST)) {
+		if (IsAnyOf(firstSlot, SLOTXY_HEAD, SLOTXY_HAND_LEFT, SLOTXY_RING_LEFT, SLOTXY_AMULET, SLOTXY_CHEST)
+		    || IsInvSlotRowStart(firstSlot)) {
 			if (IsVisualStoreOpen) {
 				InvalidateInventorySlot();
 				FocusOnVisualStore();
@@ -1709,132 +1679,6 @@ void StashMove(AxisDirection dir)
 	FocusOnInventory();
 }
 
-// [RUNS MOD] D-pad / left-stick navigation for the carried bag. The bag normally sits
-// directly below the inventory, so the inventory<->bag transition is vertical (DOWN from
-// the bottom inventory row enters the bag, UP from the bag top row returns). On short
-// displays the bag falls back to the left-panel position, where the transition is
-// horizontal like the stash (LEFT into the bag, RIGHT back to the inventory).
-void BagMove(AxisDirection dir)
-{
-	static AxisDirectionRepeater repeater(/*min_interval_ms=*/150);
-	dir = repeater.Get(dir);
-	if (dir.x == AxisDirectionX_NONE && dir.y == AxisDirectionY_NONE)
-		return;
-
-	const Item &holdItem = MyPlayer->HoldItem;
-	const bool bagLeft = BagOnLeftPanel();
-	Size itemSize = holdItem.isEmpty() ? Size { 1, 1 } : GetInventorySize(holdItem);
-
-	// If we are in neither grid, focus whichever is closest to the cursor.
-	if (Slot < 0 && ActiveBagSlot == InvalidBagPoint) {
-		const int invSlot = FindClosestInventorySlot(MousePosition, holdItem);
-		const int invDistance = MousePosition.ManhattanDistance(GetSlotCoord(invSlot));
-		const Point bagSlot = FindClosestBagSlot(MousePosition);
-		const int bagDistance = MousePosition.ManhattanDistance(GetBagSlotCoord(bagSlot));
-		if (invDistance <= bagDistance) {
-			InventoryMove(dir);
-			return;
-		}
-		ActiveBagSlot = bagSlot;
-	}
-
-	// Transition from the inventory INTO the bag at the edge facing it.
-	if (Slot >= 0) {
-		int firstSlot = Slot;
-		if (Slot >= SLOTXY_INV_FIRST && Slot <= SLOTXY_INV_LAST && holdItem.isEmpty()) {
-			const int8_t itemId = GetItemIdOnSlot(Slot);
-			if (itemId != 0)
-				firstSlot = FindFirstSlotOnItem(itemId);
-		}
-		if (!bagLeft && dir.y == AxisDirectionY_DOWN) {
-			// Stacked below: the bottom inventory row drops straight into the bag's top row.
-			if (firstSlot >= SLOTXY_INV_ROW4_FIRST && firstSlot <= SLOTXY_INV_ROW4_LAST) {
-				const Point slotCoord = GetSlotCoord(Slot);
-				InvalidateInventorySlot();
-				ActiveBagSlot = FindClosestBagSlot({ slotCoord.x, GetBagSlotCoord({ 0, 0 }).y });
-				ActiveBagSlot.x = std::clamp(ActiveBagSlot.x, 0, BagGridSize.width - itemSize.width);
-				ActiveBagSlot.y = 0;
-				dir.y = AxisDirectionY_NONE;
-			}
-		} else if (bagLeft && dir.x == AxisDirectionX_LEFT) {
-			// Left fallback: leftmost inventory column / body slots cross into the bag.
-			if (IsAnyOf(firstSlot, SLOTXY_HEAD, SLOTXY_HAND_LEFT, SLOTXY_RING_LEFT, SLOTXY_AMULET, SLOTXY_CHEST, SLOTXY_INV_ROW1_FIRST, SLOTXY_INV_ROW2_FIRST, SLOTXY_INV_ROW3_FIRST, SLOTXY_INV_ROW4_FIRST)) {
-				const Point slotCoord = GetSlotCoord(Slot);
-				InvalidateInventorySlot();
-				ActiveBagSlot = FindClosestBagSlot(slotCoord) - Displacement { itemSize.width - 1, 0 };
-				ActiveBagSlot.x = std::clamp(ActiveBagSlot.x, 0, BagGridSize.width - itemSize.width);
-				ActiveBagSlot.y = std::clamp(ActiveBagSlot.y, 0, Bag.unlockedRows - itemSize.height);
-				dir.x = AxisDirectionX_NONE;
-			}
-		}
-	}
-
-	if (Slot >= 0) {
-		InventoryMove(dir);
-		return;
-	}
-
-	// Navigate within the bag grid, leaving it at the edge facing the inventory.
-	// [RUNS MOD] The navigable grid ends at the last unlocked row.
-	const Size gridSize { BagGridSize.width, Bag.unlockedRows };
-	const bool isHoldingItem = !holdItem.isEmpty();
-	Size movingItemSize = isHoldingItem ? GetInventorySize(holdItem) : Size { 1, 1 };
-	if (!isHoldingItem && ActiveBagSlot != InvalidBagPoint) {
-		const BagStruct::BagCell id = Bag.GetItemIdAtPosition(ActiveBagSlot);
-		if (id != BagStruct::EmptyCell)
-			movingItemSize = GetInventorySize(Bag.items[id]);
-	}
-	auto getCellId = [&](Point p) -> int { return Bag.GetItemIdAtPosition(p); };
-
-	auto returnToInventory = [&](Point anchor) {
-		Slot = FindClosestInventorySlot(anchor, holdItem, [](Point mousePos, int slot) {
-			const Point slotPos = GetSlotCoord(slot);
-			return (std::abs(mousePos.y - slotPos.y) * 3) + std::abs(mousePos.x - slotPos.x);
-		});
-		ActiveBagSlot = InvalidBagPoint;
-	};
-
-	if (!bagLeft) {
-		if (dir.y == AxisDirectionY_UP) {
-			if (!GridMove(ActiveBagSlot, dir, gridSize, movingItemSize, isHoldingItem, getCellId)) {
-				const Point bagCoord = GetBagSlotCoord(ActiveBagSlot);
-				returnToInventory({ bagCoord.x, GetRightPanel().position.y + SidePanelSize.height });
-			}
-		} else {
-			GridMove(ActiveBagSlot, dir, gridSize, movingItemSize, isHoldingItem, getCellId);
-		}
-	} else {
-		if (dir.x == AxisDirectionX_RIGHT) {
-			if (!GridMove(ActiveBagSlot, dir, gridSize, movingItemSize, isHoldingItem, getCellId)) {
-				const Point bagCoord = GetBagSlotCoord(ActiveBagSlot);
-				returnToInventory({ GetRightPanel().position.x, bagCoord.y });
-			}
-		} else {
-			GridMove(ActiveBagSlot, dir, gridSize, movingItemSize, isHoldingItem, getCellId);
-		}
-	}
-
-	if (Slot >= 0) {
-		ResetInvCursorPosition();
-		return;
-	}
-
-	if (ActiveBagSlot != InvalidBagPoint) {
-		Point mousePos = GetBagSlotCoord(ActiveBagSlot);
-		if (holdItem.isEmpty()) {
-			const BagStruct::BagCell id = Bag.GetItemIdAtPosition(ActiveBagSlot);
-			if (id != BagStruct::EmptyCell) {
-				itemSize = GetInventorySize(Bag.items[id]);
-				mousePos = GetBagSlotCoord(FindFirstBagSlotOnItem(id));
-			}
-		}
-		mousePos += Displacement { itemSize.width * INV_SLOT_HALF_SIZE_PX, itemSize.height * INV_SLOT_HALF_SIZE_PX };
-		SetCursorPos(mousePos);
-		return;
-	}
-
-	FocusOnInventory();
-}
 
 void HotSpellMove(AxisDirection dir)
 {
@@ -1991,9 +1835,6 @@ HandleLeftStickOrDPadFn GetLeftStickOrDPadGameUIHandler()
 	}
 	if (IsStashOpen) {
 		return &StashMove;
-	}
-	if (IsBagOpen) { // [RUNS MOD] bag forces invflag on, so check it before the inventory
-		return &BagMove;
 	}
 	if (IsVisualStoreOpen) {
 		return &VisualStoreMove;
@@ -2408,7 +2249,6 @@ void InvalidateInventorySlot()
 {
 	Slot = -1;
 	ActiveStashSlot = InvalidStashPoint;
-	ActiveBagSlot = InvalidBagPoint; // [RUNS MOD]
 }
 
 /**
@@ -2522,10 +2362,8 @@ void PerformPrimaryAction()
 				return;
 			TryIconCurs();
 			NewCursor(CURSOR_HAND);
-		} else if (GetRightPanel().contains(MousePosition) || GetMainPanel().contains(MousePosition)) {
+		} else if (GetExtendedInventoryRect().contains(MousePosition) || GetMainPanel().contains(MousePosition)) {
 			LiftInventoryItem();
-		} else if (IsBagOpen && GetBagRect().contains(MousePosition)) {
-			LiftBagItem(); // [RUNS MOD]
 		} else if (IsStashOpen && GetLeftPanel().contains(MousePosition)) {
 			LiftStashItem();
 		} else if (IsVisualStoreOpen && GetLeftPanel().contains(MousePosition)) {
@@ -2735,29 +2573,14 @@ void PerformSecondaryAction()
 		} else if (IsStashOpen) {
 			if (pcursstashitem != StashStruct::EmptyCell) {
 				TransferItemToInventory(myPlayer, pcursstashitem);
-			} else if (pcursbagitem != BagStruct::EmptyCell) {
-				// [RUNS MOD] The bag is open next to the stash; hop the item to the
-				// inventory (a second press there sends it on to the stash).
-				TransferBagItemToInventory(myPlayer, pcursbagitem);
 			} else if (pcursinvitem != -1) {
 				TransferItemToStash(myPlayer, pcursinvitem);
 			}
 		} else if (IsVisualStoreOpen) {
-			// [RUNS MOD] Checked BEFORE IsBagOpen: the bag now opens together with the
-			// visual store, and the store's sell action must win over quick-transfer --
-			// for bag items and inventory items alike.
 			if (!myPlayer.HoldItem.isEmpty() && GetLeftPanel().contains(MousePosition)) {
 				CheckVisualStorePaste(MousePosition);
-			} else if (pcursbagitem != BagStruct::EmptyCell) {
-				SellBagItemToVisualStore(pcursbagitem); // [RUNS MOD] sell from the bag
 			} else if (pcursinvitem >= INVITEM_INV_FIRST && pcursinvitem <= INVITEM_INV_LAST) {
 				SellItemToVisualStore(pcursinvitem - INVITEM_INV_FIRST);
-			}
-		} else if (IsBagOpen) { // [RUNS MOD] quick-transfer between the bag and the inventory
-			if (pcursbagitem != BagStruct::EmptyCell) {
-				TransferBagItemToInventory(myPlayer, pcursbagitem);
-			} else if (pcursinvitem != -1) {
-				TransferItemToBag(myPlayer, pcursinvitem);
 			}
 		} else {
 			CtrlUseInvItem();

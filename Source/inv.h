@@ -35,9 +35,11 @@ enum inv_item : int8_t {
 	INVITEM_HAND_RIGHT = 5,
 	INVITEM_CHEST      = 6,
 	INVITEM_INV_FIRST  = 7,
-	INVITEM_INV_LAST   = 46,
-	INVITEM_BELT_FIRST = 47,
-	INVITEM_BELT_LAST  = 54,
+	// [RUNS MOD] The backpack range covers the extended 10x11 grid (110 cells); the
+	// belt ids shift accordingly. INVITEM_BELT_LAST = 124 keeps everything in int8_t.
+	INVITEM_INV_LAST   = INVITEM_INV_FIRST + InventoryGridCells - 1,
+	INVITEM_BELT_FIRST = INVITEM_INV_LAST + 1,
+	INVITEM_BELT_LAST  = INVITEM_BELT_FIRST + MaxBeltItems - 1,
 	// clang-format on
 };
 
@@ -67,12 +69,14 @@ enum inv_xy_slot : uint8_t {
 	SLOTXY_INV_ROW3_LAST  = 36,
 	SLOTXY_INV_ROW4_FIRST = 37,
 	SLOTXY_INV_ROW4_LAST  = 46,
-	SLOTXY_INV_LAST       = SLOTXY_INV_ROW4_LAST,
+	// [RUNS MOD] Rows 5..11 are the unlockable extension of the backpack grid; slots
+	// in rows past the player's pExtraInvRows are locked (never drawn or hit-tested).
+	SLOTXY_INV_LAST       = SLOTXY_INV_FIRST + InventoryGridCells - 1,
 
 	// belt items
-	SLOTXY_BELT_FIRST     = 47,
-	SLOTXY_BELT_LAST      = 54,
-	NUM_XY_SLOTS          = 55
+	SLOTXY_BELT_FIRST     = SLOTXY_INV_LAST + 1,
+	SLOTXY_BELT_LAST      = SLOTXY_BELT_FIRST + MaxBeltItems - 1,
+	NUM_XY_SLOTS          = SLOTXY_BELT_LAST + 1
 	// clang-format on
 };
 
@@ -87,6 +91,30 @@ enum item_color : uint8_t {
 
 extern DVL_API_FOR_TEST bool invflag;
 extern const Rectangle InvRect[NUM_XY_SLOTS];
+
+/** @brief [RUNS MOD] Extra backpack rows the player can currently use (0 outside run mode). */
+int UnlockedExtraInventoryRows(const Player &player);
+/** @brief [RUNS MOD] Usable inventory grid cells: base 40 plus 10 per unlocked extra row.
+ * Cells at index >= this are locked: never drawn, hit-tested or filled by any placement. */
+int UnlockedInventoryGridCells(const Player &player);
+/** @brief [RUNS MOD] The inventory panel rect grown downward by the unlocked extra rows
+ * (click/hover routing must use this instead of the fixed right-panel rect). */
+Rectangle GetExtendedInventoryRect();
+/** @brief [RUNS MOD] Grants the next extra inventory row if `clearedDepth` is deep enough
+ * (rows unlock at depths 2, 4, 6, 8, ...). Announces the growth; call on run-boss kill. */
+void TryUnlockInventoryRowForDepth(int clearedDepth);
+
+/** [RUNS MOD] A vanilla-shaped (base 10x4) view of a possibly extended inventory, for
+ * serialization: only items whose cells all lie in the base grid, compactly renumbered.
+ * Items touching the extended rows are excluded here and ride in the per-hero side file
+ * (see LoadInventoryExtension/SaveInventoryExtension in loadsave). */
+struct BaseInventoryView {
+	int8_t grid[BaseInventoryGridCells];
+	/** view item index -> player InvList index */
+	int8_t listMap[BaseInventoryGridCells];
+	int numItems;
+};
+BaseInventoryView BuildBaseInventoryView(const Player &player);
 
 void InvDrawSlotBack(const Surface &out, Point targetPosition, Size size, item_quality itemQuality);
 /**
@@ -110,8 +138,6 @@ void InitInv();
 /**
  * @brief Render the inventory panel to the given buffer.
  */
-/** @brief [RUNS MOD] The inventory panel art, for the bag's seamless continuation rows. */
-std::optional<ClxSprite> GetInventoryPanelSprite();
 void DrawInv(const Surface &out);
 
 void DrawInvBelt(const Surface &out);
@@ -196,7 +222,6 @@ void inv_update_rem_item(Player &player, inv_body_loc iv);
 void CheckInvSwap(Player &player, const Item &item, int invGridIndex);
 void CheckInvRemove(Player &player, int invGridIndex);
 void TransferItemToStash(Player &player, int location);
-void TransferItemToBag(Player &player, int location); // [RUNS MOD]
 void CheckInvItem(bool isShiftHeld = false, bool isCtrlHeld = false);
 
 /**

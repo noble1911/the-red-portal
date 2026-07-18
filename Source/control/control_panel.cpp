@@ -20,9 +20,9 @@
 #include "panels/partypanel.hpp"
 #include "panels/spell_book.hpp"
 #include "panels/spell_icons.hpp"
-#include "bag.h"
 #include "panels/spell_list.hpp"
 #include "pfile.h"
+#include "runs_mod.h"
 #include "qol/stash.h"
 #include "qol/visual_store.h"
 #include "stores.h"
@@ -61,9 +61,7 @@ const Rectangle &GetRightPanel()
 }
 bool IsLeftPanelOpen()
 {
-	// The bag only occupies the left panel in its fallback position; when stacked below the
-	// inventory it lives on the right, so it must not mark the left panel as open. [RUNS MOD]
-	return CharFlag || QuestLogIsOpen || IsStashOpen || IsVisualStoreOpen || (IsBagOpen && BagOnLeftPanel());
+	return CharFlag || QuestLogIsOpen || IsStashOpen || IsVisualStoreOpen;
 }
 bool IsRightPanelOpen()
 {
@@ -263,7 +261,16 @@ void CalculatePanelAreas()
 			LeftPanel.position.x = (gnScreenWidth - LeftPanel.size.width - RightPanel.size.width - MainPanel.size.width) / 2;
 		}
 	}
-	LeftPanel.position.y = (gnScreenHeight - LeftPanel.size.height - MainPanel.size.height) / 2;
+	// [RUNS MOD] The inventory panel extends below its 352px art by up to
+	// MaxExtraInventoryRows grid rows plus a re-stamped bottom border. Center the side
+	// panels on that combined height (clamped to the top edge) so the extension always
+	// fits above the main panel -- including 720p Switch handheld (683px total).
+	int sidePanelHeight = LeftPanel.size.height;
+	if (RunsModEnabled) {
+		constexpr int ExtendedInvPanelHeight = 338 + MaxExtraInventoryRows * (INV_SLOT_SIZE_PX + 1) + 14;
+		sidePanelHeight = ExtendedInvPanelHeight;
+	}
+	LeftPanel.position.y = std::max(0, (gnScreenHeight - sidePanelHeight - MainPanel.size.height) / 2);
 
 	if (ControlMode == ControlTypes::VirtualGamepad) {
 		RightPanel.position.x = gnScreenWidth / 2;

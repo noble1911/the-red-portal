@@ -34,7 +34,19 @@
 
 namespace devilution {
 
-constexpr int InventoryGridCells = 40;
+/** The engine's original 10x4 backpack grid. Saves, hero packs and network packs only
+ * ever serialize this part, keeping them vanilla-shaped (see [RUNS MOD] notes below). */
+constexpr int BaseInventoryGridCells = 40;
+/** [RUNS MOD] Extra backpack rows appended below the base 10x4 grid (unlocked by
+ * beating deeper run bosses). 7 rows is the max that keeps every slot id within the
+ * engine's int8_t slot arithmetic AND lets the full panel fit stacked on a 720p
+ * Switch screen (352px panel + 7*29px rows + 14px border + 128px main panel). */
+constexpr int MaxExtraInventoryRows = 7;
+/** [RUNS MOD] Extra rows available on a fresh character. At least 3 so the tallest
+ * (2x3) items can always sit fully inside the extra region. */
+constexpr int InitialExtraInventoryRows = 3;
+/** In-memory inventory grid: base 40 cells + the [RUNS MOD] extra rows (110 total). */
+constexpr int InventoryGridCells = BaseInventoryGridCells + MaxExtraInventoryRows * 10;
 constexpr int MaxBeltItems = 8;
 constexpr int MaxResistance = 75;
 constexpr uint8_t MaxSpellLevel = 15;
@@ -295,6 +307,11 @@ struct Player {
 	int8_t _pDFrames;
 	int8_t _pBFrames;
 	int8_t InvGrid[InventoryGridCells];
+	/** [RUNS MOD] Extra backpack rows this character has unlocked (rows past the base
+	 * 10x4 grid; grown by beating deeper run bosses). Saved in the per-hero side file,
+	 * not the vanilla-shaped player serialization; not network-synced (remote players
+	 * keep the default -- only explicit grid-index messages touch their extra rows). */
+	uint8_t pExtraInvRows = InitialExtraInventoryRows;
 
 	uint8_t plrlevel;
 	bool plrIsOnSetLevel;

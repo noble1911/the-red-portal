@@ -19,7 +19,6 @@
 #include <fmt/format.h>
 
 #include "DiabloUI/ui_flags.hpp"
-#include "bag.h"
 #include "controls/control_mode.hpp"
 #include "controls/plrctrls.h"
 #include "cursor.h"
@@ -129,6 +128,78 @@ const Rectangle InvRect[] = {
 	{ { 220, 309 }, { 29, 29 } }, // inv row 4
 	{ { 249, 309 }, { 29, 29 } }, // inv row 4
 	{ { 278, 309 }, { 29, 29 } }, // inv row 4
+	// [RUNS MOD] Rows 5..11: the unlockable extension, continuing below the panel art
+	// (the row band is re-stamped there by DrawInv). Same 29px pitch as rows 1-4.
+	{ {  17, 338 }, { 29, 29 } }, // inv row 5
+	{ {  46, 338 }, { 29, 29 } }, // inv row 5
+	{ {  75, 338 }, { 29, 29 } }, // inv row 5
+	{ { 104, 338 }, { 29, 29 } }, // inv row 5
+	{ { 133, 338 }, { 29, 29 } }, // inv row 5
+	{ { 162, 338 }, { 29, 29 } }, // inv row 5
+	{ { 191, 338 }, { 29, 29 } }, // inv row 5
+	{ { 220, 338 }, { 29, 29 } }, // inv row 5
+	{ { 249, 338 }, { 29, 29 } }, // inv row 5
+	{ { 278, 338 }, { 29, 29 } }, // inv row 5
+	{ {  17, 367 }, { 29, 29 } }, // inv row 6
+	{ {  46, 367 }, { 29, 29 } }, // inv row 6
+	{ {  75, 367 }, { 29, 29 } }, // inv row 6
+	{ { 104, 367 }, { 29, 29 } }, // inv row 6
+	{ { 133, 367 }, { 29, 29 } }, // inv row 6
+	{ { 162, 367 }, { 29, 29 } }, // inv row 6
+	{ { 191, 367 }, { 29, 29 } }, // inv row 6
+	{ { 220, 367 }, { 29, 29 } }, // inv row 6
+	{ { 249, 367 }, { 29, 29 } }, // inv row 6
+	{ { 278, 367 }, { 29, 29 } }, // inv row 6
+	{ {  17, 396 }, { 29, 29 } }, // inv row 7
+	{ {  46, 396 }, { 29, 29 } }, // inv row 7
+	{ {  75, 396 }, { 29, 29 } }, // inv row 7
+	{ { 104, 396 }, { 29, 29 } }, // inv row 7
+	{ { 133, 396 }, { 29, 29 } }, // inv row 7
+	{ { 162, 396 }, { 29, 29 } }, // inv row 7
+	{ { 191, 396 }, { 29, 29 } }, // inv row 7
+	{ { 220, 396 }, { 29, 29 } }, // inv row 7
+	{ { 249, 396 }, { 29, 29 } }, // inv row 7
+	{ { 278, 396 }, { 29, 29 } }, // inv row 7
+	{ {  17, 425 }, { 29, 29 } }, // inv row 8
+	{ {  46, 425 }, { 29, 29 } }, // inv row 8
+	{ {  75, 425 }, { 29, 29 } }, // inv row 8
+	{ { 104, 425 }, { 29, 29 } }, // inv row 8
+	{ { 133, 425 }, { 29, 29 } }, // inv row 8
+	{ { 162, 425 }, { 29, 29 } }, // inv row 8
+	{ { 191, 425 }, { 29, 29 } }, // inv row 8
+	{ { 220, 425 }, { 29, 29 } }, // inv row 8
+	{ { 249, 425 }, { 29, 29 } }, // inv row 8
+	{ { 278, 425 }, { 29, 29 } }, // inv row 8
+	{ {  17, 454 }, { 29, 29 } }, // inv row 9
+	{ {  46, 454 }, { 29, 29 } }, // inv row 9
+	{ {  75, 454 }, { 29, 29 } }, // inv row 9
+	{ { 104, 454 }, { 29, 29 } }, // inv row 9
+	{ { 133, 454 }, { 29, 29 } }, // inv row 9
+	{ { 162, 454 }, { 29, 29 } }, // inv row 9
+	{ { 191, 454 }, { 29, 29 } }, // inv row 9
+	{ { 220, 454 }, { 29, 29 } }, // inv row 9
+	{ { 249, 454 }, { 29, 29 } }, // inv row 9
+	{ { 278, 454 }, { 29, 29 } }, // inv row 9
+	{ {  17, 483 }, { 29, 29 } }, // inv row 10
+	{ {  46, 483 }, { 29, 29 } }, // inv row 10
+	{ {  75, 483 }, { 29, 29 } }, // inv row 10
+	{ { 104, 483 }, { 29, 29 } }, // inv row 10
+	{ { 133, 483 }, { 29, 29 } }, // inv row 10
+	{ { 162, 483 }, { 29, 29 } }, // inv row 10
+	{ { 191, 483 }, { 29, 29 } }, // inv row 10
+	{ { 220, 483 }, { 29, 29 } }, // inv row 10
+	{ { 249, 483 }, { 29, 29 } }, // inv row 10
+	{ { 278, 483 }, { 29, 29 } }, // inv row 10
+	{ {  17, 512 }, { 29, 29 } }, // inv row 11
+	{ {  46, 512 }, { 29, 29 } }, // inv row 11
+	{ {  75, 512 }, { 29, 29 } }, // inv row 11
+	{ { 104, 512 }, { 29, 29 } }, // inv row 11
+	{ { 133, 512 }, { 29, 29 } }, // inv row 11
+	{ { 162, 512 }, { 29, 29 } }, // inv row 11
+	{ { 191, 512 }, { 29, 29 } }, // inv row 11
+	{ { 220, 512 }, { 29, 29 } }, // inv row 11
+	{ { 249, 512 }, { 29, 29 } }, // inv row 11
+	{ { 278, 512 }, { 29, 29 } }, // inv row 11
 	{ { 205,   5 }, { 29, 29 } }, // belt
 	{ { 234,   5 }, { 29, 29 } }, // belt
 	{ { 263,   5 }, { 29, 29 } }, // belt
@@ -139,6 +210,85 @@ const Rectangle InvRect[] = {
 	{ { 408,   5 }, { 29, 29 } }  // belt
 	// clang-format on
 };
+
+// [RUNS MOD] Inventory panel art geometry: the backpack grid's first row band starts at
+// y=222 with a 29px pitch, the last base row ends at y=338, and the panel's bottom border
+// occupies y=338..352. The extended rows repeat the row band below y=338 and re-stamp the
+// border, so the base panel and the extension read as ONE taller panel.
+namespace {
+constexpr int InvRowBandTop = 222;
+constexpr int InvRowPitch = INV_SLOT_SIZE_PX + 1; // 29
+constexpr int InvLastRowBottom = 338;
+constexpr int InvBottomBorderHeight = 14; // 352 - 338
+} // namespace
+
+int UnlockedExtraInventoryRows(const Player &player)
+{
+	if (!RunsModEnabled)
+		return 0;
+	return std::min<int>(player.pExtraInvRows, MaxExtraInventoryRows);
+}
+
+int UnlockedInventoryGridCells(const Player &player)
+{
+	return BaseInventoryGridCells + UnlockedExtraInventoryRows(player) * INV_ROW_SLOT_SIZE;
+}
+
+Rectangle GetExtendedInventoryRect()
+{
+	Rectangle rect = GetRightPanel();
+	const int extraRows = UnlockedExtraInventoryRows(*MyPlayer);
+	if (extraRows > 0)
+		rect.size.height = InvLastRowBottom + extraRows * InvRowPitch + InvBottomBorderHeight;
+	return rect;
+}
+
+BaseInventoryView BuildBaseInventoryView(const Player &player)
+{
+	BaseInventoryView view {};
+	// InvList index -> view id (index+1); 0 = excluded from the base view.
+	int8_t remap[InventoryGridCells] = {};
+	for (int i = 0; i < player._pNumInv && i < InventoryGridCells; i++) {
+		bool touchesExtension = false;
+		for (int c = BaseInventoryGridCells; c < InventoryGridCells; c++) {
+			if (std::abs(player.InvGrid[c]) == i + 1) {
+				touchesExtension = true;
+				break;
+			}
+		}
+		if (touchesExtension || view.numItems >= BaseInventoryGridCells)
+			continue;
+		remap[i] = static_cast<int8_t>(view.numItems + 1);
+		view.listMap[view.numItems] = static_cast<int8_t>(i);
+		view.numItems++;
+	}
+	for (int c = 0; c < BaseInventoryGridCells; c++) {
+		const int8_t cell = player.InvGrid[c];
+		if (cell == 0) {
+			view.grid[c] = 0;
+			continue;
+		}
+		const int8_t newId = remap[std::abs(cell) - 1];
+		view.grid[c] = cell > 0 ? newId : static_cast<int8_t>(-newId);
+	}
+	return view;
+}
+
+void TryUnlockInventoryRowForDepth(int clearedDepth)
+{
+	// [RUNS MOD] Rows unlock at depths 2, 4, 6, ...: each unlocked row raises the depth
+	// needed for the next, so growing the pack requires actually going deeper rather than
+	// farming the first run. Runs on every client (each grows its own local rows),
+	// mirroring how the difficulty-tier unlock updates each client's own hero.
+	Player &player = *MyPlayer;
+	if (player.pExtraInvRows >= MaxExtraInventoryRows)
+		return;
+	const int requiredDepth = (player.pExtraInvRows - InitialExtraInventoryRows + 1) * 2;
+	if (clearedDepth < requiredDepth)
+		return;
+	player.pExtraInvRows++;
+	EventPlrMsg(_("Your pack has grown by a row."));
+}
 
 namespace {
 
@@ -304,12 +454,15 @@ bool AutoEquip(Player &player, const Item &item, inv_body_loc bodyLocation, bool
 
 int FindTargetSlotUnderItemCursor(Point cursorPosition, Size itemSize)
 {
+	// [RUNS MOD] Only the unlocked part of the (possibly extended) grid accepts items.
+	const int unlockedRows = UnlockedInventoryGridCells(*MyPlayer) / INV_ROW_SLOT_SIZE;
+	const int lastUnlockedSlot = SLOTXY_INV_FIRST + unlockedRows * INV_ROW_SLOT_SIZE - 1;
 	Displacement panelOffset = Point { 0, 0 } - GetRightPanel().position;
 	for (int r = SLOTXY_EQUIPPED_FIRST; r <= SLOTXY_EQUIPPED_LAST; r++) {
 		if (InvRect[r].contains(cursorPosition + panelOffset))
 			return r;
 	}
-	for (int r = SLOTXY_INV_FIRST; r <= SLOTXY_INV_LAST; r++) {
+	for (int r = SLOTXY_INV_FIRST; r <= lastUnlockedSlot; r++) {
 		if (InvRect[r].contains(cursorPosition + panelOffset)) {
 			// When trying to paste into the inventory we need to determine the top left cell of the nearest area that could fit the item, not the slot under the center/hot pixel.
 			if (itemSize.height <= 1 && itemSize.width <= 1) {
@@ -329,7 +482,7 @@ int FindTargetSlotUnderItemCursor(Point cursorPosition, Size itemSize)
 			}
 			// Then work out the top left cell of the nearest area that could fit this item (as pasting on the edge of the inventory would otherwise put it out of bounds)
 			const int hotPixelCell = r - SLOTXY_INV_FIRST;
-			const int targetRow = std::clamp((hotPixelCell / InventorySizeInSlots.width) - hotPixelCellOffset.deltaY, 0, InventorySizeInSlots.height - itemSize.height);
+			const int targetRow = std::clamp((hotPixelCell / InventorySizeInSlots.width) - hotPixelCellOffset.deltaY, 0, unlockedRows - itemSize.height);
 			const int targetColumn = std::clamp((hotPixelCell % InventorySizeInSlots.width) - hotPixelCellOffset.deltaX, 0, InventorySizeInSlots.width - itemSize.width);
 			return SLOTXY_INV_FIRST + (targetRow * InventorySizeInSlots.width) + targetColumn;
 		}
@@ -662,10 +815,12 @@ std::optional<inv_xy_slot> FindSlotUnderCursor(Point cursorPosition)
  */
 bool CheckItemFitsInInventorySlot(const Player &player, int slotIndex, const Size &itemSize, int itemIndexToIgnore)
 {
+	// [RUNS MOD] Locked rows never accept items, so bound by the unlocked cell count.
+	const int unlockedCells = UnlockedInventoryGridCells(player);
 	int yy = (slotIndex > 0) ? (10 * (slotIndex / 10)) : 0;
 
 	for (int j = 0; j < itemSize.height; j++) {
-		if (yy >= InventoryGridCells) {
+		if (yy >= unlockedCells) {
 			return false;
 		}
 		int xx = (slotIndex > 0) ? (slotIndex % 10) : 0;
@@ -679,6 +834,24 @@ bool CheckItemFitsInInventorySlot(const Player &player, int slotIndex, const Siz
 		yy += 10;
 	}
 	return true;
+}
+
+/**
+ * @brief [RUNS MOD] Scans the placements the vanilla search cannot see: top-left rows
+ * whose item would end in (or span into) the unlocked extra rows, row-major.
+ */
+std::optional<int> FindSlotForItemInExtraRows(const Player &player, const Size &itemSize, int itemIndexToIgnore)
+{
+	const int unlockedCells = UnlockedInventoryGridCells(player);
+	if (unlockedCells <= BaseInventoryGridCells)
+		return {};
+	// First top-left row whose bottom row falls past the base grid (covers the seam).
+	const int firstSlot = std::max(0, (InventorySizeInSlots.height + 1 - itemSize.height) * 10);
+	for (int slot = firstSlot; slot < unlockedCells; slot++) {
+		if (CheckItemFitsInInventorySlot(player, slot, itemSize, itemIndexToIgnore))
+			return slot;
+	}
+	return {};
 }
 
 /**
@@ -701,7 +874,7 @@ std::optional<int> FindSlotForItem(const Player &player, const Size &itemSize, i
 					return (10 * y) + x;
 			}
 		}
-		return {};
+		return FindSlotForItemInExtraRows(player, itemSize, itemIndexToIgnore);
 	}
 
 	if (itemSize.height == 2) {
@@ -711,7 +884,7 @@ std::optional<int> FindSlotForItem(const Player &player, const Size &itemSize, i
 					return (10 * y) + x;
 			}
 		}
-		return {};
+		return FindSlotForItemInExtraRows(player, itemSize, itemIndexToIgnore);
 	}
 
 	if (itemSize == Size { 1, 3 }) {
@@ -719,7 +892,7 @@ std::optional<int> FindSlotForItem(const Player &player, const Size &itemSize, i
 			if (CheckItemFitsInInventorySlot(player, i, itemSize, itemIndexToIgnore))
 				return i;
 		}
-		return {};
+		return FindSlotForItemInExtraRows(player, itemSize, itemIndexToIgnore);
 	}
 
 	if (itemSize == Size { 2, 3 }) {
@@ -732,7 +905,7 @@ std::optional<int> FindSlotForItem(const Player &player, const Size &itemSize, i
 			if (CheckItemFitsInInventorySlot(player, i, itemSize, itemIndexToIgnore))
 				return i;
 		}
-		return {};
+		return FindSlotForItemInExtraRows(player, itemSize, itemIndexToIgnore);
 	}
 
 	app_fatal(StrCat("Unknown item size: ", itemSize.width, "x", itemSize.height));
@@ -1189,18 +1362,27 @@ void InitInv()
 	pInvCels = LoadCel(StrCat("data\\inv\\", invName).c_str(), static_cast<uint16_t>(SidePanelSize.width));
 }
 
-std::optional<ClxSprite> GetInventoryPanelSprite()
-{
-	// [RUNS MOD] Exposes the inventory panel art so the bag can render its extra rows as
-	// a seamless continuation of the backpack grid (same slot art, same border).
-	if (!pInvCels)
-		return std::nullopt;
-	return (*pInvCels)[0];
-}
-
 void DrawInv(const Surface &out)
 {
 	ClxDraw(out, GetPanelPosition(UiPanels::Inventory, { 0, 351 }), (*pInvCels)[0]);
+
+	// [RUNS MOD] Extend the panel with the unlocked extra rows: repeat the backpack
+	// grid's row band (cropped from the panel art) for each row below the base grid,
+	// then re-stamp the bottom border band below the last one -- the base grid and the
+	// extension read as one taller panel, and locked rows simply do not exist yet.
+	const int extraRows = UnlockedExtraInventoryRows(*InspectPlayer);
+	if (extraRows > 0) {
+		const Point invPos = GetRightPanel().position;
+		for (int row = 0; row < extraRows; row++) {
+			const Surface band = out.subregion(invPos.x, invPos.y + InvLastRowBottom + row * InvRowPitch,
+			    SidePanelSize.width, InvRowPitch);
+			RenderClxSprite(band, (*pInvCels)[0], { 0, -InvRowBandTop });
+		}
+		const Surface borderBand = out.subregion(invPos.x,
+		    invPos.y + InvLastRowBottom + extraRows * InvRowPitch,
+		    SidePanelSize.width, InvBottomBorderHeight);
+		RenderClxSprite(borderBand, (*pInvCels)[0], { 0, -InvLastRowBottom });
+	}
 
 	const Size slotSize[] = {
 		{ 2, 2 }, // head
@@ -1466,7 +1648,7 @@ void ReorganizeInventory(Player &player)
 
 	// Temporary storage for items and a copy of InvGrid
 	std::vector<Item> tempStorage(player._pNumInv);
-	std::array<int8_t, 40> originalInvGrid;                                                       // Declare an array for InvGrid copy
+	std::array<int8_t, InventoryGridCells> originalInvGrid;                                       // Declare an array for InvGrid copy
 	std::copy(std::begin(player.InvGrid), std::end(player.InvGrid), std::begin(originalInvGrid)); // Copy InvGrid to originalInvGrid
 
 	// Move items to temporary storage and clear inventory slots
@@ -1501,7 +1683,11 @@ void ReorganizeInventory(Player &player)
 int RoomForGold()
 {
 	int amount = 0;
-	for (const int8_t &itemIndex : MyPlayer->InvGrid) {
+	// [RUNS MOD] Only the unlocked cells can hold gold; locked rows are always empty
+	// and must not be counted as free space.
+	const int unlockedCells = UnlockedInventoryGridCells(*MyPlayer);
+	for (int i = 0; i < unlockedCells; i++) {
+		const int8_t itemIndex = MyPlayer->InvGrid[i];
 		if (itemIndex < 0) {
 			continue;
 		}
@@ -1552,6 +1738,12 @@ int AddGoldToInventory(Player &player, int value)
 		for (int y = 2; y >= 0 && value > 0; y--) {
 			value = CreateGoldItemInInventorySlot(player, (10 * y) + x, value);
 		}
+	}
+
+	// [RUNS MOD] Overflow into the unlocked extra rows, row-major.
+	const int unlockedCells = UnlockedInventoryGridCells(player);
+	for (int i = BaseInventoryGridCells; i < unlockedCells && value > 0; i++) {
+		value = CreateGoldItemInInventorySlot(player, i, value);
 	}
 
 	return value;
@@ -1646,30 +1838,6 @@ void TransferItemToStash(Player &player, int location)
 
 	const Item &item = GetInventoryItem(player, location);
 	if (!AutoPlaceItemInStash(item, true)) {
-		player.SaySpecific(HeroSpeech::WhereWouldIPutThis);
-		return;
-	}
-
-	PlaySFX(ItemInvSnds[ItemCAnimTbl[item._iCurs]]);
-
-	if (location < INVITEM_INV_FIRST) {
-		RemoveEquipment(player, static_cast<inv_body_loc>(location), false);
-		CalcPlrInv(player, true);
-	} else if (location <= INVITEM_INV_LAST)
-		player.RemoveInvItem(location - INVITEM_INV_FIRST);
-	else
-		player.RemoveSpdBarItem(location - INVITEM_BELT_FIRST);
-}
-
-// [RUNS MOD] Auto-move an inventory/equipment/belt item into the carried bag.
-void TransferItemToBag(Player &player, int location)
-{
-	if (location == -1) {
-		return;
-	}
-
-	const Item &item = GetInventoryItem(player, location);
-	if (!AutoPlaceItemInBag(item, true)) {
 		player.SaySpecific(HeroSpeech::WhereWouldIPutThis);
 		return;
 	}
@@ -2296,7 +2464,6 @@ void CloseInventory()
 	CloseGoldWithdraw();
 	CloseStash();
 	CloseVisualStore();
-	CloseBag(); // [RUNS MOD] the carried bag closes with the inventory
 	invflag = false;
 }
 

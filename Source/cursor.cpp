@@ -21,7 +21,6 @@
 #include <fmt/format.h>
 
 #include "DiabloUI/diabloui.h"
-#include "bag.h"
 #include "control/control.hpp"
 #include "controls/control_mode.hpp"
 #include "controls/plrctrls.h"
@@ -621,7 +620,6 @@ void InitLevelCursor()
 	ObjectUnderCursor = nullptr;
 	pcursitem = -1;
 	pcursstashitem = StashStruct::EmptyCell;
-	pcursbagitem = BagStruct::EmptyCell; // [RUNS MOD]
 	PlayerUnderCursor = nullptr;
 	ClearCursor();
 }
@@ -816,7 +814,6 @@ void ResetCursorInfo()
 	}
 	pcursinvitem = -1;
 	pcursstashitem = StashStruct::EmptyCell;
-	pcursbagitem = BagStruct::EmptyCell; // [RUNS MOD]
 	pcursstoreitem = -1;
 	pcursstorebtn = -1;
 	PlayerUnderCursor = nullptr;
@@ -846,13 +843,9 @@ bool CheckPanelsAndFlags(Rectangle mainPanel)
 	if (DoomFlag) {
 		return true;
 	}
-	// [RUNS MOD] Checked BEFORE the inventory panel: the stacked bag's first row overlaps
-	// the inventory panel's bottom border band (y 338..352); that strip belongs to the bag.
-	if (IsBagShown() && GetBagRect().contains(MousePosition)) {
-		pcursbagitem = CheckBagHLight(MousePosition);
-		return true; // bag sits over the game world, so suppress world targeting under it
-	}
-	if (invflag && GetRightPanel().contains(MousePosition)) {
+	// [RUNS MOD] The panel rect is grown by the unlocked extra rows, so hover works on
+	// the extension and world targeting is suppressed under it.
+	if (invflag && GetExtendedInventoryRect().contains(MousePosition)) {
 		pcursinvitem = CheckInvHLight();
 		return true;
 	}

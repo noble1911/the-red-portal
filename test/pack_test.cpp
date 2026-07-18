@@ -1080,8 +1080,12 @@ TEST_F(NetPackTest, UnPackNetPlayer_invalid_baseVit)
 
 TEST_F(NetPackTest, UnPackNetPlayer_invalid_numInv)
 {
-	MyPlayer->_pNumInv = InventoryGridCells + 1;
-	ASSERT_FALSE(TestNetPackValidation());
+	// [RUNS MOD] Packing sanitizes the count via the base-view filter, so tamper with
+	// the packed struct directly to exercise the receiver-side validation.
+	PlayerNetPack packed;
+	PackNetPlayer(packed, *MyPlayer);
+	packed._pNumInv = BaseInventoryGridCells + 1;
+	ASSERT_FALSE(UnPackNetPlayer(packed, Players[1]));
 }
 
 TEST_F(NetPackTest, UnPackNetPlayer_invalid_strength)

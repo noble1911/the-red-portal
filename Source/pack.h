@@ -58,8 +58,10 @@ struct PlayerPack {
 	uint8_t pSplLvl[37]; // Should be MAX_SPELLS but set to 37 to make save games compatible
 	uint64_t pMemSpells;
 	ItemPack InvBody[NUM_INVLOC];
-	ItemPack InvList[InventoryGridCells];
-	int8_t InvGrid[InventoryGridCells];
+	// [RUNS MOD] Packs stay vanilla-shaped (40 backpack cells); items on the extended
+	// rows are serialized in the per-hero side file instead.
+	ItemPack InvList[BaseInventoryGridCells];
+	int8_t InvGrid[BaseInventoryGridCells];
 	uint8_t _pNumInv;
 	ItemPack SpdList[MaxBeltItems];
 	int8_t pTownWarps;
@@ -108,8 +110,10 @@ struct PlayerNetPack {
 	uint8_t pSplLvl[MAX_SPELLS];
 	uint64_t pMemSpells;
 	ItemNetPack InvBody[NUM_INVLOC];
-	ItemNetPack InvList[InventoryGridCells];
-	int8_t InvGrid[InventoryGridCells];
+	// [RUNS MOD] Vanilla-shaped: remote players only see the base 10x4 backpack view
+	// (the extension is local-only, like the stash).
+	ItemNetPack InvList[BaseInventoryGridCells];
+	int8_t InvGrid[BaseInventoryGridCells];
 	uint8_t _pNumInv;
 	ItemNetPack SpdList[MaxBeltItems];
 	uint8_t pManaShield;

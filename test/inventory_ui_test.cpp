@@ -72,7 +72,10 @@ protected:
 	 */
 	void FillInventory()
 	{
-		for (int i = 0; i < InventoryGridCells; i++) {
+		// [RUNS MOD] Only the unlocked cells (base grid + unlocked extra rows) can
+		// hold items; filling them all makes the inventory effectively full.
+		const int unlockedCells = UnlockedInventoryGridCells(*MyPlayer);
+		for (int i = 0; i < unlockedCells; i++) {
 			Item potion = MakePotion();
 			ASSERT_TRUE(AutoPlaceItemInInventory(*MyPlayer, potion))
 			    << "Failed to place potion at cell " << i;

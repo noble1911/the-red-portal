@@ -21,7 +21,6 @@
 
 #include "DiabloUI/ui_flags.hpp"
 #include "automap.h"
-#include "bag.h"
 #include "controls/control_mode.hpp"
 #include "controls/plrctrls.h"
 #include "cursor.h"
@@ -1399,10 +1398,6 @@ void DrawView(const Surface &out, Point startPosition)
 	} else if (SpellbookFlag) {
 		DrawSpellBook(out);
 	}
-	// [RUNS MOD] The carried bag renders as its own panel stacked directly below the
-	// inventory (it forces invflag on), so draw it independently of the left-panel chain.
-	if (IsBagOpen)
-		DrawBag(out);
 
 	DrawDurIcon(out);
 

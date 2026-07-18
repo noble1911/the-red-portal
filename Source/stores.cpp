@@ -15,7 +15,6 @@
 
 #include <fmt/format.h>
 
-#include "bag.h"
 #include "controls/control_mode.hpp"
 #include "controls/plrctrls.h"
 #include "cursor.h"
@@ -556,32 +555,6 @@ void ScrollSmithSell(int idx)
 	ScrollVendorStore(PlayerItems, CurrentItemIndex, idx, false);
 }
 
-// [RUNS MOD] Append sellable carried-bag items to the store's sell list. The source is
-// encoded in PlayerItemIndexes as -(bagId + MaxBeltItems + 1), i.e. <= -(MaxBeltItems+1),
-// which is distinct from inventory (>= 0) and belt (-1 .. -MaxBeltItems). Bag ids stay
-// under 80, so the encoded value fits int8_t. Returns true if any item was added.
-bool AppendBagSellItems(bool (*willBuy)(const Item &))
-{
-	bool added = false;
-	for (uint16_t bi = 0; bi < Bag.items.size(); bi++) {
-		if (CurrentItemIndex >= 48)
-			break;
-		const Item &bagItem = Bag.items[bi];
-		if (bagItem.isEmpty() || !willBuy(bagItem))
-			continue;
-		added = true;
-		Item &listItem = PlayerItems[CurrentItemIndex];
-		listItem = bagItem;
-		if (listItem._iMagical != ITEM_QUALITY_NORMAL && listItem._iIdentified)
-			listItem._ivalue = listItem._iIvalue;
-		listItem._ivalue = std::max(listItem._ivalue / 4, 1);
-		listItem._iIvalue = listItem._ivalue;
-		PlayerItemIndexes[CurrentItemIndex] = static_cast<int8_t>(-(static_cast<int>(bi) + MaxBeltItems + 1));
-		CurrentItemIndex++;
-	}
-	return added;
-}
-
 void StartSmithSell()
 {
 	IsTextFullSize = true;
@@ -628,10 +601,6 @@ void StartSmithSell()
 		}
 	}
 
-	// [RUNS MOD] Also offer sellable items carried in the bag.
-	if (AppendBagSellItems(&SmithWillBuy))
-		sellOk = true;
-
 	if (!sellOk) {
 		HasScrollbar = false;
 
@@ -644,7 +613,7 @@ void StartSmithSell()
 
 	HasScrollbar = true;
 	ScrollPos = 0;
-	NumTextLines = CurrentItemIndex; // [RUNS MOD] count includes bag items, not just _pNumInv
+	NumTextLines = CurrentItemIndex;
 
 	RenderGold = true;
 	AddSText(20, 1, _("Which item is for sale?"), UiFlags::ColorWhitegold, false);
@@ -857,10 +826,6 @@ void StartWitchSell()
 		}
 	}
 
-	// [RUNS MOD] Also offer sellable items carried in the bag.
-	if (AppendBagSellItems(&WitchWillBuy))
-		sellok = true;
-
 	if (!sellok) {
 		HasScrollbar = false;
 
@@ -874,7 +839,7 @@ void StartWitchSell()
 
 	HasScrollbar = true;
 	ScrollPos = 0;
-	NumTextLines = CurrentItemIndex; // [RUNS MOD] count includes bag items, not just _pNumInv
+	NumTextLines = CurrentItemIndex;
 
 	RenderGold = true;
 	AddSText(20, 1, _("Which item is for sale?"), UiFlags::ColorWhitegold, false);
@@ -1830,10 +1795,8 @@ void StoreSellItem()
 	const int srcIdx = PlayerItemIndexes[idx];
 	if (srcIdx >= 0)
 		myPlayer.RemoveInvItem(srcIdx);
-	else if (srcIdx >= -MaxBeltItems)
-		myPlayer.RemoveSpdBarItem(-(srcIdx + 1));
 	else
-		Bag.RemoveBagItem(static_cast<BagStruct::BagCell>(-srcIdx - (MaxBeltItems + 1))); // [RUNS MOD] bag item
+		myPlayer.RemoveSpdBarItem(-(srcIdx + 1));
 
 	const int cost = PlayerItems[idx]._iIvalue;
 	CurrentItemIndex--;
@@ -2436,10 +2399,6 @@ void BarmaidEnter()
 		IsStashOpen = true;
 		Stash.RefreshItemStatFlags();
 		invflag = true;
-		// [RUNS MOD] Show the carried bag alongside (stacked mode only; see
-		// TalkToStashChest).
-		if (RunsModEnabled && !BagOnLeftPanel())
-			OpenBag();
 		if (ControlMode != ControlTypes::KeyboardAndMouse) {
 			if (pcurs == CURSOR_DISARM)
 				NewCursor(CURSOR_HAND);

@@ -16,7 +16,6 @@
 #include <expected.hpp>
 
 #include "automap.h"
-#include "bag.h"
 #include "codec.h"
 #include "control/control.hpp"
 #include "cursor.h"
@@ -577,13 +576,17 @@ void LoadPlayer(LoadHelper &file, Player &player)
 	for (Item &item : player.InvBody)
 		LoadAndValidateItemData(file, item);
 
-	for (Item &item : player.InvList)
-		LoadAndValidateItemData(file, item);
+	// [RUNS MOD] The save keeps the vanilla 40-cell layout; the extended rows and any
+	// items on them are restored separately (LoadInventoryExtension).
+	for (int i = 0; i < BaseInventoryGridCells; i++)
+		LoadAndValidateItemData(file, player.InvList[i]);
 
 	player._pNumInv = file.NextLE<int32_t>();
 
-	for (int8_t &cell : player.InvGrid)
-		cell = file.NextLE<int8_t>();
+	for (int i = 0; i < BaseInventoryGridCells; i++)
+		player.InvGrid[i] = file.NextLE<int8_t>();
+	for (int i = BaseInventoryGridCells; i < InventoryGridCells; i++)
+		player.InvGrid[i] = 0;
 
 	for (Item &item : player.SpdList)
 		LoadAndValidateItemData(file, item);
@@ -1434,12 +1437,17 @@ void SavePlayer(SaveHelper &file, const Player &player)
 	for (const Item &item : player.InvBody)
 		SaveItem(file, item);
 
-	for (const Item &item : player.InvList)
-		SaveItem(file, item);
+	// [RUNS MOD] Write the vanilla-shaped base view: items fully inside the base 10x4
+	// grid, compactly renumbered. Items touching the extended rows are saved by
+	// SaveInventoryExtension instead.
+	const BaseInventoryView baseView = BuildBaseInventoryView(player);
+	const Item emptyItem {};
+	for (int i = 0; i < BaseInventoryGridCells; i++)
+		SaveItem(file, i < baseView.numItems ? player.InvList[baseView.listMap[i]] : emptyItem);
 
-	file.WriteLE<int32_t>(player._pNumInv);
+	file.WriteLE<int32_t>(baseView.numItems);
 
-	for (const int8_t cell : player.InvGrid)
+	for (const int8_t cell : baseView.grid)
 		file.WriteLE<int8_t>(cell);
 
 	for (const Item &item : player.SpdList)
@@ -2400,8 +2408,10 @@ void LoadHeroItems(Player &player)
 
 	gbIsHellfireSaveGame = file.NextBool8();
 
+	// [RUNS MOD] The hero-items file keeps the vanilla 40-slot list; extension items are
+	// restored by LoadInventoryExtension.
 	LoadMatchingItems(file, player, NUM_INVLOC, player.InvBody);
-	LoadMatchingItems(file, player, InventoryGridCells, player.InvList);
+	LoadMatchingItems(file, player, BaseInventoryGridCells, player.InvList);
 	LoadMatchingItems(file, player, MaxBeltItems, player.SpdList);
 
 	gbIsHellfireSaveGame = gbIsHellfire;
@@ -2690,113 +2700,182 @@ tl::expected<void, std::string> LoadGame(bool firstflag)
 
 void SaveHeroItems(SaveWriter &saveWriter, Player &player)
 {
-	const size_t itemCount = static_cast<size_t>(NUM_INVLOC) + InventoryGridCells + MaxBeltItems;
+	// [RUNS MOD] Vanilla-shaped: 40 backpack slots via the base view; extension items
+	// are written by SaveInventoryExtension.
+	const size_t itemCount = static_cast<size_t>(NUM_INVLOC) + BaseInventoryGridCells + MaxBeltItems;
 	SaveHelper file(saveWriter, "heroitems", (itemCount * (gbIsHellfire ? HellfireItemSaveSize : DiabloItemSaveSize)) + sizeof(uint8_t));
 
 	file.WriteLE<uint8_t>(gbIsHellfire ? 1 : 0);
 
+	const BaseInventoryView view = BuildBaseInventoryView(player);
+	const Item emptyItem {};
 	for (const Item &item : player.InvBody)
 		SaveItem(file, item);
-	for (const Item &item : player.InvList)
-		SaveItem(file, item);
+	for (int i = 0; i < BaseInventoryGridCells; i++)
+		SaveItem(file, i < view.numItems ? player.InvList[view.listMap[i]] : emptyItem);
 	for (const Item &item : player.SpdList)
 		SaveItem(file, item);
 }
 
-// [RUNS MOD] The carried bag: a per-character 10x8 grid, saved in the hero archive
-// (single page, no gold). Version byte lets the format evolve.
-// v0: items + grid. v1: adds unlockedRows (bag rows grow as run rewards).
-constexpr uint8_t BagVersion = 1;
+// [RUNS MOD] The inventory extension: the extra unlocked rows and every item touching
+// them, saved per character in the hero archive (file "herobag", name kept from the old
+// carried-bag feature so existing heroes migrate in place).
+// v0/v1: the old separate 10x8 bag (items + uint16 grid [+ unlockedRows in v1]).
+// v2: extraInvRows + items anchored by their top-left cell in the unified grid.
+constexpr uint8_t InventoryExtensionVersion = 2;
 
 /**
- * @brief [RUNS MOD] Drops bag items that validation cleared and frees the grid cells they
- * held, remapping the surviving items' ids.
- *
- * LoadAndValidateItemData clears an item it cannot make sense of -- most often a
- * Hellfire-only item loaded into a Diablo game. Without this, the grid still points at the
- * cleared entry: those cells stay occupied forever (CheckBagHLight refuses to pick an empty
- * item up) and render a garbage sprite. Also drops cells whose id is out of range, so a
- * truncated or corrupt grid cannot index past the item list.
+ * @brief [RUNS MOD] Inserts an item at an exact inventory grid cell, if the cells are
+ * free, in bounds and unlocked. Mirrors AddItemToInvGrid's bottom-left-positive marking.
  */
-void PurgeInvalidBagItems()
+bool PlaceItemAtInvGridIndex(Player &player, const Item &item, int gridIndex)
 {
-	std::vector<uint16_t> remap(Bag.items.size());
-	uint16_t kept = 0;
-	for (size_t i = 0; i < Bag.items.size(); i++)
-		remap[i] = Bag.items[i].isEmpty() ? BagStruct::EmptyCell : kept++;
-
-	if (kept != Bag.items.size()) {
-		std::vector<Item> compacted;
-		compacted.reserve(kept);
-		for (Item &item : Bag.items)
-			if (!item.isEmpty())
-				compacted.push_back(item);
-		Bag.items = std::move(compacted);
-	}
-
-	for (auto &col : Bag.grid) {
-		for (uint16_t &cell : col) {
-			if (cell == 0)
-				continue;
-			const uint16_t oldId = cell - 1;
-			const uint16_t newId = oldId < remap.size() ? remap[oldId] : BagStruct::EmptyCell;
-			cell = newId == BagStruct::EmptyCell ? 0 : static_cast<uint16_t>(newId + 1);
+	if (item.isEmpty() || player._pNumInv >= InventoryGridCells || gridIndex < 0)
+		return false;
+	const Size itemSize = GetInventorySize(item);
+	const int column = gridIndex % INV_ROW_SLOT_SIZE;
+	if (column + itemSize.width > INV_ROW_SLOT_SIZE)
+		return false;
+	const int lastCell = gridIndex + (itemSize.height - 1) * INV_ROW_SLOT_SIZE + itemSize.width - 1;
+	if (lastCell >= UnlockedInventoryGridCells(player))
+		return false;
+	for (int y = 0; y < itemSize.height; y++) {
+		for (int x = 0; x < itemSize.width; x++) {
+			if (player.InvGrid[gridIndex + y * INV_ROW_SLOT_SIZE + x] != 0)
+				return false;
 		}
 	}
+	player.InvList[player._pNumInv] = item;
+	player._pNumInv++;
+	const int8_t invListIndex = static_cast<int8_t>(player._pNumInv);
+	for (int y = 0; y < itemSize.height; y++) {
+		for (int x = 0; x < itemSize.width; x++) {
+			const int cell = gridIndex + y * INV_ROW_SLOT_SIZE + x;
+			player.InvGrid[cell] = (x == 0 && y == itemSize.height - 1) ? invListIndex : static_cast<int8_t>(-invListIndex);
+		}
+	}
+	return true;
 }
 
-void LoadBag()
+/** @brief [RUNS MOD] Adds a restored extension item: at its saved anchor if possible,
+ * anywhere otherwise. Items that fit nowhere are dropped (corrupt/downgraded saves). */
+void RestoreExtensionItem(Player &player, const Item &item, int anchorGridIndex)
 {
-	Bag.clear();
+	if (item.isEmpty())
+		return;
+	if (PlaceItemAtInvGridIndex(player, item, anchorGridIndex))
+		return;
+	AutoPlaceItemInInventory(player, item);
+}
+
+void LoadInventoryExtension()
+{
+	Player &player = *MyPlayer;
+	player.pExtraInvRows = InitialExtraInventoryRows;
+
+	// Idempotence: strip anything already sitting on the extended rows before
+	// re-reading them (the loader may run again on a reload).
+	for (int i = player._pNumInv - 1; i >= 0; i--) {
+		for (int c = BaseInventoryGridCells; c < InventoryGridCells; c++) {
+			if (std::abs(player.InvGrid[c]) == i + 1) {
+				player.RemoveInvItem(i, false);
+				break;
+			}
+		}
+	}
+
 	LoadHelper file(OpenSaveArchive(gSaveNumber), "herobag");
 	if (!file.IsValid())
 		return;
 	const uint8_t version = file.NextLE<uint8_t>();
-	if (version > BagVersion)
+	if (version > InventoryExtensionVersion)
 		return;
 	gbIsHellfireSaveGame = file.NextBool8();
-	const uint32_t itemCount = file.NextLE<uint32_t>();
-	Bag.items.resize(itemCount);
-	for (uint32_t i = 0; i < itemCount; i++)
-		LoadAndValidateItemData(file, Bag.items[i]);
-	for (auto &col : Bag.grid)
-		for (uint16_t &cell : col)
-			cell = file.NextLE<uint16_t>();
-	// [RUNS MOD] Row gating arrived in v1. v0 characters predate it and may hold items
-	// anywhere in the 10x8 grid, so they keep the full bag rather than having items
-	// stranded in locked rows.
-	if (version >= 1)
-		Bag.unlockedRows = std::clamp<uint8_t>(file.NextLE<uint8_t>(), InitialBagRows, BagGridSize.height);
-	else
-		Bag.unlockedRows = BagGridSize.height;
+
+	if (version >= 2) {
+		player.pExtraInvRows = std::clamp<uint8_t>(file.NextLE<uint8_t>(), InitialExtraInventoryRows, MaxExtraInventoryRows);
+		const uint32_t itemCount = file.NextLE<uint32_t>();
+		for (uint32_t i = 0; i < itemCount; i++) {
+			const uint8_t anchor = file.NextLE<uint8_t>();
+			Item item;
+			LoadAndValidateItemData(file, item);
+			RestoreExtensionItem(player, item, anchor);
+		}
+	} else {
+		// v0/v1: migrate the old separate 10x8 bag. Its row r becomes extended row r
+		// (grid cell 40 + r*10), and rows past the new cap fall back to auto-placement.
+		const uint32_t itemCount = file.NextLE<uint32_t>();
+		std::vector<Item> bagItems(itemCount);
+		for (uint32_t i = 0; i < itemCount; i++)
+			LoadAndValidateItemData(file, bagItems[i]);
+		uint16_t bagGrid[10][8];
+		for (auto &column : bagGrid)
+			for (uint16_t &cell : column)
+				cell = file.NextLE<uint16_t>();
+		uint8_t unlockedRows = 8;
+		if (version >= 1)
+			unlockedRows = std::clamp<uint8_t>(file.NextLE<uint8_t>(), 3, 8);
+		player.pExtraInvRows = std::clamp<uint8_t>(unlockedRows, InitialExtraInventoryRows, MaxExtraInventoryRows);
+		// Anchor of each bag item = its topmost-leftmost cell, scanned row-major.
+		for (uint32_t i = 0; i < itemCount; i++) {
+			int anchor = -1;
+			for (int y = 0; y < 8 && anchor < 0; y++) {
+				for (int x = 0; x < 10; x++) {
+					if (bagGrid[x][y] == i + 1) {
+						anchor = BaseInventoryGridCells + y * INV_ROW_SLOT_SIZE + x;
+						break;
+					}
+				}
+			}
+			RestoreExtensionItem(player, bagItems[i], anchor);
+		}
+	}
+
 	gbIsHellfireSaveGame = gbIsHellfire;
-	PurgeInvalidBagItems();
-	// Never strand an item in a locked row (defends against hand-edited or corrupt
-	// saves): grow the unlocked area to cover every occupied cell.
-	for (int x = 0; x < BagGridSize.width; x++)
-		for (int y = Bag.unlockedRows; y < BagGridSize.height; y++)
-			if (Bag.grid[x][y] != 0)
-				Bag.unlockedRows = static_cast<uint8_t>(y + 1);
-	Bag.RefreshItemStatFlags();
+	player._pGold = CalculateGold(player);
+	CalcPlrInv(player, false);
 }
 
-void SaveBag(SaveWriter &saveWriter)
+void SaveInventoryExtension(SaveWriter &saveWriter)
 {
+	Player &player = *MyPlayer;
+
+	// Collect every item that occupies at least one extended cell, anchored by its
+	// topmost-leftmost cell.
+	struct ExtensionEntry {
+		uint8_t anchor;
+		int invListIndex;
+	};
+	std::vector<ExtensionEntry> entries;
+	for (int i = 0; i < player._pNumInv; i++) {
+		int anchor = -1;
+		bool touchesExtension = false;
+		for (int c = 0; c < InventoryGridCells; c++) {
+			if (std::abs(player.InvGrid[c]) == i + 1) {
+				if (anchor < 0)
+					anchor = c;
+				if (c >= BaseInventoryGridCells) {
+					touchesExtension = true;
+					break;
+				}
+			}
+		}
+		if (touchesExtension && anchor >= 0)
+			entries.push_back({ static_cast<uint8_t>(anchor), i });
+	}
+
 	const int itemSize = (gbIsHellfire ? HellfireItemSaveSize : DiabloItemSaveSize);
-	const size_t size = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint32_t)
-	    + (static_cast<size_t>(itemSize) * Bag.items.size())
-	    + (BagGridSize.width * BagGridSize.height * sizeof(uint16_t))
-	    + sizeof(uint8_t); // v1: unlockedRows
+	const size_t size = 3 * sizeof(uint8_t) + sizeof(uint32_t)
+	    + entries.size() * (sizeof(uint8_t) + static_cast<size_t>(itemSize));
 	SaveHelper file(saveWriter, "herobag", size);
-	file.WriteLE<uint8_t>(BagVersion);
+	file.WriteLE<uint8_t>(InventoryExtensionVersion);
 	file.WriteLE<uint8_t>(gbIsHellfire ? 1 : 0);
-	file.WriteLE<uint32_t>(static_cast<uint32_t>(Bag.items.size()));
-	for (const Item &item : Bag.items)
-		SaveItem(file, item);
-	for (const auto &col : Bag.grid)
-		for (const uint16_t cell : col)
-			file.WriteLE<uint16_t>(cell);
-	file.WriteLE<uint8_t>(Bag.unlockedRows);
+	file.WriteLE<uint8_t>(player.pExtraInvRows);
+	file.WriteLE<uint32_t>(static_cast<uint32_t>(entries.size()));
+	for (const ExtensionEntry &entry : entries) {
+		file.WriteLE<uint8_t>(entry.anchor);
+		SaveItem(file, player.InvList[entry.invListIndex]);
+	}
 }
 
 void SaveStash(SaveWriter &stashWriter)

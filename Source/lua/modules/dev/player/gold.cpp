@@ -7,6 +7,7 @@
 
 #include <sol/sol.hpp>
 
+#include "inv.h"
 #include "items.h"
 #include "lua/metadoc.hpp"
 #include "player.h"
@@ -20,7 +21,10 @@ std::string DebugCmdGiveGoldCheat(std::optional<int> amount)
 	if (goldToAdd <= 0) return "amount must be positive";
 	Player &myPlayer = *MyPlayer;
 	const int goldAmountBefore = myPlayer._pGold;
-	for (int8_t &itemIndex : myPlayer.InvGrid) {
+	// [RUNS MOD] Locked rows must not receive gold.
+	const int unlockedCells = UnlockedInventoryGridCells(myPlayer);
+	for (int i = 0; i < unlockedCells; i++) {
+		int8_t &itemIndex = myPlayer.InvGrid[i];
 		if (itemIndex < 0)
 			continue;
 

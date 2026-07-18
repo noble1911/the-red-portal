@@ -28,7 +28,6 @@
 #include <fmt/core.h>
 
 #include "DiabloUI/ui_flags.hpp"
-#include "bag.h"
 #include "control/control.hpp"
 #include "controls/control_mode.hpp"
 #include "controls/controller_buttons.h"
@@ -69,6 +68,7 @@
 #include "panels/info_box.hpp"
 #include "panels/ui_panels.hpp"
 #include "player.h"
+#include "portal.h"
 #include "qol/stash.h"
 #include "quests.h"
 #include "runs_mod.h"
@@ -2968,11 +2968,6 @@ void CalcPlrInv(Player &player, bool loadgfx)
 			// If stash is open, ensure the items are displayed correctly
 			Stash.RefreshItemStatFlags();
 		}
-		if (IsBagOpen) {
-			// [RUNS MOD] Same for the carried bag, otherwise its usable/unusable item
-			// colouring goes stale after a level-up or an equipment change.
-			Bag.RefreshItemStatFlags();
-		}
 		if (!player.HoldItem.isEmpty())
 			player.HoldItem.updateRequiredStatsCacheForPlayer(player);
 	}
@@ -3073,6 +3068,9 @@ void EnsureStarterDungeonScroll(Player &player)
 	// load but only grants a scroll when the player has none, so it is a soft-lock
 	// safety net rather than a stream of free scrolls.
 	if (PlayerHasDungeonScroll(player))
+		return;
+	// An open dungeon portal is also a way into a run -- no scroll needed yet.
+	if (DungeonPortalOpen)
 		return;
 	Item scroll;
 	CreateDungeonScroll(scroll, 1);

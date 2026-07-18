@@ -9,6 +9,7 @@
 
 #include "engine/random.hpp"
 #include "game_mode.hpp"
+#include "inv.h"
 #include "items/validation.h"
 #include "loadsave.h"
 #include "plrmsg.h"
@@ -185,12 +186,15 @@ void PackPlayer(PlayerPack &packed, const Player &player)
 	for (int i = 0; i < NUM_INVLOC; i++)
 		PackItem(packed.InvBody[i], player.InvBody[i], gbIsHellfire);
 
-	packed._pNumInv = player._pNumInv;
-	for (int i = 0; i < packed._pNumInv; i++)
-		PackItem(packed.InvList[i], player.InvList[i], gbIsHellfire);
+	// [RUNS MOD] Pack the vanilla-shaped base view; items touching the extended rows
+	// are serialized in the per-hero side file (SaveInventoryExtension).
+	const BaseInventoryView view = BuildBaseInventoryView(player);
+	packed._pNumInv = static_cast<uint8_t>(view.numItems);
+	for (int i = 0; i < view.numItems; i++)
+		PackItem(packed.InvList[i], player.InvList[view.listMap[i]], gbIsHellfire);
 
-	for (int i = 0; i < InventoryGridCells; i++)
-		packed.InvGrid[i] = player.InvGrid[i];
+	for (int i = 0; i < BaseInventoryGridCells; i++)
+		packed.InvGrid[i] = view.grid[i];
 
 	for (int i = 0; i < MaxBeltItems; i++)
 		PackItem(packed.SpdList[i], player.SpdList[i], gbIsHellfire);
@@ -243,12 +247,15 @@ void PackNetPlayer(PlayerNetPack &packed, const Player &player)
 	for (int i = 0; i < NUM_INVLOC; i++)
 		PackNetItem(player.InvBody[i], packed.InvBody[i]);
 
-	packed._pNumInv = player._pNumInv;
-	for (int i = 0; i < packed._pNumInv; i++)
-		PackNetItem(player.InvList[i], packed.InvList[i]);
+	// [RUNS MOD] Remote players only see the vanilla-shaped base view; the extension is
+	// local-only, like the stash.
+	const BaseInventoryView view = BuildBaseInventoryView(player);
+	packed._pNumInv = static_cast<uint8_t>(view.numItems);
+	for (int i = 0; i < view.numItems; i++)
+		PackNetItem(player.InvList[view.listMap[i]], packed.InvList[i]);
 
-	for (int i = 0; i < InventoryGridCells; i++)
-		packed.InvGrid[i] = player.InvGrid[i];
+	for (int i = 0; i < BaseInventoryGridCells; i++)
+		packed.InvGrid[i] = view.grid[i];
 
 	for (int i = 0; i < MaxBeltItems; i++)
 		PackNetItem(player.SpdList[i], packed.SpdList[i]);
@@ -421,8 +428,12 @@ void UnPackPlayer(const PlayerPack &packed, Player &player)
 	for (int i = 0; i < player._pNumInv; i++)
 		UnPackItem(packed.InvList[i], player, player.InvList[i], isHellfire);
 
-	for (int i = 0; i < InventoryGridCells; i++)
+	for (int i = 0; i < BaseInventoryGridCells; i++)
 		player.InvGrid[i] = packed.InvGrid[i];
+	// [RUNS MOD] The pack only carries the base view; the extension is restored later
+	// by LoadInventoryExtension.
+	for (int i = BaseInventoryGridCells; i < InventoryGridCells; i++)
+		player.InvGrid[i] = 0;
 
 	VerifyGoldSeeds(player);
 
@@ -488,7 +499,7 @@ bool UnPackNetPlayer(const PlayerNetPack &packed, Player &player)
 	ValidateFields(packed.pClass, packed.pBaseDex, packed.pBaseDex <= player.GetMaximumAttributeValue(CharacterAttribute::Dexterity));
 	ValidateFields(packed.pClass, packed.pBaseVit, packed.pBaseVit <= player.GetMaximumAttributeValue(CharacterAttribute::Vitality));
 
-	ValidateField(packed._pNumInv, packed._pNumInv <= InventoryGridCells);
+	ValidateField(packed._pNumInv, packed._pNumInv <= BaseInventoryGridCells);
 
 	ValidateField(packed.pdir, packed.pdir <= static_cast<uint8_t>(Direction::SouthEast));
 	player.setCharacterLevel(packed.pLevel);
@@ -562,8 +573,11 @@ bool UnPackNetPlayer(const PlayerNetPack &packed, Player &player)
 			return false;
 	}
 
-	for (int i = 0; i < InventoryGridCells; i++)
+	for (int i = 0; i < BaseInventoryGridCells; i++)
 		player.InvGrid[i] = packed.InvGrid[i];
+	// [RUNS MOD] The net pack only carries the base view of the grid.
+	for (int i = BaseInventoryGridCells; i < InventoryGridCells; i++)
+		player.InvGrid[i] = 0;
 
 	for (int i = 0; i < MaxBeltItems; i++) {
 		Item &item = player.SpdList[i];

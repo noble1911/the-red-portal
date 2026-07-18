@@ -2688,7 +2688,10 @@ void OperateShrineSpiritual(DiabloGenerator &rng, Player &player)
 	if (&player != MyPlayer)
 		return;
 
-	for (int8_t &itemIndex : player.InvGrid) {
+	// [RUNS MOD] Only the unlocked cells may receive gold; locked rows stay empty.
+	const int unlockedCells = UnlockedInventoryGridCells(player);
+	for (int i = 0; i < unlockedCells; i++) {
+		int8_t &itemIndex = player.InvGrid[i];
 		if (itemIndex == 0) {
 			Item &goldItem = player.InvList[player._pNumInv];
 			MakeGoldStack(goldItem, (5 * leveltype) + rng.generateRnd(10 * leveltype));

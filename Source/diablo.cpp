@@ -26,7 +26,6 @@
 #include "DiabloUI/selstart.h"
 #include "appfat.h"
 #include "automap.h"
-#include "bag.h"
 #include "capture.h"
 #include "control/control.hpp"
 #include "cursor.h"
@@ -385,12 +384,9 @@ void LeftMouseDown(uint16_t modState)
 				stream_stop();
 			} else if (CharFlag && GetLeftPanel().contains(MousePosition)) {
 				CheckChrBtns();
-			} else if (IsBagShown() && GetBagRect().contains(MousePosition)) {
-				// [RUNS MOD] Checked BEFORE the inventory panel: the stacked bag's first
-				// row overlaps the inventory panel's bottom border band (y 338..352), and
-				// that strip must belong to the bag or clicks there hit dead border.
-				CheckBagItem(MousePosition, isShiftHeld, isCtrlHeld);
-			} else if (invflag && GetRightPanel().contains(MousePosition)) {
+			} else if (invflag && GetExtendedInventoryRect().contains(MousePosition)) {
+				// [RUNS MOD] The panel rect is grown by the unlocked extra rows so clicks
+				// on the extension reach the inventory.
 				if (!DropGoldFlag)
 					CheckInvItem(isShiftHeld, isCtrlHeld);
 			} else if (IsStashOpen && GetLeftPanel().contains(MousePosition)) {
@@ -1686,22 +1682,18 @@ void InventoryKeyPressed()
 	CloseGoldWithdraw();
 	CloseStash();
 	CloseVisualStore();
-	// [RUNS MOD] The carried bag opens/closes together with the inventory.
-	if (invflag)
-		OpenBag();
-	else
-		CloseBag();
 }
 
-// [RUNS MOD] Toggle the carried bag (opens/closes alongside the inventory).
+// [RUNS MOD] Kept as a second inventory shortcut: the bag is now part of the inventory
+// grid itself, so the old Bag key simply toggles the inventory.
 void BagKeyPressed()
 {
 	if (IsPlayerInStore())
 		return;
-	if (IsBagOpen)
+	if (invflag)
 		CloseInventory();
 	else
-		OpenBag();
+		InventoryKeyPressed();
 }
 
 void CharacterSheetKeyPressed()
@@ -1720,8 +1712,6 @@ void CharacterSheetKeyPressed()
 		}
 	}
 	ToggleCharPanel();
-	if (CharFlag)
-		CloseBag(); // [RUNS MOD] the char sheet and bag share the left panel
 }
 
 void PartyPanelSideToggleKeyPressed()
@@ -1738,8 +1728,6 @@ void QuestLogKeyPressed()
 	} else {
 		QuestLogIsOpen = false;
 	}
-	if (QuestLogIsOpen)
-		CloseBag(); // [RUNS MOD] the quest log and bag share the left panel
 	if (!IsRightPanelOpen() && CanPanelsCoverView()) {
 		if (!QuestLogIsOpen) { // We closed the quest log
 			if (MousePosition.x > 160 && MousePosition.y < GetMainPanel().position.y) {
@@ -2012,7 +2000,7 @@ void InitKeymapActions()
 	options.Keymapper.AddAction(
 	    "Bag",
 	    N_("Bag"),
-	    N_("Open the carried bag (extra inventory)."),
+	    N_("Open the inventory (the pack extension is part of it now)."),
 	    'B',
 	    BagKeyPressed,
 	    nullptr,
@@ -2728,7 +2716,6 @@ void FreeGameMem()
 	FreeObjectGFX();
 	FreeTownerGFX();
 	FreeStashGFX();
-	FreeBagGFX(); // [RUNS MOD]
 	FreeVisualStoreGFX();
 #ifndef USE_SDL1
 	DeactivateVirtualGamepad();
@@ -3297,7 +3284,7 @@ void LoadGameLevelStash()
 
 	gbIsHellfireSaveGame = gbIsHellfire;
 	LoadStash();
-	LoadBag(); // [RUNS MOD] load the per-character carried bag
+	LoadInventoryExtension(); // [RUNS MOD] load the extra inventory rows + their items
 	gbIsHellfireSaveGame = isHellfireSaveGame;
 }
 
@@ -3411,7 +3398,6 @@ tl::expected<void, std::string> LoadGameLevelTown(bool firstflag, lvl_entry lvld
 
 	InitTowners();
 	InitStash();
-	InitBag(); // [RUNS MOD]
 	InitVisualStore();
 	InitItems();
 	InitMissiles();
@@ -3600,11 +3586,14 @@ tl::expected<void, std::string> LoadGameLevel(bool firstflag, lvl_entry lvldir)
 
 	SetRndSeedForDungeonLevel();
 
-	LoadGameLevelStores();
-
+	// [RUNS MOD] Stash (and the inventory extension) loads BEFORE the stores: the
+	// starter-scroll safety net in LoadGameLevelStores must see scrolls stored on the
+	// extended inventory rows, which are only restored by LoadGameLevelStash.
 	if (firstflag || lvldir == ENTRY_LOAD) {
 		LoadGameLevelStash();
 	}
+
+	LoadGameLevelStores();
 
 	IncProgress();
 
