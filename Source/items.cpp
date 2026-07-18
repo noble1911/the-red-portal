@@ -68,6 +68,7 @@
 #include "panels/info_box.hpp"
 #include "panels/ui_panels.hpp"
 #include "player.h"
+#include "plrmsg.h"
 #include "portal.h"
 #include "qol/stash.h"
 #include "quests.h"
@@ -1830,6 +1831,12 @@ void PrintItemMisc(const Item &item)
 			AddInfoBoxString(DescribeScrollMod(mods.mods[i], /*full=*/true), /*floatingBox=*/true);
 		return;
 	}
+	if (item._iMiscId == IMISC_PRESERVE) {
+		// [RUNS MOD] The insurance scroll: explain what it does before 50,000 gold
+		// changes hands.
+		AddItemInfoBoxString(_("Marks one carried item to survive death"));
+		return;
+	}
 	if (item._iMiscId == IMISC_EAR) {
 		AddItemInfoBoxString(fmt::format(fmt::runtime(pgettext("player", "Level: {:d}")), item._ivalue));
 		return;
@@ -1864,6 +1871,10 @@ void PrintItemMisc(const Item &item)
 void PrintItemInfo(const Item &item)
 {
 	PrintItemMisc(item);
+	// [RUNS MOD] Insured items say so (shared by the identified and unidentified
+	// detail paths, so the line never hides).
+	if (RunsModEnabled && item.isPreserved())
+		AddItemInfoBoxString(_("Preserved -- survives one death"));
 	uint8_t str = item._iMinStr;
 	uint8_t dex = item._iMinDex;
 	uint8_t mag = item._iMinMag;
@@ -4030,6 +4041,63 @@ bool DoOil(Player &player, int cii)
 	return true;
 }
 
+// [RUNS MOD] Scroll of Preservation targeting state: true while the (identify-art)
+// mark cursor is up, and the slot the scroll was used from -- it is only consumed
+// when a mark succeeds, so cancelling the cursor costs nothing.
+bool PreserveTargetingActive = false;
+int8_t PreserveScrollSource = -1;
+
+bool DoPreserve(Player &player, int cii)
+{
+	// Explicit slot mapping (do NOT reuse DoOil's: with the extended inventory,
+	// belt ids would index InvList out of range).
+	Item *pi;
+	if (cii < INVITEM_INV_FIRST)
+		pi = &player.InvBody[cii];
+	else if (cii <= INVITEM_INV_LAST)
+		pi = &player.InvList[cii - INVITEM_INV_FIRST];
+	else if (cii <= INVITEM_BELT_LAST)
+		pi = &player.SpdList[cii - INVITEM_BELT_FIRST];
+	else
+		return false;
+
+	if (pi->isEmpty() || pi->_itype == ItemType::Gold || pi->_iMiscId == IMISC_PRESERVE)
+		return false;
+	if (pi->isPreserved()) {
+		EventPlrMsg(_("That is already preserved."), UiFlags::ColorWhite);
+		return false;
+	}
+
+	pi->setPreserved(true);
+
+	// Spend the scroll that opened this targeting; if its slot went stale, fall back
+	// to the first preservation scroll found (mirrors the ConsumeScroll fallback).
+	bool spent = false;
+	if (PreserveScrollSource >= INVITEM_BELT_FIRST && PreserveScrollSource <= INVITEM_BELT_LAST) {
+		const int idx = PreserveScrollSource - INVITEM_BELT_FIRST;
+		if (!player.SpdList[idx].isEmpty() && player.SpdList[idx]._iMiscId == IMISC_PRESERVE) {
+			player.RemoveSpdBarItem(idx);
+			spent = true;
+		}
+	} else if (PreserveScrollSource >= INVITEM_INV_FIRST && PreserveScrollSource <= INVITEM_INV_LAST) {
+		const int idx = PreserveScrollSource - INVITEM_INV_FIRST;
+		if (idx < player._pNumInv && player.InvList[idx]._iMiscId == IMISC_PRESERVE) {
+			player.RemoveInvItem(idx);
+			spent = true;
+		}
+	}
+	if (!spent) {
+		RemoveInventoryOrBeltItem(player, [](const Item &item) {
+			return item._iMiscId == IMISC_PRESERVE;
+		});
+	}
+	PreserveScrollSource = -1;
+
+	EventPlrMsg(_("It will follow you beyond death."), UiFlags::ColorWhitegold);
+	CalcPlrInv(player, true);
+	return true;
+}
+
 [[nodiscard]] StringOrView PrintItemPower(char plidx, const Item &item)
 {
 	switch (plidx) {
@@ -4696,6 +4764,15 @@ void SpawnDungeonVendor(int charLevel)
 		// instead of stocking a scroll for a level that cannot be entered.
 		level = NextRunDepth(level);
 	}
+
+	// [RUNS MOD] The insurance offer: one Scroll of Preservation, always in stock.
+	// Priced by its TSV value (50,000) -- deliberately a late-game purchase.
+	Item preserve = {};
+	InitializeItem(preserve, IDI_PRESERVESCROLL);
+	GenerateNewSeed(preserve);
+	preserve._iIdentified = true;
+	preserve._iStatFlag = true;
+	DungeonVendorItems.push_back(preserve);
 }
 
 void SpawnBoy(int lvl)

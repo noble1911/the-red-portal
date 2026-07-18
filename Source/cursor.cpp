@@ -576,6 +576,11 @@ void NewCursor(const Item &item)
 
 void NewCursor(int cursId)
 {
+	// [RUNS MOD] Any cursor change away from the identify art ends Scroll of
+	// Preservation targeting (covers every cancel path in one place).
+	if (cursId != CURSOR_IDENTIFY)
+		PreserveTargetingActive = false;
+
 	if (pcurs >= CURSOR_FIRSTITEM && cursId > CURSOR_HAND && cursId < CURSOR_HOURGLASS) {
 		if (!TryDropItem()) {
 			return;

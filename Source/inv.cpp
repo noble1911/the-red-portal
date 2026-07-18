@@ -1427,6 +1427,9 @@ void DrawInv(const Surface &out)
 
 			if (pcursinvitem == slot) {
 				ClxDrawOutline(out, GetOutlineColor(myPlayer.InvBody[slot], true), position, sprite);
+			} else if (RunsModEnabled && myPlayer.InvBody[slot].isPreserved()) {
+				// [RUNS MOD] Insured by a Scroll of Preservation: constant gold outline.
+				ClxDrawOutline(out, ICOL_YELLOW, position, sprite);
 			}
 
 			DrawItem(myPlayer.InvBody[slot], out, position, sprite);
@@ -1461,6 +1464,9 @@ void DrawInv(const Surface &out)
 			const Point position = GetPanelPosition(UiPanels::Inventory, InvRect[j + SLOTXY_INV_FIRST].position) + Displacement { 0, InventorySlotSizeInPixels.height };
 			if (pcursinvitem == ii + INVITEM_INV_FIRST) {
 				ClxDrawOutline(out, GetOutlineColor(myPlayer.InvList[ii], true), position, sprite);
+			} else if (RunsModEnabled && myPlayer.InvList[ii].isPreserved()) {
+				// [RUNS MOD] Insured by a Scroll of Preservation: constant gold outline.
+				ClxDrawOutline(out, ICOL_YELLOW, position, sprite);
 			}
 
 			DrawItem(myPlayer.InvList[ii], out, position, sprite);
@@ -1495,6 +1501,9 @@ void DrawInvBelt(const Surface &out)
 			if (ControlMode == ControlTypes::KeyboardAndMouse || invflag) {
 				ClxDrawOutline(out, GetOutlineColor(myPlayer.SpdList[i], true), position, sprite);
 			}
+		} else if (RunsModEnabled && myPlayer.SpdList[i].isPreserved()) {
+			// [RUNS MOD] Insured by a Scroll of Preservation: constant gold outline.
+			ClxDrawOutline(out, ICOL_YELLOW, position, sprite);
 		}
 
 		DrawItem(myPlayer.SpdList[i], out, position, sprite);
@@ -2405,6 +2414,22 @@ bool UseInvItem(int cii)
 		// into it to enter. Independent of town portals. The scroll's seed, modifier
 		// count and difficulty are passed so the run applies this scroll's exact setup.
 		OpenDungeonPortal(level, scrollSeed, modCount, difficulty);
+		return true;
+	}
+
+	if (item->_iMiscId == IMISC_PRESERVE) {
+		// [RUNS MOD] Scroll of Preservation: enter mark-targeting (identify cursor
+		// art + the PreserveTargetingActive flag). The scroll is NOT consumed here --
+		// only a successful mark spends it (DoPreserve), so cancelling costs nothing.
+		if (&player == MyPlayer) {
+			PreserveScrollSource = static_cast<int8_t>(cii);
+			PreserveTargetingActive = true;
+			if (SpellbookFlag)
+				SpellbookFlag = false;
+			if (!invflag)
+				invflag = true;
+			NewCursor(CURSOR_IDENTIFY);
+		}
 		return true;
 	}
 

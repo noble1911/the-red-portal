@@ -135,13 +135,18 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   the first boss — that loop is now the intended one, and E4 must keep it cheap to
   lose.
 
-**E4 — Death economy tuning**
-- E1 shipped the harsh end (full drop). If playtesting shows it is too brutal for
-  fresh level-1 characters (who already need several sorties per boss), the levers
-  are: a small "secure container" (a few slots whose contents survive death,
-  Tarkov-style — could reuse the per-item-tag design that was considered and
-  dropped for E1), belt-as-safe-pocket, or an insurance fee at a vendor. Optional
-  "hardcore" scroll affix stays an idea for the knife-edge crowd.
+**E4 — Death economy tuning** 🔶 E4a shipped 2026-07-19
+- **E4a — Scroll of Preservation** (shipped): a 50,000-gold consumable, always in
+  stock at the Dungeon Merchant. Use it, then click any equipped / backpack / belt
+  item: the item is marked (persistent gold outline + "Preserved" tooltip line) and
+  survives exactly ONE death — the mark is spent by it. The mark persists across
+  saves and dungeons until spent (dwBuff bit, save/pack/net-safe). The scroll is
+  consumed only on a successful mark; cancelling the targeting cursor costs nothing.
+  Multiple marks may be active (one scroll each). Gold and preservation scrolls
+  themselves cannot be marked.
+- Remaining E4 levers if full-drop still needs softening after playtest: secure
+  container slots, belt-as-safe-pocket, "hardcore" scroll affix for the knife-edge
+  crowd.
 
 **Feature ideas (next slices)**
 - [ ] **Scroll modifier expansion** (PoE-map direction): more affix variety — pack

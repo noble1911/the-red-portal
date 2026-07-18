@@ -2889,6 +2889,18 @@ bool TryIconCurs()
 	Player &myPlayer = *MyPlayer;
 
 	if (pcurs == CURSOR_IDENTIFY) {
+		// [RUNS MOD] The Scroll of Preservation reuses the identify cursor art; the
+		// targeting flag routes the click. Nothing was spent yet: an invalid item
+		// keeps the cursor for re-aiming, clicking away cancels for free.
+		if (PreserveTargetingActive) {
+			if (pcursinvitem != -1 && !IsInspectingPlayer()) {
+				if (DoPreserve(myPlayer, pcursinvitem))
+					NewCursor(CURSOR_HAND);
+			} else {
+				NewCursor(CURSOR_HAND);
+			}
+			return true;
+		}
 		if (pcursinvitem != -1 && !IsInspectingPlayer())
 			CheckIdentify(myPlayer, pcursinvitem);
 		else if (pcursstashitem != StashStruct::EmptyCell) {

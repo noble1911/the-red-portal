@@ -2720,6 +2720,10 @@ StartPlayerKill(Player &player, DeathReason deathReason)
 		// Ensure that items are removed for remote players
 		// The dropped items will be synced separately (by the remote client)
 		for (Item &item : player.InvBody) {
+			// [RUNS MOD] Preserved gear survives the death on the owner's client, so
+			// keep the remote paper-doll consistent (dwBuff is synced).
+			if (RunsModEnabled && item.isPreserved())
+				continue;
 			item.clear();
 		}
 		CalcPlrInv(player, false);
@@ -2777,6 +2781,12 @@ StartPlayerKill(Player &player, DeathReason deathReason)
 				Direction pdd = player._pdir;
 				for (Item &item : player.InvBody) {
 					pdd = Left(pdd);
+					// [RUNS MOD] A Scroll of Preservation mark spends itself to keep
+					// the item through exactly one death.
+					if (RunsModEnabled && item.isPreserved()) {
+						item.setPreserved(false);
+						continue;
+					}
 					DeadItem(player, item.pop(), Displacement(pdd));
 				}
 
@@ -2794,6 +2804,10 @@ StartPlayerKill(Player &player, DeathReason deathReason)
 						Item &item = player.InvList[i];
 						if (item.isEmpty() || item._itype == ItemType::Gold)
 							continue;
+						if (item.isPreserved()) { // [RUNS MOD] insured: survives this death
+							item.setPreserved(false);
+							continue;
+						}
 						Item drop = item;
 						player.RemoveInvItem(i, false);
 						pdd = Left(pdd);
@@ -2802,6 +2816,10 @@ StartPlayerKill(Player &player, DeathReason deathReason)
 					for (int i = 0; i < MaxBeltItems; i++) {
 						if (player.SpdList[i].isEmpty())
 							continue;
+						if (player.SpdList[i].isPreserved()) { // [RUNS MOD] insured
+							player.SpdList[i].setPreserved(false);
+							continue;
+						}
 						Item drop = player.SpdList[i];
 						player.RemoveSpdBarItem(i);
 						pdd = Left(pdd);

@@ -176,6 +176,10 @@ enum icreateinfo_flag2 {
 	// clang-format off
 	CF_HELLFIRE = 1 << 0,
 	CF_UIDOFFSET = ((1 << 4) - 1) << 1,
+	/** [RUNS MOD] Marked by a Scroll of Preservation: survives ONE extraction death,
+	 * which clears the bit. dwBuff bits 5-31 are otherwise unused and round-trip
+	 * fully through saves, hero packs, RecreateItem and network sync. */
+	CF_PRESERVED = 1 << 5,
 	// clang-format on
 };
 
@@ -391,6 +395,20 @@ struct Item {
 		return IsAnyOf(_iMiscId, IMISC_SCROLL, IMISC_SCROLLT);
 	}
 
+	/** @brief [RUNS MOD] Marked by a Scroll of Preservation to survive one death. */
+	[[nodiscard]] bool isPreserved() const
+	{
+		return (dwBuff & CF_PRESERVED) != 0;
+	}
+
+	void setPreserved(bool preserved) // [RUNS MOD]
+	{
+		if (preserved)
+			dwBuff |= CF_PRESERVED;
+		else
+			dwBuff &= ~static_cast<uint32_t>(CF_PRESERVED);
+	}
+
 	[[nodiscard]] bool isScrollOf(SpellID spellId) const
 	{
 		return isScroll() && _iSpell == spellId;
@@ -588,6 +606,14 @@ void FreeItemGFX();
 void GetItemFrm(Item &item);
 void GetItemStr(Item &item);
 void CheckIdentify(Player &player, int cii);
+/** @brief [RUNS MOD] True while the Scroll of Preservation's mark cursor is up
+ * (reuses the identify cursor art; routes the identify click to DoPreserve). */
+extern bool PreserveTargetingActive;
+/** @brief [RUNS MOD] Slot (INVITEM_* id) the preservation scroll was used from. */
+extern int8_t PreserveScrollSource;
+/** @brief [RUNS MOD] Marks the clicked item to survive one death and spends the
+ * scroll. Returns false (keeping the cursor) on an invalid target. */
+bool DoPreserve(Player &player, int cii);
 void DoRepair(Player &player, int cii);
 void DoRecharge(Player &player, int cii);
 bool DoOil(Player &player, int cii);

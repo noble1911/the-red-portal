@@ -1037,6 +1037,18 @@ void DungeonVendorBuyItem(Item &item)
 		return;
 	TakePlrsMoney(item._iIvalue);
 	StoreAutoPlace(item, true);
+	// [RUNS MOD] The Scroll of Preservation is always in stock: buying it refreshes
+	// the slot with a fresh one (its 50,000g price is the limiter, not scarcity).
+	if (item._iMiscId == IMISC_PRESERVE) {
+		Item restock = {};
+		InitializeItem(restock, IDI_PRESERVESCROLL);
+		GenerateNewSeed(restock);
+		restock._iIdentified = true;
+		restock._iStatFlag = true;
+		DungeonVendorItems[idx] = restock;
+		CalcPlrInv(*MyPlayer, true);
+		return;
+	}
 	// Stock shrinks as you buy, down to a floor of one: while more than one remains,
 	// remove the purchased scroll; the last scroll instead refreshes to a new one, so
 	// a run can always be started. A full restock happens after a dungeon is completed.
