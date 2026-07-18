@@ -22,7 +22,8 @@ enum class ScrollAffix : uint8_t {
 	Bountiful,   // +extra item drops  / monsters deal more damage
 	Erudite,     // +experience        / monsters have more life
 	Savage,      // +gold found        / monsters deal more damage
-	Last = Savage,
+	Volatile,    // +extra item drops  / the run clock ticks faster (see run_clock)
+	Last = Volatile,
 };
 
 /** One rolled modifier: an affix plus the magnitudes (percent) of its boon/bane. */
@@ -73,6 +74,7 @@ struct RunModMultipliers {
 	int itemQtyPct = 0;    // extra item-drop chance
 	int magicFindPct = 0;  // bias toward higher-quality items
 	int xpPct = 0;         // extra experience from kills
+	int collapsePct = 0;   // run clock compression: grace/waves/collapse all faster
 };
 
 /** @brief Sums a modifier set into the aggregate run multipliers. */

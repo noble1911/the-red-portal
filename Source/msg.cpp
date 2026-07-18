@@ -52,6 +52,7 @@
 #include "plrmsg.h"
 #include "portals/validation.hpp"
 #include "quests/validation.hpp"
+#include "run_clock.h"
 #include "runs_mod.h"
 #include "spells.h"
 #include "storm/storm_net.hpp"
@@ -2039,11 +2040,14 @@ size_t OnOpenDungeonPortal(const TCmdParam4 &message, Player &player)
 
 size_t OnCloseDungeonPortal(const TCmd &cmd, Player &player)
 {
-	// [RUNS MOD] Another client closed the hub dungeon-scroll portal.
+	// [RUNS MOD] Another client closed the hub dungeon-scroll portal. This is only
+	// sent for the manual close (nobody inside), so the run clock resets with it;
+	// the collapse seal closes locally on every client without this message.
 	if (gbBufferMsgs == 1) {
 		BufferMessage(player, &cmd, sizeof(cmd));
 	} else if (&player != MyPlayer) {
 		CloseDungeonPortal();
+		ResetRunClock();
 	}
 
 	return sizeof(cmd);

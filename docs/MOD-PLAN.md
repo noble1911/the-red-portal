@@ -97,11 +97,19 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   WM_DIABRETOWN SaveGame (interfac.cpp). Level item cap (MAXITEMS) overflow silently
   discards excess drops — accepted.
 
-**E2 — Push-your-luck clock**
-- A reason to leave before the level is vacuumed: escalating respawns the longer you
-  stay, and/or boss death starting a collapse timer that gilds remaining loot while
-  shoving elites at you. Naturally expressed as scroll affixes (e.g. "Volatile: portal
-  collapses 90s after the boss falls, +40% loot") — feeds the modifier expansion below.
+**E2 — Push-your-luck clock** ✅ shipped 2026-07-18
+- Baseline on every run: 2 min grace on-level, then a monster wave spawns near a
+  player every 60 s, growing 1→4; boss death arms a **3 min collapse countdown**
+  (HUD timer; runs in real ticks even from town — it is the looting/corpse-run
+  window). At zero the portal seals itself (no re-entry, corpse loot gone) and waves
+  go overtime (every 10 s, max size) while anyone lingers — the stairs still work.
+- **Volatile** affix (new): +40-80% item drops, but the whole clock runs 30-60%
+  faster.
+- Impl: `Source/run_clock.h/.cpp` (deterministic GameLogic-tick driven; session-only
+  state like the portal), `SpawnRunWaveMonster` in monster.cpp (level-owner gated via
+  SpawnMonster + broadcast; only level-native types spawn), seal = local
+  CloseDungeonPortal on countdown expiry per client. Full co-op verification folds
+  into the existing deferred 2-client test.
 
 **E3 — Boss-optional runs**
 - Skipping the boss becomes a strategy, not a failure: the level holds extractable loot,

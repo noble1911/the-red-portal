@@ -66,6 +66,7 @@ enum class Effect : uint8_t {
 	MonsterHp,
 	BossHp,
 	MonsterDmg,
+	Collapse, // [RUNS MOD] the push-your-luck clock runs this much faster
 };
 
 struct AffixData {
@@ -81,7 +82,7 @@ struct AffixData {
 };
 
 // Indexed by ScrollAffix. Each affix is a boon paired with an offsetting bane.
-constexpr std::array<AffixData, 5> Affixes = { {
+constexpr std::array<AffixData, 6> Affixes = { {
     // Avaricious: +gold / monsters have more life
     { "Avaricious", Effect::GoldFind, 40, 70, 3, Effect::MonsterHp, 15, 30, 2 },
     // Enchanted: +magic find / boss has more life & damage
@@ -92,6 +93,8 @@ constexpr std::array<AffixData, 5> Affixes = { {
     { "Erudite", Effect::Experience, 25, 50, 3, Effect::MonsterHp, 20, 40, 2 },
     // Savage: +gold / monsters deal more damage
     { "Savage", Effect::GoldFind, 30, 55, 3, Effect::MonsterDmg, 20, 40, 3 },
+    // Volatile: big +item drops / the run clock (grace, waves, collapse) runs faster
+    { "Volatile", Effect::ItemQuantity, 40, 80, 4, Effect::Collapse, 30, 60, 2 },
 } };
 
 const AffixData &DataFor(ScrollAffix affix)
@@ -123,6 +126,9 @@ void ApplyEffect(RunModMultipliers &out, Effect effect, int pct)
 	case Effect::MonsterDmg:
 		out.monsterDmgPct += pct;
 		break;
+	case Effect::Collapse:
+		out.collapsePct += pct;
+		break;
 	}
 }
 
@@ -145,6 +151,8 @@ std::string DescribeEffect(Effect effect, int pct, bool full)
 		return fmt::format(fmt::runtime(full ? _("boss +{:d}% life") : _("boss HP +{:d}%")), pct);
 	case Effect::MonsterDmg:
 		return fmt::format(fmt::runtime(full ? _("monsters +{:d}% damage") : _("mob dmg +{:d}%")), pct);
+	case Effect::Collapse:
+		return fmt::format(fmt::runtime(full ? _("the dungeon destabilizes {:d}% faster") : _("clock +{:d}%")), pct);
 	}
 	return {};
 }

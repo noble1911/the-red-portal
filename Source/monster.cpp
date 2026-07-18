@@ -80,6 +80,7 @@
 #include "options.h"
 #include "player.h"
 #include "quests.h"
+#include "run_clock.h"
 #include "runs_mod.h"
 #include "scroll_mods.h"
 #include "sound_effect_enums.h"
@@ -3965,6 +3966,39 @@ void InitializeSpawnedMonster(Point position, Direction dir, size_t typeIndex, s
 	}
 }
 
+void SpawnRunWaveMonster(Point target, uint32_t rngValue)
+{
+	// [RUNS MOD] Template selection must be deterministic across clients (the caller
+	// provides the rng value), and only types already in LevelMonsterTypes can spawn.
+	// Collect living, ordinary monsters and pick one as the template.
+	size_t candidates[MaxMonsters];
+	size_t candidateCount = 0;
+	for (size_t i = 0; i < ActiveMonsterCount; i++) {
+		const Monster &monster = Monsters[ActiveMonsters[i]];
+		if (monster.hitPoints <= 0 || monster.isPlayerMinion() || monster.isUnique())
+			continue;
+		candidates[candidateCount++] = ActiveMonsters[i];
+	}
+	if (candidateCount == 0)
+		return; // level cleared of trash -- nothing left to echo
+
+	const Monster &tmpl = Monsters[candidates[rngValue % candidateCount]];
+	const size_t typeIndex = GetMonsterTypeIndex(tmpl.type().type);
+	if (typeIndex >= LevelMonsterTypeCount)
+		return;
+
+	// A few tiles out from the target so the wave presses in rather than materializing
+	// on top of the player; fall back to adjacent if the area is cramped.
+	const Point spawnAt = Crawl(3, 8, [&](Displacement displacement) -> std::optional<Point> {
+		const Point position = target + displacement;
+		if (IsTileAvailable(position))
+			return position;
+		return {};
+	}).value_or(target + Displacement { 1, 1 });
+
+	SpawnMonster(spawnAt, tmpl.direction, typeIndex);
+}
+
 void AddDoppelganger(Monster &monster)
 {
 	Point target = { 0, 0 };
@@ -4124,6 +4158,9 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 	const bool isRunBoss = RunsModEnabled && monster.isUnique() && monster.uniqueType == RunBossType;
 	if (isRunBoss) {
 		RunBossDefeated = true;
+		// [RUNS MOD] The boss's death starts the collapse countdown (push-your-luck:
+		// finish looting and get out before the run seals).
+		ArmRunCollapse();
 		// [RUNS MOD] Completing a dungeon restocks the Dungeon Merchant on the next
 		// hub visit.
 		DungeonVendorRestockPending = true;

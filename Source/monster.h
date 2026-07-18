@@ -583,6 +583,11 @@ void ActivateSkeleton(Monster &monster, Point position);
 Monster *PreSpawnSkeleton();
 void TalktoMonster(Player &player, Monster &monster);
 void SpawnGolem(const Player &player, Point position, uint8_t spellLevel);
+/** @brief [RUNS MOD] Spawns one escalation-wave monster near `target` for the run
+ * clock: picks a living non-boss monster on the level as the template (only types
+ * already registered on the level can spawn) using the caller's deterministic
+ * `rngValue`, and routes through SpawnMonster (level-owner gated + broadcast). */
+void SpawnRunWaveMonster(Point target, uint32_t rngValue);
 bool CanTalkToMonst(const Monster &monster);
 uint8_t encode_enemy(Monster &monster);
 void decode_enemy(Monster &monster, uint8_t enemyId);

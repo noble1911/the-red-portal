@@ -57,6 +57,7 @@
 #include "panels/console.hpp"
 #include "panels/partypanel.hpp"
 #include "panels/spell_list.hpp"
+#include "run_clock.h"
 #include "plrmsg.h"
 #include "qol/chatlog.h"
 #include "qol/floatingnumbers.h"
@@ -1390,6 +1391,7 @@ void DrawView(const Surface &out, Point startPosition)
 	DrawItemNameLabels(out);
 	DrawMonsterHealthBar(out);
 	DrawFloatingNumbers(out, startPosition, offset);
+	DrawRunClock(out); // [RUNS MOD] collapse countdown / overtime banner
 
 	if (IsPlayerInStore() && !qtextflag)
 		DrawSText(out);

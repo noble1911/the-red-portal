@@ -100,6 +100,7 @@
 #include "msg.h"
 #include "quick_messages.hpp"
 #include "restrict.h"
+#include "run_clock.h"
 #include "runs_mod.h"
 #include "scroll_mods.h"
 #include "stores.h"
@@ -1581,6 +1582,10 @@ void GameLogic()
 	}
 	gGameLogicStep = GameLogicStep::None;
 
+	// [RUNS MOD] The push-your-luck clock ticks with the deterministic game logic
+	// (escalation waves, post-boss collapse countdown, portal seal).
+	ProcessRunClock();
+
 #ifdef _DEBUG
 	if (DebugScrollViewEnabled && (SDL_GetModState() & SDL_KMOD_SHIFT) != 0) {
 		ScrollView();
@@ -2179,6 +2184,7 @@ void InitKeymapActions()
 			    }
 		    }
 		    CloseDungeonPortal();
+		    ResetRunClock(); // [RUNS MOD] no portal, no clock
 		    if (gbIsMultiplayer)
 			    NetSendCmd(true, CMD_CLOSEDUNGEONPORTAL);
 		    EventPlrMsg(_("Dungeon portal closed."), UiFlags::ColorWhite);
@@ -3237,6 +3243,7 @@ void PrimeScrollRun(int level)
 	// until the portal is replaced or closed.
 	level = ClampRunDepth(level);
 	RunBossDefeated = false;
+	ResetRunClock(); // [RUNS MOD] a fresh run starts with a fresh clock
 	const uint32_t seed = GenerateSeed();
 	ApplyRunSeed(level, seed); // sets DungeonSeeds/LevelSeeds/_pLvlVisited + RunDepth
 	if (gbIsMultiplayer) {
