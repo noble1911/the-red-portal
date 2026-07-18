@@ -541,6 +541,8 @@ struct GraphicsOptions : OptionCategoryBase {
 	OptionEntryBoolean perPixelLighting;
 	/** @brief [RUNS MOD] Walls occlude light sources, so torches and spells cast shadows. */
 	OptionEntryBoolean dynamicShadows;
+	/** @brief [RUNS MOD] Torches, candles and braziers flicker (sub-tile sway + radius dips). */
+	OptionEntryBoolean torchFlicker;
 	/** @brief Enable color cycling animations. */
 	OptionEntryBoolean colorCycling;
 	/** @brief Use alternate nest palette. */
