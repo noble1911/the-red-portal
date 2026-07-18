@@ -102,6 +102,13 @@ level to clear** — the tension lives at the exit. Planned slices, in order:
 - Skipping the boss becomes a strategy, not a failure: the level holds extractable loot,
   but the boss guards the scroll drop and a bonus vault. "Loot two rooms and ghost out"
   vs "commit with half my potions gone" is a real decision.
+- Playtest data point (2026-07-18): a fresh level-1 character with no gear needs
+  *several* portal runs before the level-1 boss is beatable (even after the earlier
+  early-boss easing). Boss-less farming runs are ALREADY the de-facto early loop —
+  E3 makes that intentional and rewarding instead of feeling like failed attempts, and
+  E4 must keep those first gear-up sorties cheap to lose.
+- Cleanup while here: retire the vestigial RunBossDefeated -> AdvanceRunDepth() path
+  (scroll-defined depth superseded it).
 
 **E4 — Death economy tuning**
 - Unsecured-loot loss (+ maybe gold fee / durability hit) is the target severity; full
