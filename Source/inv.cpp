@@ -1189,6 +1189,15 @@ void InitInv()
 	pInvCels = LoadCel(StrCat("data\\inv\\", invName).c_str(), static_cast<uint16_t>(SidePanelSize.width));
 }
 
+std::optional<ClxSprite> GetInventoryPanelSprite()
+{
+	// [RUNS MOD] Exposes the inventory panel art so the bag can render its extra rows as
+	// a seamless continuation of the backpack grid (same slot art, same border).
+	if (!pInvCels)
+		return std::nullopt;
+	return (*pInvCels)[0];
+}
+
 void DrawInv(const Surface &out)
 {
 	ClxDraw(out, GetPanelPosition(UiPanels::Inventory, { 0, 351 }), (*pInvCels)[0]);

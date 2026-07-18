@@ -142,6 +142,12 @@ bool CanSellToCurrentVendor(const Item &item);
 void SellItemToVisualStore(int invIndex);
 
 /**
+ * @brief [RUNS MOD] Sell an item from the carried bag to the current vendor.
+ * @param bagIndex 0-based index into Bag.items; out-of-range (incl. EmptyCell) is a no-op.
+ */
+void SellBagItemToVisualStore(uint16_t bagIndex);
+
+/**
  * @brief Get the number of items for the current vendor/tab.
  * @return The item count.
  */

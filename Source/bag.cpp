@@ -26,6 +26,7 @@
 #include "plrmsg.h"
 #include "quests.h"
 #include "qol/stash.h"
+#include "qol/visual_store.h"
 #include "utils/language.h"
 
 namespace devilution {
@@ -220,12 +221,25 @@ void TransferBagItemToInventory(Player &player, uint16_t itemId)
 	Bag.RemoveBagItem(itemId);
 }
 
+// [RUNS MOD] Inventory panel art geometry (from InvRect in inv.cpp): the backpack grid's
+// first row band starts at y=222 with a 29px pitch, the last row ends at y=338, and the
+// panel's bottom border occupies y=338..352. The stacked bag repeats the row band and
+// re-stamps the border, so inventory + bag read as ONE taller panel.
+namespace {
+constexpr int InvGridLeft = 17;
+constexpr int InvRowBandTop = 222;
+constexpr int InvRowPitch = INV_SLOT_SIZE_PX + 1; // 29
+constexpr int InvLastRowBottom = 338;
+constexpr int InvBottomBorderHeight = 14; // 352 - 338
+} // namespace
+
 bool BagOnLeftPanel()
 {
-	// The bag stacks directly below the inventory when there is vertical room between the
-	// inventory panel and the bottom (main) panel. On short displays (e.g. 720p / Switch
-	// handheld) it would overlap, so fall back to the left-hand (stash) panel position.
-	const int stackedBottom = GetRightPanel().position.y + 2 * SidePanelSize.height;
+	// The bag extends the inventory panel downward when there is vertical room above the
+	// bottom (main) panel; on short displays fall back to the left-hand (stash) position.
+	// Only the UNLOCKED rows need space, so a young bag fits where a full one may not.
+	const int stackedBottom = GetRightPanel().position.y + InvLastRowBottom
+	    + Bag.unlockedRows * InvRowPitch + InvBottomBorderHeight;
 	return stackedBottom > GetMainPanel().position.y;
 }
 
@@ -233,23 +247,26 @@ Point GetBagPanelPosition()
 {
 	if (BagOnLeftPanel())
 		return GetPanelPosition(UiPanels::Stash);
-	// Directly below the inventory panel, same width, so the grids line up and the two
-	// read as one continuous inventory.
-	return GetRightPanel().position + Displacement { 0, SidePanelSize.height };
+	// The stacked bag is a continuation of the inventory panel itself.
+	return GetRightPanel().position;
 }
 
 Rectangle GetBagRect()
 {
-	return Rectangle { GetBagPanelPosition(), SidePanelSize };
+	if (BagOnLeftPanel())
+		return Rectangle { GetBagPanelPosition(), SidePanelSize };
+	return Rectangle { GetRightPanel().position + Displacement { 0, InvLastRowBottom },
+		Size { SidePanelSize.width, Bag.unlockedRows * InvRowPitch + InvBottomBorderHeight } };
 }
 
 Point GetBagSlotCoord(Point slot)
 {
-	constexpr int BagNextCell = INV_SLOT_SIZE_PX + 1;
-	// The bag grid shares the stash's panel-relative layout (x=17, 29px spacing), which is
-	// also the inventory backpack's column layout -- so stacked below the inventory the
-	// columns align exactly.
-	return GetBagPanelPosition() + Displacement { slot.x * BagNextCell + 17, slot.y * BagNextCell + 48 };
+	if (BagOnLeftPanel()) {
+		// Stash-panel layout: header on top, grid starting 48px down.
+		return GetBagPanelPosition() + Displacement { slot.x * InvRowPitch + InvGridLeft, slot.y * InvRowPitch + 48 };
+	}
+	// Stacked: continue the backpack grid directly (row 0 sits right under inv row 4).
+	return GetRightPanel().position + Displacement { slot.x * InvRowPitch + InvGridLeft, InvLastRowBottom + slot.y * InvRowPitch };
 }
 
 void BagStruct::RemoveBagItem(BagStruct::BagCell iv)
@@ -307,43 +324,63 @@ void CloseBag()
 
 void DrawBag(const Surface &out)
 {
-	// [RUNS MOD] Unlike the town-only stash, the bag is carried and can be opened in
-	// dungeons -- but its art is freed on every level transition (FreeGameMem) and only
-	// reloaded on town entry (InitBag). Reload it on demand so drawing it outside town
-	// does not dereference an empty optional (assert value_data_ != nullptr).
-	if (!BagPanelArt)
-		InitBag();
-	if (!BagPanelArt)
-		return; // headless / load failed
+	// [RUNS MOD] On short displays the bag's fallback position is the left panel -- the
+	// same spot the visual store's grid occupies. The store wins; the bag hides until
+	// the store closes (its items are still sellable via lift-and-drop from inventory,
+	// and always via the classic text store).
+	if (IsVisualStoreOpen && BagOnLeftPanel())
+		return;
+	if (!BagOnLeftPanel()) {
+		// [RUNS MOD] Seamless mode: extend the inventory panel itself. Repeat the
+		// backpack grid's row band (cropped from the inventory art) for each unlocked
+		// row, then re-stamp the panel's bottom border below the last one -- the
+		// inventory and bag read as one taller panel, and locked rows simply don't
+		// exist yet. DrawInv has already drawn the panel above us in this frame.
+		std::optional<ClxSprite> invSprite = GetInventoryPanelSprite();
+		if (!invSprite)
+			return; // headless / gfx not loaded
+		const Point invPos = GetRightPanel().position;
+		for (int row = 0; row < Bag.unlockedRows; row++) {
+			const Surface band = out.subregion(invPos.x, invPos.y + InvLastRowBottom + row * InvRowPitch,
+			    SidePanelSize.width, InvRowPitch);
+			RenderClxSprite(band, *invSprite, { 0, -InvRowBandTop });
+		}
+		const Surface borderBand = out.subregion(invPos.x,
+		    invPos.y + InvLastRowBottom + Bag.unlockedRows * InvRowPitch,
+		    SidePanelSize.width, InvBottomBorderHeight);
+		RenderClxSprite(borderBand, *invSprite, { 0, -InvLastRowBottom });
+	} else {
+		// [RUNS MOD] Left-panel fallback (short displays): standalone panel reusing the
+		// stash art. The art is freed on level transitions (FreeGameMem) and only
+		// reloaded on town entry (InitBag); reload on demand so drawing in a dungeon
+		// does not dereference an empty optional.
+		if (!BagPanelArt)
+			InitBag();
+		if (!BagPanelArt)
+			return; // headless / load failed
 
-	const Point panel = GetBagPanelPosition();
-	RenderClxSprite(out, (*BagPanelArt)[0], panel);
+		const Point panel = GetBagPanelPosition();
+		RenderClxSprite(out, (*BagPanelArt)[0], panel);
 
-	// Mask off the stash-specific chrome (gold/page/nav header) and the two grid rows
-	// the bag does not use, so the reused 10x10 panel reads as a clean 10x8 bag.
-	// Use an opaque fill (not a half-transparent overlay) so the hidden grid rows and
-	// header widgets do not show through.
-	constexpr uint8_t MaskColor = 0; // black
-	const int panelWidth = (*BagPanelArt)[0].width();
-	const int panelBottom = panel.y + (*BagPanelArt)[0].height();
-	// Header: everything above the first grid row (the grid starts 48px down -- see
-	// the Displacement in GetBagSlotCoord).
-	const int gridTop = GetBagSlotCoord({ 0, 0 }).y;
-	FillRect(out, panel.x, panel.y, panelWidth, gridTop - panel.y, MaskColor);
-	// Bottom: from the top of the first row past the unlocked ones down. Locked rows
-	// (unlockedRows..BagGridSize.height) are masked together with the stash rows the bag
-	// never uses, so a partially grown bag reads as a shorter grid, not empty slots.
-	const int unusedTop = GetBagSlotCoord({ 0, Bag.unlockedRows }).y - 1;
-	if (panelBottom > unusedTop)
-		FillRect(out, panel.x, unusedTop, panelWidth, panelBottom - unusedTop, MaskColor);
-	DrawString(out, _("Bag"), { panel + Displacement { 0, 6 }, { panelWidth, 24 } },
-	    { .flags = UiFlags::AlignCenter | UiFlags::VerticalCenter | UiFlags::ColorWhitegold });
-	// [RUNS MOD] Tell the player how the bag grows while rows are still locked.
-	if (Bag.unlockedRows < BagGridSize.height) {
-		const int lockedHeight = GetBagSlotCoord({ 0, BagGridSize.height }).y - 1 - unusedTop;
-		DrawString(out, _("Defeat deeper bosses to grow your bag"),
-		    { Point { panel.x, unusedTop }, { panelWidth, lockedHeight } },
-		    { .flags = UiFlags::AlignCenter | UiFlags::VerticalCenter | UiFlags::ColorWhite | UiFlags::FontSize12 });
+		// Mask off the stash-specific chrome (gold/page/nav header) and every row past
+		// the unlocked ones, opaque so the hidden widgets don't show through.
+		constexpr uint8_t MaskColor = 0; // black
+		const int panelWidth = (*BagPanelArt)[0].width();
+		const int panelBottom = panel.y + (*BagPanelArt)[0].height();
+		const int gridTop = GetBagSlotCoord({ 0, 0 }).y;
+		FillRect(out, panel.x, panel.y, panelWidth, gridTop - panel.y, MaskColor);
+		const int unusedTop = GetBagSlotCoord({ 0, Bag.unlockedRows }).y - 1;
+		if (panelBottom > unusedTop)
+			FillRect(out, panel.x, unusedTop, panelWidth, panelBottom - unusedTop, MaskColor);
+		DrawString(out, _("Bag"), { panel + Displacement { 0, 6 }, { panelWidth, 24 } },
+		    { .flags = UiFlags::AlignCenter | UiFlags::VerticalCenter | UiFlags::ColorWhitegold });
+		// Tell the player how the bag grows while rows are still locked.
+		if (Bag.unlockedRows < BagGridSize.height) {
+			const int lockedHeight = GetBagSlotCoord({ 0, BagGridSize.height }).y - 1 - unusedTop;
+			DrawString(out, _("Defeat deeper bosses to grow your bag"),
+			    { Point { panel.x, unusedTop }, { panelWidth, lockedHeight } },
+			    { .flags = UiFlags::AlignCenter | UiFlags::VerticalCenter | UiFlags::ColorWhite | UiFlags::FontSize12 });
+		}
 	}
 
 	constexpr Displacement offset { 0, INV_SLOT_SIZE_PX - 1 };
@@ -392,16 +429,29 @@ void TryUnlockBagRowForDepth(int clearedDepth)
 
 void CheckBagItem(Point mousePosition, bool isShiftHeld, bool isCtrlHeld)
 {
-	if (!MyPlayer->HoldItem.isEmpty())
+	// [RUNS MOD] Hidden while the visual store occupies the bag's fallback panel.
+	if (IsVisualStoreOpen && BagOnLeftPanel())
+		return;
+	if (!MyPlayer->HoldItem.isEmpty()) {
 		CheckBagPaste(mousePosition);
-	else if (isCtrlHeld)
-		TransferBagItemToInventory(*MyPlayer, pcursbagitem);
-	else
+	} else if (isCtrlHeld) {
+		// [RUNS MOD] With a vendor open, ctrl-click sells straight from the bag,
+		// matching the inventory's ctrl-click sale; otherwise it quick-transfers
+		// to the inventory as before.
+		if (IsVisualStoreOpen)
+			SellBagItemToVisualStore(pcursbagitem);
+		else
+			TransferBagItemToInventory(*MyPlayer, pcursbagitem);
+	} else {
 		CheckBagCut(mousePosition, isShiftHeld);
+	}
 }
 
 uint16_t CheckBagHLight(Point mousePosition)
 {
+	// [RUNS MOD] Hidden while the visual store occupies the bag's fallback panel.
+	if (IsVisualStoreOpen && BagOnLeftPanel())
+		return BagStruct::EmptyCell;
 	Point slot = InvalidBagPoint;
 	for (auto point : PointsInRectangle(Rectangle { { 0, 0 }, Size { BagGridSize.width, Bag.unlockedRows } })) {
 		const Rectangle cell { GetBagSlotCoord(point), InventorySlotSizeInPixels + 1 };

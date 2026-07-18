@@ -2738,17 +2738,22 @@ void PerformSecondaryAction()
 			} else if (pcursinvitem != -1) {
 				TransferItemToStash(myPlayer, pcursinvitem);
 			}
+		} else if (IsVisualStoreOpen) {
+			// [RUNS MOD] Checked BEFORE IsBagOpen: the bag now opens together with the
+			// visual store, and the store's sell action must win over quick-transfer --
+			// for bag items and inventory items alike.
+			if (!myPlayer.HoldItem.isEmpty() && GetLeftPanel().contains(MousePosition)) {
+				CheckVisualStorePaste(MousePosition);
+			} else if (pcursbagitem != BagStruct::EmptyCell) {
+				SellBagItemToVisualStore(pcursbagitem); // [RUNS MOD] sell from the bag
+			} else if (pcursinvitem >= INVITEM_INV_FIRST && pcursinvitem <= INVITEM_INV_LAST) {
+				SellItemToVisualStore(pcursinvitem - INVITEM_INV_FIRST);
+			}
 		} else if (IsBagOpen) { // [RUNS MOD] quick-transfer between the bag and the inventory
 			if (pcursbagitem != BagStruct::EmptyCell) {
 				TransferBagItemToInventory(myPlayer, pcursbagitem);
 			} else if (pcursinvitem != -1) {
 				TransferItemToBag(myPlayer, pcursinvitem);
-			}
-		} else if (IsVisualStoreOpen) {
-			if (!myPlayer.HoldItem.isEmpty() && GetLeftPanel().contains(MousePosition)) {
-				CheckVisualStorePaste(MousePosition);
-			} else if (pcursinvitem >= INVITEM_INV_FIRST && pcursinvitem <= INVITEM_INV_LAST) {
-				SellItemToVisualStore(pcursinvitem - INVITEM_INV_FIRST);
 			}
 		} else {
 			CtrlUseInvItem();

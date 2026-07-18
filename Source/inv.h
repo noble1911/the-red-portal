@@ -6,7 +6,9 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
+#include "engine/clx_sprite.hpp"
 #include "engine/palette.h"
 #include "engine/point.hpp"
 #include "inv_iterators.hpp"
@@ -108,6 +110,8 @@ void InitInv();
 /**
  * @brief Render the inventory panel to the given buffer.
  */
+/** @brief [RUNS MOD] The inventory panel art, for the bag's seamless continuation rows. */
+std::optional<ClxSprite> GetInventoryPanelSprite();
 void DrawInv(const Surface &out);
 
 void DrawInvBelt(const Surface &out);

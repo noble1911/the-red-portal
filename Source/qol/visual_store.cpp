@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <span>
 
+#include "bag.h"
 #include "control/control.hpp"
 #include "controls/plrctrls.h"
 #include "cursor.h"
@@ -28,6 +29,7 @@
 #include "panels/info_box.hpp"
 #include "panels/ui_panels.hpp"
 #include "player.h"
+#include "runs_mod.h"
 #include "qol/stash.h"
 #include "spells.h"
 #include "stores.h"
@@ -228,6 +230,10 @@ void OpenVisualStore(VisualStoreVendor vendor)
 {
 	IsVisualStoreOpen = true;
 	invflag = true; // Open inventory panel alongside
+	// [RUNS MOD] Show the carried bag too, so its items are visible and sellable at the
+	// vendor (the bag renders as a continuation of the inventory panel).
+	if (RunsModEnabled)
+		OpenBag();
 
 	VisualStore.vendor = vendor;
 	VisualStore.activeTab = VisualStoreTab::Basic;
@@ -253,6 +259,7 @@ void CloseVisualStore()
 	if (IsVisualStoreOpen) {
 		IsVisualStoreOpen = false;
 		invflag = false;
+		CloseBag(); // [RUNS MOD] the bag was opened together with the store
 		pcursstoreitem = -1;
 		pcursstorebtn = -1;
 		VisualStoreButtonPressed = -1;
@@ -766,6 +773,31 @@ void SellItemToVisualStore(int invIndex)
 
 	// Remove item from inventory
 	player.RemoveInvItem(invIndex);
+}
+
+void SellBagItemToVisualStore(uint16_t bagIndex)
+{
+	// [RUNS MOD] Bag counterpart of SellItemToVisualStore. The bounds check also rejects
+	// BagStruct::EmptyCell (0xFFFF), so callers can pass pcursbagitem directly.
+	if (!VendorAcceptsSale())
+		return;
+	if (bagIndex >= Bag.items.size())
+		return;
+
+	Player &player = *MyPlayer;
+	Item &item = Bag.items[bagIndex];
+	if (item.isEmpty())
+		return;
+
+	if (!CanSellToCurrentVendor(item)) {
+		player.SaySpecific(HeroSpeech::ICantDoThat);
+		return;
+	}
+
+	const int sellPrice = GetSellPrice(item);
+	AddGoldToInventory(player, sellPrice);
+	PlaySFX(SfxID::ItemGold);
+	Bag.RemoveBagItem(bagIndex);
 }
 
 void CheckVisualStoreButtonPress(Point mousePosition)
