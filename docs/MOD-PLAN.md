@@ -98,8 +98,9 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   discards excess drops — accepted.
 
 **E2 — Push-your-luck clock** ✅ shipped 2026-07-18
-- Baseline on every run: 2 min grace on-level, then a monster wave spawns near a
-  player every 60 s, growing 1→4; boss death arms a **3 min collapse countdown**
+- Baseline on every run: 5 min grace on-level (raised from 2 after playtest), then a
+  monster wave spawns near a player every 60 s, growing 1→4; boss death arms a
+  **3 min collapse countdown**
   (HUD timer; runs in real ticks even from town — it is the looting/corpse-run
   window). At zero the portal seals itself (no re-entry, corpse loot gone) and waves
   go overtime (every 10 s, max size) while anyone lingers — the stairs still work.

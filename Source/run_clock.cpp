@@ -34,7 +34,7 @@ namespace {
 // All values in game ticks (sgGameInitInfo.nTickRate per second, default 20).
 constexpr int TicksPerSecondDefault = 20;
 /** Quiet time on the run level before the dungeon starts pushing back. */
-constexpr int GraceSeconds = 120;
+constexpr int GraceSeconds = 300;
 /** Interval between escalation waves after the grace period. */
 constexpr int WaveIntervalSeconds = 60;
 /** Waves grow one monster per wave up to this size. */
