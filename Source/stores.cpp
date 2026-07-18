@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -942,11 +943,27 @@ void StoreNoRoom()
 // [RUNS MOD] --- Dedicated dungeon-scroll merchant (buy + crafting) ---
 
 // Crafting state (see the crafting functions below): the chosen operation and the
-// inventory slots of the target/material scrolls.
+// inventory slots of the target/material scrolls. Upgrading fuses THREE materials
+// (each of the target's level or higher); reroll/add-modifier consume one.
 enum class ScrollCraftOp : uint8_t { Reroll, Upgrade, AddMod };
 ScrollCraftOp CraftOp = ScrollCraftOp::Reroll;
 int CraftTargetInv = -1;
-int CraftMaterialInv = -1;
+constexpr int MaxCraftMaterials = 3;
+int CraftMaterialInvs[MaxCraftMaterials] = { -1, -1, -1 };
+int CraftMaterialCount = 0;
+
+int MaterialsRequired()
+{
+	return CraftOp == ScrollCraftOp::Upgrade ? MaxCraftMaterials : 1;
+}
+
+bool IsPickedMaterial(int invIndex)
+{
+	for (int i = 0; i < CraftMaterialCount; i++)
+		if (CraftMaterialInvs[i] == invIndex)
+			return true;
+	return false;
+}
 
 void StartDungeonVendor()
 {
@@ -1157,6 +1174,8 @@ void BuildScrollList(bool forCraft, int exceptInv)
 			continue;
 		if (forCraft && !CraftValid(inv))
 			continue;
+		if (!forCraft && IsPickedMaterial(i))
+			continue;
 		if (!forCraft && exceptInv >= 0 && exceptInv < player._pNumInv
 		    && !CraftMaterialValid(player.InvList[exceptInv], inv))
 			continue;
@@ -1180,9 +1199,12 @@ void ShowScrollListNotice(std::string_view text)
 void StartDungeonVendorCraftTarget()
 {
 	IsTextFullSize = true;
-	if (CountDungeonScrolls() < 2) {
+	CraftMaterialCount = 0; // fresh target choice restarts the material picks
+	if (CountDungeonScrolls() < 1 + MaterialsRequired()) {
 		CurrentItemIndex = 0;
-		ShowScrollListNotice(_("You need two scrolls to craft (one is consumed)."));
+		ShowScrollListNotice(CraftOp == ScrollCraftOp::Upgrade
+		        ? _("Upgrading fuses scrolls: you need four (three are consumed).")
+		        : _("You need two scrolls to craft (one is consumed)."));
 		return;
 	}
 	BuildScrollList(/*forCraft=*/true, /*exceptInv=*/-1);
@@ -1203,17 +1225,26 @@ void StartDungeonVendorCraftTarget()
 void StartDungeonVendorCraftMaterial()
 {
 	IsTextFullSize = true;
+	// Returning here from a cancelled confirm re-opens the last pick.
+	if (CraftMaterialCount >= MaterialsRequired())
+		CraftMaterialCount = MaterialsRequired() - 1;
 	BuildScrollList(/*forCraft=*/false, /*exceptInv=*/CraftTargetInv);
 	if (CurrentItemIndex == 0) {
 		ShowScrollListNotice(CraftOp == ScrollCraftOp::Upgrade
-		        ? _("Upgrading consumes a scroll of the target's level or higher.")
+		        ? _("Upgrading fuses three scrolls of the target's level or higher.")
 		        : _("You have no other scroll to use as material."));
 		return;
 	}
 	HasScrollbar = true;
 	ScrollPos = 0;
 	RenderGold = true;
-	AddSText(20, 1, _("Consume which scroll as material?"), UiFlags::ColorWhitegold, false);
+	if (MaterialsRequired() > 1) {
+		AddSText(20, 1,
+		    fmt::format(fmt::runtime(_("Consume which scroll? ({:d} of {:d})")), CraftMaterialCount + 1, MaterialsRequired()),
+		    UiFlags::ColorWhitegold, false);
+	} else {
+		AddSText(20, 1, _("Consume which scroll as material?"), UiFlags::ColorWhitegold, false);
+	}
 	AddSLine(3);
 	ScrollVendorStore(PlayerItems, CurrentItemIndex, ScrollPos, false);
 	AddItemListBackButton();
@@ -1225,15 +1256,24 @@ void CraftApply()
 	Player &player = *MyPlayer;
 	if (CraftTargetInv < 0 || CraftTargetInv >= player._pNumInv)
 		return;
-	if (CraftMaterialInv < 0 || CraftMaterialInv >= player._pNumInv || CraftMaterialInv == CraftTargetInv)
-		return;
 	Item &target = player.InvList[CraftTargetInv];
 	if (target._iMiscId != IMISC_DUNGEONSCROLL)
 		return;
-	// Re-validate the material at apply time (indices can go stale between screens).
-	if (player.InvList[CraftMaterialInv]._iMiscId != IMISC_DUNGEONSCROLL
-	    || !CraftMaterialValid(target, player.InvList[CraftMaterialInv]))
+	// Re-validate every material at apply time (indices can go stale between screens):
+	// all distinct, none the target, each a scroll valid for the operation.
+	if (CraftMaterialCount != MaterialsRequired())
 		return;
+	for (int i = 0; i < CraftMaterialCount; i++) {
+		const int inv = CraftMaterialInvs[i];
+		if (inv < 0 || inv >= player._pNumInv || inv == CraftTargetInv)
+			return;
+		for (int j = 0; j < i; j++)
+			if (CraftMaterialInvs[j] == inv)
+				return;
+		if (player.InvList[inv]._iMiscId != IMISC_DUNGEONSCROLL
+		    || !CraftMaterialValid(target, player.InvList[inv]))
+			return;
+	}
 
 	TakePlrsMoney(CraftGoldCost(target));
 	switch (CraftOp) {
@@ -1252,7 +1292,14 @@ void CraftApply()
 		break;
 	}
 	}
-	player.RemoveInvItem(CraftMaterialInv);
+	// Remove materials from the highest inventory index down: RemoveInvItem compacts
+	// InvList, so descending order keeps the remaining picked indices valid.
+	int sorted[MaxCraftMaterials];
+	std::copy(CraftMaterialInvs, CraftMaterialInvs + CraftMaterialCount, sorted);
+	std::sort(sorted, sorted + CraftMaterialCount, std::greater<>());
+	for (int i = 0; i < CraftMaterialCount; i++)
+		player.RemoveInvItem(sorted[i]);
+	CraftMaterialCount = 0;
 	CalcPlrInv(player, true);
 }
 
@@ -1275,7 +1322,13 @@ void DungeonVendorCraftTargetEnter()
 void DungeonVendorCraftMaterialEnter()
 {
 	if (CurrentTextLine == BackButtonLine()) {
-		StartStore(TalkID::DungeonVendorCraftTarget);
+		// Back steps through the picks before leaving the material screen.
+		if (CraftMaterialCount > 0) {
+			CraftMaterialCount--;
+			StartStore(TalkID::DungeonVendorCraftMaterial);
+		} else {
+			StartStore(TalkID::DungeonVendorCraftTarget);
+		}
 		return;
 	}
 	if (CurrentItemIndex == 0)
@@ -1291,7 +1344,11 @@ void DungeonVendorCraftMaterialEnter()
 		StartStore(TalkID::NoMoney);
 		return;
 	}
-	CraftMaterialInv = PlayerItemIndexes[idx];
+	CraftMaterialInvs[CraftMaterialCount++] = PlayerItemIndexes[idx];
+	if (CraftMaterialCount < MaterialsRequired()) {
+		StartStore(TalkID::DungeonVendorCraftMaterial); // pick the next material
+		return;
+	}
 	OldActiveStore = TalkID::DungeonVendorCraftMaterial;
 	TempItem = MyPlayer->InvList[CraftTargetInv]; // the confirm shows the target scroll
 	StartStore(TalkID::Confirm);
@@ -1337,7 +1394,7 @@ void StoreConfirm(Item &item)
 	case TalkID::DungeonVendorCraftMaterial:
 		switch (CraftOp) {
 		case ScrollCraftOp::Upgrade:
-			prompt = _("Upgrade this scroll's level? A scroll is consumed.");
+			prompt = _("Upgrade this scroll's level? Three scrolls are consumed.");
 			break;
 		case ScrollCraftOp::AddMod:
 			prompt = _("Add a modifier to this scroll? A scroll is consumed.");
