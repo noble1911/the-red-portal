@@ -910,7 +910,12 @@ void RunGameLoop(interface_mode uMsg)
 			DebugCmdsFromCommandLine.clear();
 		}
 #else
-		if (gbIsMultiplayer && IsAssetIntegrityViolated) {
+		// [RUNS MOD] The override guard exists to stop mismatched gameplay data desyncing
+		// vanilla multiplayer, but this mod IS overridden data (loose TSV/Lua assets and
+		// the Hellfire mod folder). Co-op here already requires the exact same build on
+		// every client, which the version/programid join gate enforces, so identical
+		// assets are guaranteed by the same contract.
+		if (!RunsModEnabled && gbIsMultiplayer && IsAssetIntegrityViolated) {
 			app_fatal(_("Cannot play Multiplayer with overridden *.lua, *.tsv, or *.sol assets."));
 		}
 #endif
@@ -1272,6 +1277,12 @@ void DiabloInit()
 	if (!forceDiablo && !forceHellfire)
 		wasHellfireDiscovered = (HaveHellfire() && *GetOptions().GameMode.gameMode == StartUpGameMode::Ask);
 	bool enableHellfire = forceHellfire || wasHellfireDiscovered;
+	// [RUNS MOD] The Red Portal is one game: when the Hellfire data is present just use
+	// it, skipping the vanilla Diablo-or-Hellfire startup prompt. enableHellfire has
+	// already latched the discovery above; clearing the flag here only suppresses the
+	// UiSelStartUpGameOption dialog. --diablo and --hellfire still override as before.
+	if (RunsModEnabled)
+		wasHellfireDiscovered = false;
 	if (!forceDiablo && *GetOptions().GameMode.gameMode == StartUpGameMode::Hellfire) { // Migrate legacy options
 		GetOptions().GameMode.gameMode.SetValue(StartUpGameMode::Diablo);
 		enableHellfire = true;

@@ -23,6 +23,7 @@
 #include "movie.h"
 #include "options.h"
 #include "pfile.h"
+#include "runs_mod.h"
 #include "storm/storm_net.hpp"
 #include "utils/language.h"
 
@@ -82,7 +83,10 @@ bool InitSinglePlayerMenu()
 bool InitMultiPlayerMenu()
 {
 #ifndef _DEBUG
-	if (IsAssetIntegrityViolated) {
+	// [RUNS MOD] This mod ships as overridden loose assets by design; co-op safety comes
+	// from the same-build requirement (enforced at join by the version/programid gate),
+	// so the vanilla integrity block would only forbid legitimate play.
+	if (!RunsModEnabled && IsAssetIntegrityViolated) {
 		UiSelOkDialog(_("Multi Player Game").data(), _("Cannot play Multiplayer with overridden *.lua, *.tsv, or *.sol assets.").data(), false);
 		return true;
 	}
