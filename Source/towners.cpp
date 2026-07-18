@@ -839,6 +839,15 @@ void InitTowners()
 	for (const auto &entry : TownersDataEntries) {
 		TownerLongNames.try_emplace(entry.type, entry.name);
 	}
+	// [RUNS MOD] Names for the mod's custom towner types MUST live in this owned map.
+	// InitTownerInfo's fallback path stores a string_view of entry.name, and for these
+	// towners `entry` is the local `relocated` copy below -- the view dangled into a
+	// freed std::string, which showed as garbage (e.g. a reused music-path allocation)
+	// on mouse-over. The map entry also makes the names translatable like the rest.
+	if (RunsModEnabled) {
+		TownerLongNames.try_emplace(TOWN_STASHCHEST, N_("Stash"));
+		TownerLongNames.try_emplace(TOWN_DUNGEONVENDOR, N_("Dungeon Merchant"));
+	}
 
 	CowSprites.emplace(LoadCelSheet("towners\\animals\\cow", 128));
 
@@ -873,7 +882,8 @@ void InitTowners()
 				if (chestBehavior == TownerBehaviors.end() || chestBehavior->second == nullptr)
 					continue;
 				behaviorIt = chestBehavior;
-				relocated.name = "Stash";
+				// (Name comes from TownerLongNames -- see InitTowners -- because a name
+				// set on this LOCAL copy would be viewed, then freed: use-after-free.)
 				relocated.position = { 25, 37 };
 			} break;
 			case TOWN_PEGBOY: {
@@ -883,7 +893,7 @@ void InitTowners()
 				if (vendorBehavior == TownerBehaviors.end() || vendorBehavior->second == nullptr)
 					continue;
 				behaviorIt = vendorBehavior;
-				relocated.name = "Dungeon Merchant";
+				// (Name via TownerLongNames, as above.)
 				// Moved straight "north" (up on screen) from {33,36}: on the isometric
 				// grid that means lowering x and y together (keeping x-y constant so he
 				// does not drift sideways).
