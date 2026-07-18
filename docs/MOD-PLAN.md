@@ -48,8 +48,10 @@ Last updated: **2026-07-18** (v0.3.0).
   hero files and network packs stay vanilla-shaped (40 cells); extension items live in a
   per-hero side file with migration from old bag saves. Remote players see only the base
   40 cells (extension is local, like the stash).
-- **Presentation**: torch flicker, dynamic wall shadows, red-portal home-menu icon,
-  no pregame difficulty screen (difficulty comes from scrolls), multiplayer unblocked.
+- **Presentation**: red-portal home-menu icon, no pregame difficulty screen (difficulty
+  comes from scrolls), multiplayer unblocked. (Torch flicker + dynamic wall shadows were
+  tried 2026-07-18 and reverted the same day: the flicker read as jarring, and the
+  shadows were visually redundant with fog-of-war darkness.)
 
 ## Releases
 

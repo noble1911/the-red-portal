@@ -34,7 +34,6 @@
 #include "levels/setmaps.h"
 #include "levels/themes.h"
 #include "levels/tile_properties.hpp"
-#include "engine/ticks.hpp"
 #include "lighting.h"
 #include "minitext.h"
 #include "missiles.h"
@@ -1245,9 +1244,12 @@ void AddTrap(Object &trap)
 
 void AddObjectLight(Object &object)
 {
+	int radius;
 	switch (object._otype) {
 	case OBJ_STORYCANDLE:
 	case OBJ_L5CANDLE:
+		radius = 3;
+		break;
 	case OBJ_L1LIGHT:
 	case OBJ_SKFIRE:
 	case OBJ_CANDLE1:
@@ -1255,20 +1257,24 @@ void AddObjectLight(Object &object)
 	case OBJ_BOOKCANDLE:
 	case OBJ_BCROSS:
 	case OBJ_TBCROSS:
+		radius = 5;
+		break;
 	case OBJ_TORCHL:
 	case OBJ_TORCHR:
 	case OBJ_TORCHL2:
 	case OBJ_TORCHR2:
-		// [RUNS MOD] Flame lights are dynamic (0 = present but unlit) instead of baked
-		// into the dPreLight baseline: UpdateObjectLight spawns a runtime light when a
-		// player comes near (radius + 10) and releases it when they leave, which is what
-		// keeps the MAXLIGHTS budget in check. Baked light can never dim -- DoLighting
-		// only brightens past the baseline -- so baking would make flicker impossible.
-		object._oVar1 = 0;
+		radius = 8;
 		break;
 	default:
-		break;
+		return;
 	}
+
+	DoLighting(object.position, radius, {});
+	if (LoadingMapObjects) {
+		DoUnLight(object.position, radius);
+		UpdateLighting = true;
+	}
+	object._oVar1 = -1;
 }
 
 void AddBarrel(Object &barrel)
@@ -1466,40 +1472,6 @@ bool IsLightVisible(Object &light, int lightRadius)
 	return false;
 }
 
-// [RUNS MOD] Candle/torch flicker: a light, stateless jitter of a live flame light.
-// Every ~130ms interval derives a sub-tile offset (in eighths of a tile, the same unit
-// walking lights use) and an occasional one-step radius dip from a hash of the interval
-// counter and the flame's tile, so each flame dances to its own rhythm with no stored
-// state. Deliberately NOT GenerateRnd: that would advance the shared gameplay RNG and
-// desync multiplayer for a purely cosmetic effect.
-void FlickerObjectLight(const Object &light, int lightRadius)
-{
-	if (light._olid == NO_LIGHT)
-		return;
-	if (!*GetOptions().Graphics.torchFlicker) {
-		// Self-heal to the steady state so toggling the option off never strands a
-		// light mid-dip.
-		ChangeLightOffset(light._olid, {});
-		if (Lights[light._olid].radius != lightRadius)
-			ChangeLightRadius(light._olid, static_cast<uint8_t>(lightRadius));
-		return;
-	}
-	const uint32_t interval = GetAnimationFrame(4096, 130);
-	uint32_t h = (interval * 2654435761U)
-	    ^ (static_cast<uint32_t>(light.position.x) << 16)
-	    ^ static_cast<uint32_t>(light.position.y);
-	h *= 0x9E3779B9U;
-	h ^= h >> 16;
-	const DisplacementOf<int8_t> offset {
-		static_cast<int8_t>(static_cast<int>(h % 3) - 1),
-		static_cast<int8_t>(static_cast<int>((h >> 8) % 3) - 1),
-	};
-	const auto radius = static_cast<uint8_t>((h >> 16) % 100 < 20 ? lightRadius - 1 : lightRadius);
-	ChangeLightOffset(light._olid, offset); // no-ops while the offset is unchanged
-	if (Lights[light._olid].radius != radius)
-		ChangeLightRadius(light._olid, radius);
-}
-
 void UpdateObjectLight(Object &light, int lightRadius)
 {
 	if (light._oVar1 == -1) {
@@ -1510,7 +1482,6 @@ void UpdateObjectLight(Object &light, int lightRadius)
 		if (light._oVar1 == 0)
 			light._olid = AddLight(light.position, lightRadius);
 		light._oVar1 = 1;
-		FlickerObjectLight(light, lightRadius);
 	} else {
 		if (light._oVar1 == 1)
 			AddUnLight(light._olid);
@@ -1806,9 +1777,6 @@ void OperateDoor(Object &door, bool sendflag)
 	}
 
 	RedoPlayerVision();
-	// [RUNS MOD] With dynamic shadows the door just changed the light-blocking geometry,
-	// so every cached light near it is stale -- relight, exactly like vision above.
-	RelightAll();
 
 	if (sendflag)
 		NetSendCmdLoc(MyPlayerId, true, openDoor ? CMD_OPENDOOR : CMD_CLOSEDOOR, door.position);
@@ -4765,13 +4733,6 @@ void SyncBreakObj(const Player &player, Object &object)
 
 void SyncObjectAnim(Object &object)
 {
-	// [RUNS MOD] Flame lights are dynamic and their runtime light id (_olid) is not
-	// saved, so a level saved with a lit flame (_oVar1 == 1) must reset to "present but
-	// unlit" on load or UpdateObjectLight would poke a stale light. Old saves that
-	// predate dynamic flames (_oVar1 == -1, baked into the saved dLight) are converted
-	// too: the runtime light merely re-brightens the already-bright baked tiles.
-	AddObjectLight(object);
-
 	object_graphic_id index = AllObjects[object._otype].ofindex;
 
 	if (!HeadlessMode) {

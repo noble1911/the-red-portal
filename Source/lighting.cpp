@@ -22,7 +22,6 @@
 #include "engine/world_tile.hpp"
 #include "levels/tile_properties.hpp"
 #include "objects.h"
-#include "options.h"
 #include "player.h"
 #include "utils/attributes.h"
 #include "utils/is_of.hpp"
@@ -142,25 +141,6 @@ void DoLighting(Point position, uint8_t radius, DisplacementOf<int8_t> offset)
 		position -= { 0, 1 };
 	}
 
-	// [RUNS MOD] Dynamic shadows: light is occluded by walls, using the same raycast as
-	// player vision (so what is lit always matches what could be seen from the light).
-	// Tiles the rays never reach keep their ambient level, which the per-pixel lightmap
-	// then smooths into angled shadow edges. Walls facing the light stay lit because
-	// DoVision marks a blocking tile before ending the ray at it.
-	constexpr int MaskRadius = 15;
-	bool litMask[2 * MaskRadius + 1][2 * MaskRadius + 1] = {};
-	const bool occlude = *GetOptions().Graphics.dynamicShadows;
-	if (occlude) {
-		const Point maskOrigin = position;
-		auto markVisibleFn = [&litMask, maskOrigin](Point rayPoint) {
-			litMask[rayPoint.x - maskOrigin.x + MaskRadius][rayPoint.y - maskOrigin.y + MaskRadius] = true;
-		};
-		auto noopFn = [](Point) {};
-		auto passesLightFn = [](Point rayPoint) { return TileAllowsLight(rayPoint); };
-		auto inBoundsFn = [](Point rayPoint) { return InDungeonBounds(rayPoint); };
-		DoVision(position, MaskRadius, markVisibleFn, noopFn, passesLightFn, inBoundsFn);
-	}
-
 	DisplacementOf<int8_t> dist = offset;
 
 	int minX = 15;
@@ -199,9 +179,6 @@ void DoLighting(Point position, uint8_t radius, DisplacementOf<int8_t> offset)
 				const Point temp = position + (Displacement { x, y }).Rotate(-i);
 				const uint8_t v = LightFalloffs[radius][linearDistance];
 				if (!InDungeonBounds(temp))
-					continue;
-				// [RUNS MOD] Skip tiles the light's rays cannot reach (occluded by a wall).
-				if (occlude && !litMask[temp.x - position.x + MaskRadius][temp.y - position.y + MaskRadius])
 					continue;
 				if (v < GetLight(temp))
 					SetLight(temp, v);
@@ -492,27 +469,6 @@ void ChangeLight(int i, Point position, uint8_t radius)
 	light.position.tile = position;
 	light.radius = radius;
 
-	UpdateLighting = true;
-}
-
-namespace {
-// [RUNS MOD] Toggling the option in the settings menu takes effect immediately.
-const auto OptionChangeHandlerDynamicShadows = (GetOptions().Graphics.dynamicShadows.SetValueChangedCallback(RelightAll), true);
-} // namespace
-
-void RelightAll()
-{
-	// [RUNS MOD] Re-run every active light from scratch (unlight then relight). Needed
-	// whenever the world's light-blocking geometry changes -- opening or closing a door
-	// -- because with dynamic shadows the cached dLight of every nearby light is stale.
-	for (int i = 0; i < ActiveLightCount; i++) {
-		Light &light = Lights[ActiveLights[i]];
-		if (light.isInvalid || light.hasChanged)
-			continue; // Already scheduled for unlight this tick; don't clobber its old state.
-		light.hasChanged = true;
-		light.position.old = light.position.tile;
-		light.oldRadius = light.radius;
-	}
 	UpdateLighting = true;
 }
 
