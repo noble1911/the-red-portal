@@ -919,7 +919,8 @@ Point FindClosestBagSlot(Point mousePos)
 {
 	int shortestDistance = std::numeric_limits<int>::max();
 	Point bestSlot = {};
-	for (const Point point : BagGridRange) {
+	// [RUNS MOD] Only unlocked rows are navigable.
+	for (const Point point : PointsInRectangle(Rectangle { { 0, 0 }, Size { BagGridSize.width, Bag.unlockedRows } })) {
 		const int distance = mousePos.ManhattanDistance(GetBagSlotCoord(point));
 		if (distance < shortestDistance) {
 			shortestDistance = distance;
@@ -1762,7 +1763,7 @@ void BagMove(AxisDirection dir)
 				InvalidateInventorySlot();
 				ActiveBagSlot = FindClosestBagSlot(slotCoord) - Displacement { itemSize.width - 1, 0 };
 				ActiveBagSlot.x = std::clamp(ActiveBagSlot.x, 0, BagGridSize.width - itemSize.width);
-				ActiveBagSlot.y = std::clamp(ActiveBagSlot.y, 0, BagGridSize.height - itemSize.height);
+				ActiveBagSlot.y = std::clamp(ActiveBagSlot.y, 0, Bag.unlockedRows - itemSize.height);
 				dir.x = AxisDirectionX_NONE;
 			}
 		}
@@ -1774,7 +1775,8 @@ void BagMove(AxisDirection dir)
 	}
 
 	// Navigate within the bag grid, leaving it at the edge facing the inventory.
-	const Size gridSize = BagGridSize;
+	// [RUNS MOD] The navigable grid ends at the last unlocked row.
+	const Size gridSize { BagGridSize.width, Bag.unlockedRows };
 	const bool isHoldingItem = !holdItem.isEmpty();
 	Size movingItemSize = isHoldingItem ? GetInventorySize(holdItem) : Size { 1, 1 };
 	if (!isHoldingItem && ActiveBagSlot != InvalidBagPoint) {

@@ -27,6 +27,10 @@ struct Player;
 inline constexpr Size BagGridSize { 10, 8 };
 inline constexpr PointsInRectangle<int> BagGridRange { { { 0, 0 }, BagGridSize } };
 
+/** [RUNS MOD] Rows available on a fresh character. Must be at least 3 so the largest
+ * items (2x3 -- armor, staves, bows) always fit in a brand-new bag. */
+inline constexpr uint8_t InitialBagRows = 3;
+
 class BagStruct {
 public:
 	using BagCell = uint16_t;
@@ -37,6 +41,10 @@ public:
 	BagGrid grid {};
 	std::vector<Item> items;
 	bool dirty = false;
+	/** [RUNS MOD] Rows currently usable (grown by beating deeper run bosses). Rows at
+	 * index >= unlockedRows are locked: not drawn as slots, not hit-tested, and no
+	 * placement path will put an item there. */
+	uint8_t unlockedRows = InitialBagRows;
 
 	/** @brief 0-based index of the item at a grid position, or EmptyCell. */
 	BagCell GetItemIdAtPosition(Point p)
@@ -56,6 +64,7 @@ public:
 		grid = {};
 		items.clear();
 		dirty = false;
+		unlockedRows = InitialBagRows;
 	}
 };
 
@@ -88,5 +97,8 @@ void CloseBag();
 bool AutoPlaceItemInBag(const Item &item, bool persistItem);
 /** @brief Auto-moves a bag item into the inventory (used by the controller quick-transfer). */
 void TransferBagItemToInventory(Player &player, uint16_t itemId);
+/** @brief [RUNS MOD] Grants the next bag row if `clearedDepth` is deep enough (rows 4..8
+ * unlock at depths 2, 4, 6, 8, 10). Announces the growth; call on run-boss kill. */
+void TryUnlockBagRowForDepth(int clearedDepth);
 
 } // namespace devilution

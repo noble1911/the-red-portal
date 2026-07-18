@@ -23,6 +23,7 @@
 #include "inv.h"
 #include "minitext.h"
 #include "panels/ui_panels.hpp"
+#include "plrmsg.h"
 #include "quests.h"
 #include "qol/stash.h"
 #include "utils/language.h"
@@ -46,7 +47,12 @@ void AddItemToBagGrid(Point position, uint16_t bagListIndex, Size itemSize)
 
 std::optional<Point> FindTargetSlotUnderItemCursor(Point cursorPosition, Size itemSize)
 {
-	for (auto point : BagGridRange) {
+	// [RUNS MOD] Placement is confined to the unlocked rows; InitialBagRows >= 3
+	// guarantees even the tallest (2x3) items always have a valid clamp range.
+	const int unlockedRows = Bag.unlockedRows;
+	if (itemSize.height > unlockedRows)
+		return {};
+	for (auto point : PointsInRectangle(Rectangle { { 0, 0 }, Size { BagGridSize.width, unlockedRows } })) {
 		const Rectangle cell { GetBagSlotCoord(point), InventorySlotSizeInPixels + 1 };
 		if (cell.contains(cursorPosition)) {
 			if (itemSize.height <= 1 && itemSize.width <= 1)
@@ -56,7 +62,7 @@ std::optional<Point> FindTargetSlotUnderItemCursor(Point cursorPosition, Size it
 				hotPixelCellOffset.deltaX++;
 			if (itemSize.height % 2 == 0 && cell.contains(cursorPosition + Displacement { 0, INV_SLOT_HALF_SIZE_PX }))
 				hotPixelCellOffset.deltaY++;
-			point.y = std::clamp(point.y - hotPixelCellOffset.deltaY, 0, BagGridSize.height - itemSize.height);
+			point.y = std::clamp(point.y - hotPixelCellOffset.deltaY, 0, unlockedRows - itemSize.height);
 			point.x = std::clamp(point.x - hotPixelCellOffset.deltaX, 0, BagGridSize.width - itemSize.width);
 			return point;
 		}
@@ -119,7 +125,7 @@ void CheckBagCut(Point cursorPosition, bool automaticMove)
 	Player &player = *MyPlayer;
 
 	Point slot = InvalidBagPoint;
-	for (auto point : BagGridRange) {
+	for (auto point : PointsInRectangle(Rectangle { { 0, 0 }, Size { BagGridSize.width, Bag.unlockedRows } })) {
 		const Rectangle cell { GetBagSlotCoord(point), InventorySlotSizeInPixels + 1 };
 		if (cell.contains(cursorPosition)) {
 			slot = point;
@@ -173,8 +179,11 @@ bool AutoPlaceItemInBag(const Item &item, bool persistItem)
 		return false;
 
 	const Size itemSize = GetInventorySize(item);
+	// [RUNS MOD] Only scan the unlocked rows for a free spot.
+	if (itemSize.height > Bag.unlockedRows)
+		return false;
 	for (const Point firstSlot : PointsInRectangle(Rectangle { { 0, 0 },
-	         Size { BagGridSize.width - (itemSize.width - 1), BagGridSize.height - (itemSize.height - 1) } })) {
+	         Size { BagGridSize.width - (itemSize.width - 1), Bag.unlockedRows - (itemSize.height - 1) } })) {
 		bool isSpaceFree = true;
 		for (const Point p : PointsInRectangle(Rectangle { firstSlot, itemSize })) {
 			if (Bag.GetItemIdAtPosition(p) != BagStruct::EmptyCell) {
@@ -321,12 +330,21 @@ void DrawBag(const Surface &out)
 	// the Displacement in GetBagSlotCoord).
 	const int gridTop = GetBagSlotCoord({ 0, 0 }).y;
 	FillRect(out, panel.x, panel.y, panelWidth, gridTop - panel.y, MaskColor);
-	// Bottom: from the top of the first unused row (row index BagGridSize.height) down.
-	const int unusedTop = GetBagSlotCoord({ 0, BagGridSize.height }).y - 1;
+	// Bottom: from the top of the first row past the unlocked ones down. Locked rows
+	// (unlockedRows..BagGridSize.height) are masked together with the stash rows the bag
+	// never uses, so a partially grown bag reads as a shorter grid, not empty slots.
+	const int unusedTop = GetBagSlotCoord({ 0, Bag.unlockedRows }).y - 1;
 	if (panelBottom > unusedTop)
 		FillRect(out, panel.x, unusedTop, panelWidth, panelBottom - unusedTop, MaskColor);
 	DrawString(out, _("Bag"), { panel + Displacement { 0, 6 }, { panelWidth, 24 } },
 	    { .flags = UiFlags::AlignCenter | UiFlags::VerticalCenter | UiFlags::ColorWhitegold });
+	// [RUNS MOD] Tell the player how the bag grows while rows are still locked.
+	if (Bag.unlockedRows < BagGridSize.height) {
+		const int lockedHeight = GetBagSlotCoord({ 0, BagGridSize.height }).y - 1 - unusedTop;
+		DrawString(out, _("Defeat deeper bosses to grow your bag"),
+		    { Point { panel.x, unusedTop }, { panelWidth, lockedHeight } },
+		    { .flags = UiFlags::AlignCenter | UiFlags::VerticalCenter | UiFlags::ColorWhite | UiFlags::FontSize12 });
+	}
 
 	constexpr Displacement offset { 0, INV_SLOT_SIZE_PX - 1 };
 	for (auto slot : BagGridRange) {
@@ -356,6 +374,22 @@ void DrawBag(const Surface &out)
 	}
 }
 
+void TryUnlockBagRowForDepth(int clearedDepth)
+{
+	// [RUNS MOD] Rows 4..8 unlock at depths 2, 4, 6, 8, 10: each unlocked row raises the
+	// depth needed for the next, so growing the bag requires actually going deeper rather
+	// than farming the first run. Runs on every client (each grows its own local bag),
+	// mirroring how the difficulty-tier unlock updates each client's own hero.
+	if (Bag.unlockedRows >= BagGridSize.height)
+		return;
+	const int requiredDepth = (Bag.unlockedRows - InitialBagRows + 1) * 2;
+	if (clearedDepth < requiredDepth)
+		return;
+	Bag.unlockedRows++;
+	Bag.dirty = true;
+	EventPlrMsg(_("Your bag has grown by a row."));
+}
+
 void CheckBagItem(Point mousePosition, bool isShiftHeld, bool isCtrlHeld)
 {
 	if (!MyPlayer->HoldItem.isEmpty())
@@ -369,7 +403,7 @@ void CheckBagItem(Point mousePosition, bool isShiftHeld, bool isCtrlHeld)
 uint16_t CheckBagHLight(Point mousePosition)
 {
 	Point slot = InvalidBagPoint;
-	for (auto point : BagGridRange) {
+	for (auto point : PointsInRectangle(Rectangle { { 0, 0 }, Size { BagGridSize.width, Bag.unlockedRows } })) {
 		const Rectangle cell { GetBagSlotCoord(point), InventorySlotSizeInPixels + 1 };
 		if (cell.contains(mousePosition)) {
 			slot = point;

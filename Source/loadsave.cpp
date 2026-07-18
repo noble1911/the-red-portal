@@ -2705,7 +2705,8 @@ void SaveHeroItems(SaveWriter &saveWriter, Player &player)
 
 // [RUNS MOD] The carried bag: a per-character 10x8 grid, saved in the hero archive
 // (single page, no gold). Version byte lets the format evolve.
-constexpr uint8_t BagVersion = 0;
+// v0: items + grid. v1: adds unlockedRows (bag rows grow as run rewards).
+constexpr uint8_t BagVersion = 1;
 
 /**
  * @brief [RUNS MOD] Drops bag items that validation cleared and frees the grid cells they
@@ -2761,8 +2762,21 @@ void LoadBag()
 	for (auto &col : Bag.grid)
 		for (uint16_t &cell : col)
 			cell = file.NextLE<uint16_t>();
+	// [RUNS MOD] Row gating arrived in v1. v0 characters predate it and may hold items
+	// anywhere in the 10x8 grid, so they keep the full bag rather than having items
+	// stranded in locked rows.
+	if (version >= 1)
+		Bag.unlockedRows = std::clamp<uint8_t>(file.NextLE<uint8_t>(), InitialBagRows, BagGridSize.height);
+	else
+		Bag.unlockedRows = BagGridSize.height;
 	gbIsHellfireSaveGame = gbIsHellfire;
 	PurgeInvalidBagItems();
+	// Never strand an item in a locked row (defends against hand-edited or corrupt
+	// saves): grow the unlocked area to cover every occupied cell.
+	for (int x = 0; x < BagGridSize.width; x++)
+		for (int y = Bag.unlockedRows; y < BagGridSize.height; y++)
+			if (Bag.grid[x][y] != 0)
+				Bag.unlockedRows = static_cast<uint8_t>(y + 1);
 	Bag.RefreshItemStatFlags();
 }
 
@@ -2771,7 +2785,8 @@ void SaveBag(SaveWriter &saveWriter)
 	const int itemSize = (gbIsHellfire ? HellfireItemSaveSize : DiabloItemSaveSize);
 	const size_t size = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint32_t)
 	    + (static_cast<size_t>(itemSize) * Bag.items.size())
-	    + (BagGridSize.width * BagGridSize.height * sizeof(uint16_t));
+	    + (BagGridSize.width * BagGridSize.height * sizeof(uint16_t))
+	    + sizeof(uint8_t); // v1: unlockedRows
 	SaveHelper file(saveWriter, "herobag", size);
 	file.WriteLE<uint8_t>(BagVersion);
 	file.WriteLE<uint8_t>(gbIsHellfire ? 1 : 0);
@@ -2781,6 +2796,7 @@ void SaveBag(SaveWriter &saveWriter)
 	for (const auto &col : Bag.grid)
 		for (const uint16_t cell : col)
 			file.WriteLE<uint16_t>(cell);
+	file.WriteLE<uint8_t>(Bag.unlockedRows);
 }
 
 void SaveStash(SaveWriter &stashWriter)

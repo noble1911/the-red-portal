@@ -34,6 +34,7 @@
 #include <fmt/core.h>
 
 #include "automap.h"
+#include "bag.h"
 #include "control/control.hpp"
 #include "crawl.hpp"
 #include "cursor.h"
@@ -4073,6 +4074,8 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 		// [RUNS MOD] Completing a dungeon restocks the Dungeon Merchant on the next
 		// hub visit.
 		DungeonVendorRestockPending = true;
+		// [RUNS MOD] Deep-enough clears grow the carried bag (each client its own).
+		TryUnlockBagRowForDepth(currlevel);
 		// [RUNS MOD] Clearing the boss at the unlock depth opens the next difficulty tier
 		// (Normal -> Nightmare -> Hell), tracked per character in pDiabloKillLevel (stored
 		// as clearedDifficulty + 1, matching vanilla's Diablo-kill difficulty gate).
