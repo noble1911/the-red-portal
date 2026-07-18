@@ -1128,8 +1128,21 @@ int CountDungeonScrolls()
 	return n;
 }
 
+// [RUNS MOD] Whether `material` may be consumed for the current op on `target`.
+// Upgrading fuses scrolls: the material must match or exceed the target's level, so
+// pushing past a depth requires a second scroll OF that depth -- otherwise cheap
+// level-1 vendor scrolls would make gold the only gate and boss-skipping trivial.
+// Reroll/Add-modifier don't change depth, so any scroll burns.
+bool CraftMaterialValid(const Item &target, const Item &material)
+{
+	if (CraftOp != ScrollCraftOp::Upgrade)
+		return true;
+	return DungeonScrollLevel(material) >= DungeonScrollLevel(target);
+}
+
 // Fills PlayerItems with the player's dungeon scrolls; if `forCraft` only those valid
 // for the current op, skipping the inventory slot `exceptInv` (the chosen target).
+// When `exceptInv` names a chosen target (material step), only valid materials list.
 void BuildScrollList(bool forCraft, int exceptInv)
 {
 	CurrentItemIndex = 0;
@@ -1143,6 +1156,9 @@ void BuildScrollList(bool forCraft, int exceptInv)
 		if (inv._iMiscId != IMISC_DUNGEONSCROLL)
 			continue;
 		if (forCraft && !CraftValid(inv))
+			continue;
+		if (!forCraft && exceptInv >= 0 && exceptInv < player._pNumInv
+		    && !CraftMaterialValid(player.InvList[exceptInv], inv))
 			continue;
 		PlayerItems[CurrentItemIndex] = inv;
 		if (forCraft)
@@ -1189,7 +1205,9 @@ void StartDungeonVendorCraftMaterial()
 	IsTextFullSize = true;
 	BuildScrollList(/*forCraft=*/false, /*exceptInv=*/CraftTargetInv);
 	if (CurrentItemIndex == 0) {
-		ShowScrollListNotice(_("You have no other scroll to use as material."));
+		ShowScrollListNotice(CraftOp == ScrollCraftOp::Upgrade
+		        ? _("Upgrading consumes a scroll of the target's level or higher.")
+		        : _("You have no other scroll to use as material."));
 		return;
 	}
 	HasScrollbar = true;
@@ -1211,6 +1229,10 @@ void CraftApply()
 		return;
 	Item &target = player.InvList[CraftTargetInv];
 	if (target._iMiscId != IMISC_DUNGEONSCROLL)
+		return;
+	// Re-validate the material at apply time (indices can go stale between screens).
+	if (player.InvList[CraftMaterialInv]._iMiscId != IMISC_DUNGEONSCROLL
+	    || !CraftMaterialValid(target, player.InvList[CraftMaterialInv]))
 		return;
 
 	TakePlrsMoney(CraftGoldCost(target));

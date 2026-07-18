@@ -122,6 +122,11 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   vendor's **Upgrade craft is the ghost path to depth** and was repriced as a real
   gold sink — quadratic in target level (L1→2: 400g … L14→15: 22,500g), so buying
   depth is always pricier than beating the boss for the free scroll.
+- **Upgrade is fusion** (follow-up, same day): the consumed material must be a scroll
+  of the target's level or higher — otherwise cheap L1 vendor scrolls made gold the
+  only gate and boss-skipping trivial. Ghosting deeper now needs a second same-depth
+  scroll (3% trash drops), while the boss stays the fast lane. Reroll/Add-modifier
+  still burn any scroll.
 - Vestigial `AdvanceRunDepth` retired (depth is scroll-defined; boss rewards all fire
   at kill time). A physical vault room was rejected: theme rooms don't generate on
   Nest/Crypt/many layouts.
