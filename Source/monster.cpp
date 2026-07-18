@@ -128,14 +128,30 @@ UniqueMonsterType RunBossType = UniqueMonsterType::Butcher;
 
 namespace {
 
-// [RUNS MOD] Pool of clean combat bosses that place cleanly as standalone run bosses.
-constexpr UniqueMonsterType RunBossPool[] = {
-	UniqueMonsterType::Butcher,
-	UniqueMonsterType::SkeletonKing,
-	UniqueMonsterType::WarlordOfBlood,
-	UniqueMonsterType::RedVex,
-	UniqueMonsterType::BlackJade,
-};
+// [RUNS MOD] Per-tileset boss pools, so each tileset has its own cast instead of the
+// same few bosses everywhere. Entries name rows of unique_monstdat.tsv (including the
+// mod's own additions for the Hellfire tilesets) and are resolved at runtime, so the
+// pools survive TSV reordering. All picks are combat-clean: no talk/quest AI, and their
+// row level never matches a run level, so PlaceUniqueMonsters cannot also spawn them
+// organically (except where noted, which the RunBossType guard there covers). Stats are
+// normalized in ScaleRunMonsters, so only type, AI, color and resistances matter here.
+constexpr std::string_view CathedralRunBosses[] = { "The Butcher", "Skeleton King", "Bonehead Keenaxe", "Rotfeast the Hungry", "Deadeye" };
+constexpr std::string_view CatacombsRunBosses[] = { "Bloodgutter", "Nightwing the Cold", "Baron Sludge", "Bronzefist Firestone", "Wrathfire the Doomed" };
+constexpr std::string_view CavesRunBosses[] = { "Stormbane", "Breakspine", "Warpfire Hellspawn", "Goldblight of the Flame", "Bluehorn" };
+constexpr std::string_view HellRunBosses[] = { "Warlord of Blood", "Red Vex", "Black Jade", "Blackskull", "Dreadjudge" };
+constexpr std::string_view NestRunBosses[] = { "Broodmother Arachnia", "Gorehusk the Sowmaster", "Vessik the Broodlord", "Grimspike" };
+constexpr std::string_view CryptRunBosses[] = { "Gravelord Vhassk", "The Pale Regent", "Kargol the Twice-Crowned", "Doomlock" };
+
+/** @brief [RUNS MOD] Resolves a unique_monstdat name to its row; the Butcher on a miss
+ * (e.g. a modded TSV), so a run always has a boss. */
+UniqueMonsterType FindUniqueMonsterByName(std::string_view name)
+{
+	for (size_t i = 0; i < UniqueMonstersData.size(); ++i) {
+		if (name == UniqueMonstersData[i].mName)
+			return static_cast<UniqueMonsterType>(i);
+	}
+	return UniqueMonsterType::Butcher;
+}
 
 /**
  * @brief [RUNS MOD] Deterministically picks the run boss for a level from its dungeon
@@ -143,9 +159,35 @@ constexpr UniqueMonsterType RunBossPool[] = {
  */
 UniqueMonsterType PickRunBoss(int level)
 {
+	const std::string_view *pool = CathedralRunBosses;
+	size_t poolSize = std::size(CathedralRunBosses);
+	switch (GetLevelType(level)) {
+	case DTYPE_CATACOMBS:
+		pool = CatacombsRunBosses;
+		poolSize = std::size(CatacombsRunBosses);
+		break;
+	case DTYPE_CAVES:
+		pool = CavesRunBosses;
+		poolSize = std::size(CavesRunBosses);
+		break;
+	case DTYPE_HELL:
+		pool = HellRunBosses;
+		poolSize = std::size(HellRunBosses);
+		break;
+	case DTYPE_NEST:
+		pool = NestRunBosses;
+		poolSize = std::size(NestRunBosses);
+		break;
+	case DTYPE_CRYPT:
+		pool = CryptRunBosses;
+		poolSize = std::size(CryptRunBosses);
+		break;
+	default:
+		break; // Cathedral and anything unexpected use the cathedral pool.
+	}
 	uint32_t seed = DungeonSeeds[level] * 2654435761u + static_cast<uint32_t>(level) + 1u;
 	seed = seed * 1103515245u + 12345u;
-	return RunBossPool[(seed >> 16) % (sizeof(RunBossPool) / sizeof(RunBossPool[0]))];
+	return FindUniqueMonsterByName(pool[(seed >> 16) % poolSize]);
 }
 
 constexpr int NightmareToHitBonus = 85;
@@ -552,6 +594,11 @@ tl::expected<void, std::string> PlaceUniqueMonsters()
 			continue;
 
 		const auto uniqueType = static_cast<UniqueMonsterType>(u);
+		// [RUNS MOD] The run boss is placed separately in PlaceQuestMonsters (which runs
+		// first); skip its organic spawn so a level can never hold two monsters matching
+		// RunBossType -- killing the roaming twin would complete the run.
+		if (RunsModEnabled && uniqueType == RunBossType)
+			continue;
 		if (uniqueType == UniqueMonsterType::Garbud && Quests[Q_GARBUD]._qactive == QUEST_NOTAVAIL)
 			continue;
 		if (uniqueType == UniqueMonsterType::Zhar && Quests[Q_ZHAR]._qactive == QUEST_NOTAVAIL)
@@ -3513,8 +3560,15 @@ tl::expected<void, std::string> GetLevelMTypes()
 
 	if (!setlevel) {
 		// [RUNS MOD] Load the run boss type (chosen for this level) on any run level.
-		if (RunsModEnabled && currlevel >= 1)
-			RETURN_IF_ERROR(AddMonsterType(PickRunBoss(currlevel), PLACE_SPECIAL));
+		// Also (re)assign RunBossType here, not just in PlaceQuestMonsters: this runs on
+		// BOTH generate and load-from-save paths, while PlaceQuestMonsters only runs on
+		// generation -- without this, resuming a saved run left RunBossType stale and
+		// killing the boss never registered. PickRunBoss is deterministic from the saved
+		// DungeonSeeds, so the recomputed identity always matches the placed monster.
+		if (RunsModEnabled && currlevel >= 1) {
+			RunBossType = PickRunBoss(currlevel);
+			RETURN_IF_ERROR(AddMonsterType(RunBossType, PLACE_SPECIAL));
+		}
 		if (Quests[Q_BUTCHER].IsAvailable())
 			RETURN_IF_ERROR(AddMonsterType(MT_CLEAVER, PLACE_SPECIAL));
 		if (Quests[Q_GARBUD].IsAvailable())

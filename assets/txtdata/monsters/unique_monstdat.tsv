@@ -99,3 +99,9 @@ MT_HLSPWN	Webwidow	general	16	774	Succubus	1	20	50	0	0	0	0	0	0	IMMUNE_MAGIC,IMMU
 MT_SOLBRNR	Fleshdancer	general	16	999	Succubus	3	30	50	0	0	0	0	0	0	IMMUNE_MAGIC,RESIST_FIRE	None	0	0	
 MT_OBLORD	Grimspike	general	19	534	Sneak	1	25	40	0	0	0	0	0	0	IMMUNE_MAGIC,RESIST_FIRE	Leashed	0	0	
 MT_STORML	Doomlock	general	28	534	Sneak	1	35	55	0	0	0	0	0	0	IMMUNE_MAGIC,RESIST_FIRE,RESIST_LIGHTNING	Leashed	0	0	
+MT_ARACHNON	Broodmother Arachnia	general	0	600	SkeletonMelee	3	20	35	0	0	0	0	0	0	RESIST_LIGHTNING	None	0	0	
+MT_HELLBOAR	Gorehusk the Sowmaster	general	0	700	SkeletonMelee	3	25	45	0	0	0	0	0	0	RESIST_FIRE,RESIST_LIGHTNING	None	0	0	
+MT_SPIDLORD	Vessik the Broodlord	general	0	550	AcidUnique	3	18	30	0	0	0	0	0	0	IMMUNE_MAGIC,RESIST_LIGHTNING	None	0	0	
+MT_LICH	Gravelord Vhassk	general	0	600	Lich	3	20	35	0	0	0	0	0	0	IMMUNE_MAGIC,RESIST_FIRE	None	0	0	
+MT_ARCHLICH	The Pale Regent	general	0	750	ArchLich	3	25	40	0	0	0	0	0	0	IMMUNE_MAGIC,IMMUNE_FIRE	None	0	0	
+MT_BICLOPS	Kargol the Twice-Crowned	general	0	800	SkeletonMelee	3	30	50	0	0	0	0	0	0	RESIST_FIRE,RESIST_LIGHTNING	None	0	0	
