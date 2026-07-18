@@ -76,9 +76,41 @@ Last updated: **2026-07-18** (v0.3.0).
       only partly covers this).
 - [ ] Dungeon portal state is session-only (not saved).
 
+## Gameplay direction: PvE extraction (decided 2026-07-18)
+
+The loop is not a roguelike (no permadeath, persistent character/stash/economy) — it is a
+**PvE extraction loop**: gear up in the hub, commit to a sortie, decide how greedy to get,
+leave with what you can carry. Design principle: **a run is a heist to survive, not a
+level to clear** — the tension lives at the exit. Planned slices, in order:
+
+**E1 — Unsecured loot + the extraction sack** (first slice; mostly reuses shipped systems)
+- Loot picked up during a run is *unsecured*: die and it drops with your corpse, and if
+  the portal closes or reseeds it is gone for good. Gear brought into the run stays
+  yours — death stings but never bricks the character.
+- The extended inventory rows ARE the extraction sack: run loot auto-flows into the
+  extra rows, and those rows are what death forfeits. Pack growth from boss kills then
+  reads as "you can risk carrying more." (Tag candidates: an "acquired this run" bit;
+  `_iCreateInfo` already round-trips flags recreation-safely.)
+
+**E2 — Push-your-luck clock**
+- A reason to leave before the level is vacuumed: escalating respawns the longer you
+  stay, and/or boss death starting a collapse timer that gilds remaining loot while
+  shoving elites at you. Naturally expressed as scroll affixes (e.g. "Volatile: portal
+  collapses 90s after the boss falls, +40% loot") — feeds the modifier expansion below.
+
+**E3 — Boss-optional runs**
+- Skipping the boss becomes a strategy, not a failure: the level holds extractable loot,
+  but the boss guards the scroll drop and a bonus vault. "Loot two rooms and ghost out"
+  vs "commit with half my potions gone" is a real decision.
+
+**E4 — Death economy tuning**
+- Unsecured-loot loss (+ maybe gold fee / durability hit) is the target severity; full
+  loss would fight Diablo's gear treadmill. Optional "hardcore" scroll affix for the
+  knife-edge crowd.
+
 **Feature ideas (next slices)**
 - [ ] **Scroll modifier expansion** (PoE-map direction): more affix variety — pack
       density, extra elites, monster speed, elemental-heavy rolls, shrine/chest density,
       boss mods (e.g. twinned) — plus a wider risk/reward magnitude spread and affix
-      tiers so crafting rerolls have texture.
+      tiers so crafting rerolls have texture. Pairs with E2's risk affixes.
 - [ ] Loot tuning pass via TSV (M4 remainder).
