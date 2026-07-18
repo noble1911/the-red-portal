@@ -26,14 +26,15 @@ namespace {
 
 /** [RUNS MOD] Extra boss HP / damage per run level (percent), on top of modifiers. */
 constexpr int BossHpPctPerLevel = 25;
-constexpr int BossDmgPctPerLevel = 12;
+constexpr int BossDmgPctPerLevel = 16;
 
-/** [RUNS MOD] Reference boss stats (the Butcher's) that every run boss is NORMALIZED to
- * at level 1, then scaled up by level -- so whichever boss is chosen is level-appropriate
- * (a Warlord on level 1 is scaled down, a Butcher on level 15 is scaled up). */
-constexpr int ReferenceBossHp = 220;
-constexpr int ReferenceBossMinDmg = 6;
-constexpr int ReferenceBossMaxDmg = 12;
+/** [RUNS MOD] Reference boss stats that every run boss is NORMALIZED to at level 1, then
+ * scaled up by level -- so whichever boss is chosen is level-appropriate (a Warlord on
+ * level 1 is scaled down, a Butcher on level 15 is scaled up). Tuned so a fresh character
+ * can beat the level-1 boss: modest HP and low base damage, ramping up with level. */
+constexpr int ReferenceBossHp = 150;
+constexpr int ReferenceBossMinDmg = 2;
+constexpr int ReferenceBossMaxDmg = 6;
 
 /** A private, self-contained LCG so rolling never disturbs the game RNG. */
 struct ModRng {
