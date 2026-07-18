@@ -539,6 +539,8 @@ struct GraphicsOptions : OptionCategoryBase {
 	OptionEntryBoolean zoom;
 	/** @brief Subtile lighting for smoother light gradients. */
 	OptionEntryBoolean perPixelLighting;
+	/** @brief [RUNS MOD] Walls occlude light sources, so torches and spells cast shadows. */
+	OptionEntryBoolean dynamicShadows;
 	/** @brief Enable color cycling animations. */
 	OptionEntryBoolean colorCycling;
 	/** @brief Use alternate nest palette. */

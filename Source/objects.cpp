@@ -1777,6 +1777,9 @@ void OperateDoor(Object &door, bool sendflag)
 	}
 
 	RedoPlayerVision();
+	// [RUNS MOD] With dynamic shadows the door just changed the light-blocking geometry,
+	// so every cached light near it is stale -- relight, exactly like vision above.
+	RelightAll();
 
 	if (sendflag)
 		NetSendCmdLoc(MyPlayerId, true, openDoor ? CMD_OPENDOOR : CMD_CLOSEDOOR, door.position);

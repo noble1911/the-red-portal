@@ -70,6 +70,9 @@ void ChangeLightXY(int i, Point position);
 void ChangeLightOffset(int i, DisplacementOf<int8_t> offset);
 void ChangeLight(int i, Point position, uint8_t radius);
 void ProcessLightList();
+/** @brief [RUNS MOD] Unlight + relight every active light. Call when light-blocking
+ * geometry changes (doors), or when the dynamic-shadows option is toggled. */
+void RelightAll();
 void SavePreLighting();
 void ActivateVision(Point position, int r, size_t id);
 void ChangeVisionRadius(size_t id, int r);
