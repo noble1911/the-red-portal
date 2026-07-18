@@ -82,7 +82,9 @@ extern void FontsCleanup();
 extern DVL_API_FOR_TEST int PauseMode;
 extern clicktype sgbMouseDown;
 extern uint16_t gnTickDelay;
-extern char gszProductName[64];
+// [RUNS MOD] 128 (was 64): now carries the mod name plus engine name/version, and
+// BufCopy does not bounds-check.
+extern char gszProductName[128];
 
 extern PlayerActionType LastPlayerAction;
 

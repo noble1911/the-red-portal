@@ -1,4 +1,5 @@
-# Nintendo Switch Port of DevilutionX (Diablo)
+# Diablo: The Red Portal -- Nintendo Switch
+# A roguelike-run total conversion built on DevilutionX (Diablo)
 
 # How To Install:
  - Put `devilutionx.nro` into `/switch/devilutionx`

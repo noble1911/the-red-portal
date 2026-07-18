@@ -28,6 +28,7 @@
 #include "hwcursor.hpp"
 #include "options.h"
 #include "pfile.h"
+#include "runs_mod.h"
 #include "utils/file_util.h"
 #include "utils/language.h"
 #include "utils/log.hpp"
@@ -128,7 +129,7 @@ void init_cleanup()
 
 void init_create_window()
 {
-	if (!SpawnWindow(PROJECT_NAME))
+	if (!SpawnWindow(RunsModGameName)) // [RUNS MOD] the window title carries the mod's name
 		app_fatal(_("Unable to create main window"));
 	dx_init();
 	gbActive = true;

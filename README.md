@@ -1,3 +1,17 @@
+# Diablo: The Red Portal
+
+A roguelike-run total conversion of Diablo 1, built on this fork of DevilutionX for
+desktop and Nintendo Switch (with Switch-to-Switch co-op). Tristram becomes a compact
+hub; dungeon scrolls open a red portal to single-level runs with a guaranteed boss —
+beat it, return, go deeper. Requires your own Diablo (and optionally Hellfire) MPQs.
+
+> Private project. If this is ever distributed publicly, the name drops to
+> "The Red Portal" (Diablo is a Blizzard trademark).
+
+Upstream DevilutionX README follows.
+
+---
+
 <p align="center">
   <img width="560" height="144" alt="image" src="https://github.com/user-attachments/assets/7ac73801-ef7b-4cc1-8442-a191a2a0a1ce" />
 </p>

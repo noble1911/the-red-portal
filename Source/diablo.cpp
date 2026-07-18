@@ -150,7 +150,7 @@ bool cineflag;
 int PauseMode;
 clicktype sgbMouseDown;
 uint16_t gnTickDelay = 50;
-char gszProductName[64] = "DevilutionX vUnknown";
+char gszProductName[128] = "DevilutionX vUnknown";
 
 #ifdef _DEBUG
 bool DebugDisableNetworkTimeout = false;
@@ -1225,7 +1225,9 @@ void DiabloInitScreen()
 
 void SetApplicationVersions()
 {
-	*BufCopy(gszProductName, PROJECT_NAME, " v", PROJECT_VERSION) = '\0';
+	// [RUNS MOD] Brand the product string (main menu footer, Discord presence) with the
+	// mod's name; the underlying engine name/version stay visible for support.
+	*BufCopy(gszProductName, RunsModGameName, " (", PROJECT_NAME, " v", PROJECT_VERSION, ")") = '\0';
 	*BufCopy(gszVersionNumber, "version ", PROJECT_VERSION) = '\0';
 }
 

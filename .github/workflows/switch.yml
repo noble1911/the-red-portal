@@ -45,20 +45,20 @@ jobs:
           mkdir -p package
           cp ./build/devilutionx.nro package/
           cp -r ./build/mods package/mods
-          cd package && zip -r ../devilutionx-switch.zip .
+          cd package && zip -r ../the-red-portal-switch.zip .
 
       - name: Upload Package
         if: ${{ !env.ACT }}
         uses: actions/upload-artifact@v7
         with:
-          name: devilutionx-switch
-          path: ./devilutionx-switch.zip
+          name: the-red-portal-switch
+          path: ./the-red-portal-switch.zip
 
       - name: Update Release
         if: ${{ github.event_name == 'release' && !env.ACT }}
         uses: svenstaro/upload-release-action@v2
         with:
-          asset_name: devilutionx-switch.zip
-          file: ./devilutionx-switch.zip
+          asset_name: the-red-portal-switch.zip
+          file: ./the-red-portal-switch.zip
           overwrite: true
 ...

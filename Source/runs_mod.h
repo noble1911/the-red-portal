@@ -13,6 +13,13 @@ namespace devilution {
 // away). May be promoted to a runtime option later.
 constexpr bool RunsModEnabled = true;
 
+// The mod's display name: window title, main menu footer, Switch home menu. Branding is
+// presentation-layer only -- PROJECT_NAME/binary names stay "devilutionx" so upstream
+// merges stay clean. NOTE: "Diablo" is Blizzard's trademark; while the repo and releases
+// are private this is fine, but any PUBLIC distribution should drop it and ship under
+// "The Red Portal" alone.
+constexpr char RunsModGameName[] = "Diablo: The Red Portal";
+
 // Compact hub (M1): Tristram is cropped to a small plaza around the cathedral run
 // portal. Bounds below are in world-tile coordinates; everything outside is voided
 // out so the playable hub is just this corner. These are deliberately easy to tune.
