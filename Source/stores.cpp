@@ -1124,7 +1124,7 @@ bool CraftValid(const Item &scroll)
 {
 	switch (CraftOp) {
 	case ScrollCraftOp::Upgrade:
-		return DungeonScrollLevel(scroll) < MaxRunDepth;
+		return DungeonScrollLevel(scroll) < GetMaxRunDepth();
 	case ScrollCraftOp::AddMod:
 		return DungeonScrollModCount(scroll) < MaxScrollMods;
 	case ScrollCraftOp::Reroll:
@@ -1247,7 +1247,7 @@ void CraftApply()
 		GenerateNewSeed(target); // new seed => new affixes (same level and count)
 		break;
 	case ScrollCraftOp::Upgrade: {
-		const int newLevel = std::min(DungeonScrollLevel(target) + 1, MaxRunDepth);
+		const int newLevel = NextRunDepth(DungeonScrollLevel(target));
 		target._iCreateInfo = MakeDungeonScrollCreateInfo(newLevel, DungeonScrollModCount(target), DungeonScrollDifficulty(target));
 		target._ivalue = target._iIvalue = newLevel * 50;
 		break;

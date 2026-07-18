@@ -126,10 +126,10 @@ std::string DebugCmdLevelSeed(std::optional<uint8_t> level)
 std::string DebugCmdSetRunDepth(std::optional<uint8_t> depth)
 {
 	if (!depth.has_value())
-		return StrCat("Current run depth: ", RunDepth, " / ", MaxRunDepth,
+		return StrCat("Current run depth: ", RunDepth, " / ", GetMaxRunDepth(),
 		    RunBossDefeated ? " (boss defeated)" : " (boss alive)");
-	if (*depth < 1 || *depth > MaxRunDepth)
-		return StrCat("depth out of range (1..", MaxRunDepth, ")");
+	if (*depth < 1 || *depth > GetMaxRunDepth() || *depth == ArenaRunDepth)
+		return StrCat("depth out of range (1..", GetMaxRunDepth(), ", excluding ", ArenaRunDepth, ")");
 	RunDepth = *depth;
 	return StrCat("Run depth set to ", *depth, ". Take the hub portal to start that run.");
 }
@@ -139,8 +139,8 @@ std::string DebugCmdSetRunDepth(std::optional<uint8_t> depth)
 // be tested without a vendor / without grinding the unlock ladder.
 std::string DebugCmdGiveDungeonScroll(uint8_t level, std::optional<uint8_t> difficulty)
 {
-	if (level < 1 || level > MaxRunDepth)
-		return StrCat("level out of range (1..", MaxRunDepth, ")");
+	if (level < 1 || level > GetMaxRunDepth() || level == ArenaRunDepth)
+		return StrCat("level out of range (1..", GetMaxRunDepth(), ", excluding ", ArenaRunDepth, ")");
 	const int diff = std::clamp(static_cast<int>(difficulty.value_or(0)), 0, static_cast<int>(DIFF_HELL));
 	Item item;
 	CreateDungeonScroll(item, level, diff);

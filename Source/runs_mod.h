@@ -42,11 +42,39 @@ constexpr bool IsInsideHub(int x, int y)
 
 // A run is a single contained dungeon level. Successive runs go progressively
 // deeper (RunDepth grows), which scales monster difficulty and loot for free via
-// the engine. Capped below the Diablo arena (level 16) to avoid its special-case
-// generation/monster handling.
-constexpr int MaxRunDepth = 15;
+// the engine.
+//
+// Level 16 is the Diablo arena: its special-case generation and monster handling
+// don't suit a run, so it is skipped over entirely rather than capped below.
+// Hellfire adds the Nest (17-20) and the Crypt (21-24); GetLevelType() already maps
+// those, but their tilesets live in the Hellfire MPQs, so the cap is only raised
+// when the Hellfire mod is actually active.
+constexpr int DiabloMaxRunDepth = 15;
+constexpr int HellfireMaxRunDepth = 24;
+constexpr int ArenaRunDepth = 16;
 
-// The dungeon level of the current run (1..MaxRunDepth). Defined in diablo.cpp.
+// Depth whose boss unlocks the next difficulty tier. Held at the Diablo cap so the
+// tier ladder keeps the pacing it was tuned for even when Hellfire raises the depth
+// cap to 24; the Nest and Crypt are then extra depth within a tier rather than a
+// longer road to Nightmare.
+constexpr int DifficultyUnlockDepth = DiabloMaxRunDepth;
+
+/** @brief Deepest reachable run level: 24 when Hellfire is active, otherwise 15.
+ *
+ * Safe to branch on in multiplayer. GAME_ID folds gbIsHellfire into
+ * GameData::programid, and IsGameCompatible() refuses a join whose programid differs,
+ * so every client in a game necessarily agrees on this value and therefore on the
+ * whole depth progression. Defined in diablo.cpp.
+ */
+int GetMaxRunDepth();
+
+/** @brief Clamps to a valid run level: 1..GetMaxRunDepth(), never the arena. */
+int ClampRunDepth(int depth);
+
+/** @brief The run level after `depth`: skips the arena, stops at the cap. */
+int NextRunDepth(int depth);
+
+// The dungeon level of the current run. Defined in diablo.cpp.
 extern int RunDepth;
 
 // True once the current run's boss has been killed. Progression to a deeper run

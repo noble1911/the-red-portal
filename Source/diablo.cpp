@@ -3141,12 +3141,34 @@ int RunDepth = 1;
 bool RunBossDefeated = false;
 bool DungeonVendorRestockPending = true;
 
+int GetMaxRunDepth()
+{
+	// [RUNS MOD] The Nest (17-20) and Crypt (21-24) are Hellfire levels: GetLevelType()
+	// maps them unconditionally, but their tilesets ship in the Hellfire MPQs, so
+	// generating one without the expansion would fail to load its assets.
+	return gbIsHellfire ? HellfireMaxRunDepth : DiabloMaxRunDepth;
+}
+
+int ClampRunDepth(int depth)
+{
+	depth = std::clamp(depth, 1, GetMaxRunDepth());
+	// Step over the Diablo arena rather than stopping at it. Unreachable without
+	// Hellfire, where the cap already sits below 16.
+	if (depth == ArenaRunDepth)
+		depth = ArenaRunDepth + 1;
+	return depth;
+}
+
+int NextRunDepth(int depth)
+{
+	return ClampRunDepth(depth + 1);
+}
+
 void AdvanceRunDepth()
 {
 	// [RUNS MOD] Each run goes one level deeper (engine difficulty + loot scale
-	// with dungeon level). Capped to avoid the Diablo arena's special handling.
-	if (RunDepth < MaxRunDepth)
-		RunDepth++;
+	// with dungeon level), skipping the arena and stopping at the cap.
+	RunDepth = NextRunDepth(RunDepth);
 }
 
 void ApplyRunSeed(int depth, uint32_t seed)
@@ -3155,6 +3177,9 @@ void ApplyRunSeed(int depth, uint32_t seed)
 	// cached LevelSeeds entry stops the generator from replaying a prior layout;
 	// clearing _pLvlVisited forces regeneration (single-player otherwise reloads
 	// the saved level on re-entry; multiplayer always regenerates).
+	// [RUNS MOD] Clamp before indexing: `depth` arrives off the wire via CMD_RUNSEED, and
+	// a malformed or out-of-range value would index DungeonSeeds/_pLvlVisited out of bounds.
+	depth = ClampRunDepth(depth);
 	RunDepth = depth;
 	DungeonSeeds[depth] = seed;
 	LevelSeeds[depth] = std::nullopt;
@@ -3200,10 +3225,7 @@ void PrimeScrollRun(int level)
 	// new seed (new layout) and clear its cached state, without teleporting. The
 	// player enters by stepping into the portal; the dungeon then persists (resume)
 	// until the portal is replaced or closed.
-	if (level < 1)
-		level = 1;
-	if (level > MaxRunDepth)
-		level = MaxRunDepth;
+	level = ClampRunDepth(level);
 	RunBossDefeated = false;
 	const uint32_t seed = GenerateSeed();
 	ApplyRunSeed(level, seed); // sets DungeonSeeds/LevelSeeds/_pLvlVisited + RunDepth
@@ -3218,10 +3240,7 @@ void EnterScrollRun(int level)
 {
 	// [RUNS MOD] Step into the scroll portal: enter the run level WITHOUT reseeding,
 	// so re-entering resumes the same dungeon while the portal stays open.
-	if (level < 1)
-		level = 1;
-	if (level > MaxRunDepth)
-		level = MaxRunDepth;
+	level = ClampRunDepth(level);
 	RunDepth = level;
 	SuppressRunReseed = true;
 	StartNewLvl(*MyPlayer, WM_DIABNEXTLVL, level);

@@ -631,18 +631,25 @@ tl::expected<void, std::string> PlaceQuestMonsters()
 
 		if (currlevel == 24) {
 			UberDiabloMonsterIndex = -1;
-			const size_t typeIndex = GetMonsterTypeIndex(MT_NAKRUL);
-			if (typeIndex < LevelMonsterTypeCount) {
-				for (size_t i = 0; i < ActiveMonsterCount; i++) {
-					const Monster &monster = Monsters[i];
-					if (monster.isUnique() || monster.levelType == typeIndex) {
-						UberDiabloMonsterIndex = static_cast<int>(i);
-						break;
+			// [RUNS MOD] Na-Krul is quest content, and quests are disabled in run mode.
+			// Worse, the scan below claims the first *unique* monster it finds -- which is
+			// the run boss, placed above -- so the crypt lever's WeakenNaKrul would halve
+			// the run boss's HP and strip its resistances. Leaving the index at -1 makes
+			// WeakenNaKrul a no-op.
+			if (!RunsModEnabled) {
+				const size_t typeIndex = GetMonsterTypeIndex(MT_NAKRUL);
+				if (typeIndex < LevelMonsterTypeCount) {
+					for (size_t i = 0; i < ActiveMonsterCount; i++) {
+						const Monster &monster = Monsters[i];
+						if (monster.isUnique() || monster.levelType == typeIndex) {
+							UberDiabloMonsterIndex = static_cast<int>(i);
+							break;
+						}
 					}
 				}
+				if (UberDiabloMonsterIndex == -1)
+					RETURN_IF_ERROR(PlaceUniqueMonst(UniqueMonsterType::NaKrul, 0, 0));
 			}
-			if (UberDiabloMonsterIndex == -1)
-				RETURN_IF_ERROR(PlaceUniqueMonst(UniqueMonsterType::NaKrul, 0, 0));
 		}
 	} else if (setlvlnum == SL_SKELKING) {
 		RETURN_IF_ERROR(PlaceUniqueMonst(UniqueMonsterType::SkeletonKing, 0, 0));
@@ -3492,11 +3499,15 @@ tl::expected<void, std::string> GetLevelMTypes()
 		RETURN_IF_ERROR(AddMonsterType(MT_HORKSPWN, PLACE_SCATTER));
 		RETURN_IF_ERROR(AddMonsterType(MT_HORKDMN, PLACE_UNIQUE));
 	}
-	if (currlevel == 20)
+	// [RUNS MOD] The Defiler and Na-Krul are quest bosses; run mode disables quests and
+	// supplies its own boss, so don't burn a monster-type slot (and its image budget) on
+	// them. The Arch-Lich is ordinary scatter population and stays for variety.
+	if (currlevel == 20 && !RunsModEnabled)
 		RETURN_IF_ERROR(AddMonsterType(MT_DEFILER, PLACE_UNIQUE));
 	if (currlevel == 24) {
 		RETURN_IF_ERROR(AddMonsterType(MT_ARCHLICH, PLACE_SCATTER));
-		RETURN_IF_ERROR(AddMonsterType(MT_NAKRUL, PLACE_SPECIAL));
+		if (!RunsModEnabled)
+			RETURN_IF_ERROR(AddMonsterType(MT_NAKRUL, PLACE_SPECIAL));
 	}
 
 	if (!setlevel) {
@@ -4062,10 +4073,15 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 		// [RUNS MOD] Completing a dungeon restocks the Dungeon Merchant on the next
 		// hub visit.
 		DungeonVendorRestockPending = true;
-		// [RUNS MOD] Clearing the DEEPEST level's boss unlocks the next difficulty tier
+		// [RUNS MOD] Clearing the boss at the unlock depth opens the next difficulty tier
 		// (Normal -> Nightmare -> Hell), tracked per character in pDiabloKillLevel (stored
 		// as clearedDifficulty + 1, matching vanilla's Diablo-kill difficulty gate).
-		if (currlevel >= MaxRunDepth) {
+		//
+		// Deliberately DifficultyUnlockDepth (15) rather than the Hellfire cap (24): the
+		// tier pacing was tuned against a 15-level ladder, and tying it to the cap would
+		// silently make Nightmare nine levels harder to reach. The Nest and Crypt are extra
+		// depth within a tier instead. Move this to GetMaxRunDepth() to change that.
+		if (currlevel >= DifficultyUnlockDepth) {
 			Player &mp = *MyPlayer;
 			const auto cleared = static_cast<uint8_t>(sgGameInitInfo.nDifficulty + 1);
 			if (mp.pDiabloKillLevel < cleared) {
@@ -4089,9 +4105,9 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 		const int maxUnlocked = std::min<int>(MyPlayer->pDiabloKillLevel, DIFF_HELL);
 		const int dropDiff = (runDiff < maxUnlocked && GenerateRnd(100) < 20) ? runDiff + 1 : runDiff;
 		if (isRunBoss) {
-			DropDungeonScroll(std::clamp(static_cast<int>(currlevel) + 1, 1, MaxRunDepth), monster.position.tile, dropDiff, true);
+			DropDungeonScroll(NextRunDepth(static_cast<int>(currlevel)), monster.position.tile, dropDiff, true);
 		} else if (GenerateRnd(100) < 3) {
-			DropDungeonScroll(std::clamp(static_cast<int>(currlevel), 1, MaxRunDepth), monster.position.tile, dropDiff, true);
+			DropDungeonScroll(ClampRunDepth(static_cast<int>(currlevel)), monster.position.tile, dropDiff, true);
 		}
 	}
 

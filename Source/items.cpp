@@ -4685,15 +4685,18 @@ void SpawnDungeonVendor(int charLevel)
 	DungeonVendorItems.clear();
 	if (!RunsModEnabled)
 		return;
-	const int base = std::clamp((charLevel + 1) / 2, 1, MaxRunDepth);
+	const int base = std::clamp((charLevel + 1) / 2, 1, GetMaxRunDepth());
 	// Start one below the character's level, but keep the top of the range within the
 	// depth cap so all four levels stay distinct.
-	const int lowest = std::clamp(base - 1, 1, MaxRunDepth - 3);
+	int level = ClampRunDepth(std::clamp(base - 1, 1, GetMaxRunDepth() - 3));
 	for (int i = 0; i < 4; i++) {
 		Item scroll = {};
-		CreateDungeonScroll(scroll, lowest + i);
+		CreateDungeonScroll(scroll, level);
 		scroll._iStatFlag = true;
 		DungeonVendorItems.push_back(scroll);
+		// Step with NextRunDepth rather than lowest+i so the range steps over the arena
+		// instead of stocking a scroll for a level that cannot be entered.
+		level = NextRunDepth(level);
 	}
 }
 
