@@ -20,5 +20,14 @@ if (-not (Test-Path "$exeDir\assets\ui_art\diablo.pal")) {
     Copy-Item -Recurse -Force "$root\build\assets" "$exeDir\assets"
 }
 
+# Mod data is looked up under <BasePath>\mods\<name>\, and passing --data-dir makes
+# BasePath the *data dir*, not the exe dir. So mods must sit next to the MPQs -- which is
+# also exactly the layout a Switch user ends up with (mods\ beside the .nro). Without
+# this the Hellfire mod never loads and hellfire.mpq alone does nothing.
+if (-not (Test-Path "$DataDir\mods\Hellfire\lua\mods\Hellfire\init.lua")) {
+    Write-Host "==> Copying mod data into the data dir..." -ForegroundColor Cyan
+    Copy-Item -Recurse -Force "$root\build\mods" "$DataDir\mods"
+}
+
 Write-Host "==> Launching DevilutionX (data: $DataDir)" -ForegroundColor Green
 Start-Process -FilePath $exe -ArgumentList '--data-dir', $DataDir -WorkingDirectory $exeDir
