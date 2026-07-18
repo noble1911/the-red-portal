@@ -524,10 +524,17 @@ void PressKey(SDL_Keycode vkey, uint16_t modState)
 	if (MyPlayerIsDead) {
 		if (vkey == SDLK_ESCAPE) {
 			if (!gbIsMultiplayer) {
-				if (gbValidSaveFile)
+				if (RunsModEnabled) {
+					// [RUNS MOD] Extraction death is survivable: the corpse (and
+					// everything it dropped) stays in the run, and the player wakes
+					// in the hub -- same flow multiplayer gets via CMD_RETOWN.
+					MyPlayerIsDead = false;
+					RestartTownLvl(*MyPlayer);
+				} else if (gbValidSaveFile) {
 					gamemenu_load_game(false);
-				else
+				} else {
 					gamemenu_exit_game(false);
+				}
 			} else {
 				NetSendCmd(true, CMD_RETOWN);
 			}

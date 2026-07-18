@@ -83,14 +83,19 @@ The loop is not a roguelike (no permadeath, persistent character/stash/economy) 
 leave with what you can carry. Design principle: **a run is a heist to survive, not a
 level to clear** — the tension lives at the exit. Planned slices, in order:
 
-**E1 — Unsecured loot + the extraction sack** (first slice; mostly reuses shipped systems)
-- Loot picked up during a run is *unsecured*: die and it drops with your corpse, and if
-  the portal closes or reseeds it is gone for good. Gear brought into the run stays
-  yours — death stings but never bricks the character.
-- The extended inventory rows ARE the extraction sack: run loot auto-flows into the
-  extra rows, and those rows are what death forfeits. Pack growth from boss kills then
-  reads as "you can risk carrying more." (Tag candidates: an "acquired this run" bit;
-  `_iCreateInfo` already round-trips flags recreation-safely.)
+**E1 — Extraction death** ✅ shipped 2026-07-18 (design revised at sign-off: full
+Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
+- Dying in a run drops EVERYTHING at the corpse: equipped gear (vanilla), plus the
+  whole backpack and belt (new, run-mode only), plus half your gold (vanilla rule;
+  the retained half stays retained — gold stacks are excluded from the backpack drop).
+- Death is survivable: SP now respawns in the hub exactly like MP (Esc), instead of
+  game-over/reload; the outcome is force-saved on town arrival so a reload cannot
+  undo the loss (SP never autosaved on level change).
+- Corpse runs: the drops lie in the run, which persists behind the portal — go back
+  in to recover them; when the portal closes or reseeds they are gone for good.
+- Impl: `StartPlayerKill` dropItems branch (player.cpp), SP Esc handler (diablo.cpp),
+  WM_DIABRETOWN SaveGame (interfac.cpp). Level item cap (MAXITEMS) overflow silently
+  discards excess drops — accepted.
 
 **E2 — Push-your-luck clock**
 - A reason to leave before the level is vacuumed: escalating respawns the longer you
@@ -111,9 +116,12 @@ level to clear** — the tension lives at the exit. Planned slices, in order:
   (scroll-defined depth superseded it).
 
 **E4 — Death economy tuning**
-- Unsecured-loot loss (+ maybe gold fee / durability hit) is the target severity; full
-  loss would fight Diablo's gear treadmill. Optional "hardcore" scroll affix for the
-  knife-edge crowd.
+- E1 shipped the harsh end (full drop). If playtesting shows it is too brutal for
+  fresh level-1 characters (who already need several sorties per boss), the levers
+  are: a small "secure container" (a few slots whose contents survive death,
+  Tarkov-style — could reuse the per-item-tag design that was considered and
+  dropped for E1), belt-as-safe-pocket, or an insurance fee at a vendor. Optional
+  "hardcore" scroll affix stays an idea for the knife-edge crowd.
 
 **Feature ideas (next slices)**
 - [ ] **Scroll modifier expansion** (PoE-map direction): more affix variety — pack

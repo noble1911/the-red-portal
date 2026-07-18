@@ -2780,6 +2780,35 @@ StartPlayerKill(Player &player, DeathReason deathReason)
 					DeadItem(player, item.pop(), Displacement(pdd));
 				}
 
+				// [RUNS MOD] Extraction death: everything carried drops with the corpse,
+				// not just worn gear -- backpack and belt included. Gold stays excluded:
+				// DropHalfPlayersGold above dropped half, and the retained half must
+				// remain retained. The drops are recoverable by re-entering the still-
+				// open portal, and lost for good once it closes or reseeds.
+				// RemoveInvItem/RemoveSpdBarItem broadcast each removal for co-op, and
+				// DeadItem broadcasts each spawn; past the level item cap (MAXITEMS)
+				// RespawnDeadItem silently discards -- accepted for a full pack on a
+				// littered floor.
+				if (RunsModEnabled && leveltype != DTYPE_TOWN) {
+					for (int i = player._pNumInv - 1; i >= 0; i--) {
+						Item &item = player.InvList[i];
+						if (item.isEmpty() || item._itype == ItemType::Gold)
+							continue;
+						Item drop = item;
+						player.RemoveInvItem(i, false);
+						pdd = Left(pdd);
+						DeadItem(player, std::move(drop), Displacement(pdd));
+					}
+					for (int i = 0; i < MaxBeltItems; i++) {
+						if (player.SpdList[i].isEmpty())
+							continue;
+						Item drop = player.SpdList[i];
+						player.RemoveSpdBarItem(i);
+						pdd = Left(pdd);
+						DeadItem(player, std::move(drop), Displacement(pdd));
+					}
+				}
+
 				CalcPlrInv(player, false);
 			}
 		}

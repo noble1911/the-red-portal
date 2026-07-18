@@ -39,6 +39,7 @@
 #include "multi.h"
 #include "pfile.h"
 #include "plrmsg.h"
+#include "runs_mod.h"
 #include "utils/log.hpp"
 #include "utils/sdl_compat.h"
 #include "utils/sdl_geometry.h"
@@ -462,6 +463,12 @@ void DoLoad(interface_mode uMsg)
 		IncProgress();
 		loadResult = LoadGameLevel(false, ENTRY_MAIN);
 		if (loadResult.has_value()) IncProgress();
+		// [RUNS MOD] RETOWN in single player is the death respawn. Persist the outcome
+		// (dropped gear, halved gold, hub position) immediately: SP never autosaves on
+		// level change, and without this a reload of the pre-death save would undo the
+		// extraction loss.
+		if (RunsModEnabled && !gbIsMultiplayer && loadResult.has_value())
+			SaveGame();
 		break;
 	default:
 		loadResult = tl::make_unexpected<std::string>("Unknown progress mode");
