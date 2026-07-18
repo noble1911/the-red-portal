@@ -78,6 +78,14 @@ void InitNoTriggers()
 
 bool IsWarpOpen(dungeon_type type)
 {
+	// [RUNS MOD] Runs are entered only via dungeon-scroll portals, so the vanilla town
+	// warps stay shut -- they would drop the player straight into a non-run dungeon level
+	// and bypass the loop. This is not reachable-by-accident only: multiplayer opens every
+	// warp below regardless of progress, and the Crypt warp tile (36,24) lands inside the
+	// hub crop, while Hellfire opens Catacombs/Caves/Hell on character level alone.
+	if (RunsModEnabled)
+		return false;
+
 	if (gbIsSpawn)
 		return false;
 
