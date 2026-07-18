@@ -331,14 +331,16 @@ void DrawBag(const Surface &out)
 	constexpr Displacement offset { 0, INV_SLOT_SIZE_PX - 1 };
 	for (auto slot : BagGridRange) {
 		const BagStruct::BagCell itemId = Bag.GetItemIdAtPosition(slot);
-		if (itemId == BagStruct::EmptyCell)
+		if (itemId == BagStruct::EmptyCell || Bag.items[itemId].isEmpty())
 			continue;
 		const Item &item = Bag.items[itemId];
 		InvDrawSlotBack(out, GetBagSlotCoord(slot) + offset, InventorySlotSizeInPixels, item._iMagical);
 	}
 	for (auto slot : BagGridRange) {
 		const BagStruct::BagCell itemId = Bag.GetItemIdAtPosition(slot);
-		if (itemId == BagStruct::EmptyCell)
+		// [RUNS MOD] Skip cleared items too: CheckBagHLight already refuses to pick them up,
+		// so drawing them would put an un-grabbable garbage sprite on the grid.
+		if (itemId == BagStruct::EmptyCell || Bag.items[itemId].isEmpty())
 			continue;
 		const Item &item = Bag.items[itemId];
 		if (item.position != slot)

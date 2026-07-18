@@ -28,6 +28,7 @@
 #include <fmt/core.h>
 
 #include "DiabloUI/ui_flags.hpp"
+#include "bag.h"
 #include "control/control.hpp"
 #include "controls/control_mode.hpp"
 #include "controls/controller_buttons.h"
@@ -2966,6 +2967,11 @@ void CalcPlrInv(Player &player, bool loadgfx)
 		if (IsStashOpen) {
 			// If stash is open, ensure the items are displayed correctly
 			Stash.RefreshItemStatFlags();
+		}
+		if (IsBagOpen) {
+			// [RUNS MOD] Same for the carried bag, otherwise its usable/unusable item
+			// colouring goes stale after a level-up or an equipment change.
+			Bag.RefreshItemStatFlags();
 		}
 		if (!player.HoldItem.isEmpty())
 			player.HoldItem.updateRequiredStatsCacheForPlayer(player);

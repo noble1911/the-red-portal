@@ -2707,6 +2707,43 @@ void SaveHeroItems(SaveWriter &saveWriter, Player &player)
 // (single page, no gold). Version byte lets the format evolve.
 constexpr uint8_t BagVersion = 0;
 
+/**
+ * @brief [RUNS MOD] Drops bag items that validation cleared and frees the grid cells they
+ * held, remapping the surviving items' ids.
+ *
+ * LoadAndValidateItemData clears an item it cannot make sense of -- most often a
+ * Hellfire-only item loaded into a Diablo game. Without this, the grid still points at the
+ * cleared entry: those cells stay occupied forever (CheckBagHLight refuses to pick an empty
+ * item up) and render a garbage sprite. Also drops cells whose id is out of range, so a
+ * truncated or corrupt grid cannot index past the item list.
+ */
+void PurgeInvalidBagItems()
+{
+	std::vector<uint16_t> remap(Bag.items.size());
+	uint16_t kept = 0;
+	for (size_t i = 0; i < Bag.items.size(); i++)
+		remap[i] = Bag.items[i].isEmpty() ? BagStruct::EmptyCell : kept++;
+
+	if (kept != Bag.items.size()) {
+		std::vector<Item> compacted;
+		compacted.reserve(kept);
+		for (Item &item : Bag.items)
+			if (!item.isEmpty())
+				compacted.push_back(item);
+		Bag.items = std::move(compacted);
+	}
+
+	for (auto &col : Bag.grid) {
+		for (uint16_t &cell : col) {
+			if (cell == 0)
+				continue;
+			const uint16_t oldId = cell - 1;
+			const uint16_t newId = oldId < remap.size() ? remap[oldId] : BagStruct::EmptyCell;
+			cell = newId == BagStruct::EmptyCell ? 0 : static_cast<uint16_t>(newId + 1);
+		}
+	}
+}
+
 void LoadBag()
 {
 	Bag.clear();
@@ -2725,6 +2762,7 @@ void LoadBag()
 		for (uint16_t &cell : col)
 			cell = file.NextLE<uint16_t>();
 	gbIsHellfireSaveGame = gbIsHellfire;
+	PurgeInvalidBagItems();
 	Bag.RefreshItemStatFlags();
 }
 
