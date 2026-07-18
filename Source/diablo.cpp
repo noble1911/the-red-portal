@@ -3180,13 +3180,6 @@ int NextRunDepth(int depth)
 	return ClampRunDepth(depth + 1);
 }
 
-void AdvanceRunDepth()
-{
-	// [RUNS MOD] Each run goes one level deeper (engine difficulty + loot scale
-	// with dungeon level), skipping the arena and stopping at the cap.
-	RunDepth = NextRunDepth(RunDepth);
-}
-
 void ApplyRunSeed(int depth, uint32_t seed)
 {
 	// [RUNS MOD] A new seed gives the run level a different layout; clearing the

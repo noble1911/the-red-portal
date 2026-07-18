@@ -1073,8 +1073,15 @@ int CraftGoldCost(const Item &scroll)
 {
 	const int level = std::max(1, DungeonScrollLevel(scroll));
 	switch (CraftOp) {
-	case ScrollCraftOp::Upgrade:
-		return level * 150;
+	case ScrollCraftOp::Upgrade: {
+		// [RUNS MOD] Upgrading is the ghost-run path to depth (farm wealth, buy your
+		// way deeper without ever facing a boss), so it must be a REAL gold sink:
+		// quadratic in the target level. L1->2 costs 400, L4->5 2,500, L9->10 10,000,
+		// L14->15 22,500 -- affordable early, a serious investment at depth, and
+		// always pricier than just beating the boss for the free next-depth scroll.
+		const int target = level + 1;
+		return target * target * 100;
+	}
 	case ScrollCraftOp::AddMod:
 		return level * 200;
 	case ScrollCraftOp::Reroll:

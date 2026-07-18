@@ -112,17 +112,22 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   CloseDungeonPortal on countdown expiry per client. Full co-op verification folds
   into the existing deferred 2-client test.
 
-**E3 — Boss-optional runs**
-- Skipping the boss becomes a strategy, not a failure: the level holds extractable loot,
-  but the boss guards the scroll drop and a bonus vault. "Loot two rooms and ghost out"
-  vs "commit with half my potions gone" is a real decision.
-- Playtest data point (2026-07-18): a fresh level-1 character with no gear needs
-  *several* portal runs before the level-1 boss is beatable (even after the earlier
-  early-boss easing). Boss-less farming runs are ALREADY the de-facto early loop —
-  E3 makes that intentional and rewarding instead of feeling like failed attempts, and
-  E4 must keep those first gear-up sorties cheap to lose.
-- Cleanup while here: retire the vestigial RunBossDefeated -> AdvanceRunDepth() path
-  (scroll-defined depth superseded it).
+**E3 — Boss-optional runs** ✅ shipped 2026-07-18
+- The incentive split is now intentional: **ghost = wealth, boss = progression +
+  jackpot**. Boss death drops the VAULT on top of its normal unique item + next-depth
+  scroll: 2 + depth/5 good-quality items and 2 + depth/10 gold piles (2 items + 2
+  gold at depth 1 → 5 items + 3 gold at 15), delta-persisted so the pile survives
+  exit/re-entry during the collapse window.
+- Ghost-run economy deliberately unchanged: trash scrolls stay 3%/same-depth; the
+  vendor's **Upgrade craft is the ghost path to depth** and was repriced as a real
+  gold sink — quadratic in target level (L1→2: 400g … L14→15: 22,500g), so buying
+  depth is always pricier than beating the boss for the free scroll.
+- Vestigial `AdvanceRunDepth` retired (depth is scroll-defined; boss rewards all fire
+  at kill time). A physical vault room was rejected: theme rooms don't generate on
+  Nest/Crypt/many layouts.
+- Playtest context kept: fresh level-1 characters need several ghost sorties before
+  the first boss — that loop is now the intended one, and E4 must keep it cheap to
+  lose.
 
 **E4 — Death economy tuning**
 - E1 shipped the harsh end (full drop). If playtesting shows it is too brutal for

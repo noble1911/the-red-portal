@@ -4199,6 +4199,17 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 		const int dropDiff = (runDiff < maxUnlocked && GenerateRnd(100) < 20) ? runDiff + 1 : runDiff;
 		if (isRunBoss) {
 			DropDungeonScroll(NextRunDepth(static_cast<int>(currlevel)), monster.position.tile, dropDiff, true);
+			// [RUNS MOD] The boss guards the VAULT: a loot shower on top of the normal
+			// unique drop, scaling with depth -- ghost runs farm the floor, but the boss
+			// is the jackpot. Broadcast per item (CMD_DROPITEM) and delta-persisted so
+			// the pile survives exit/re-entry during the collapse window. Gold piles
+			// inherit the Avaricious gold scaling via the GetItemAttrs hook.
+			const int vaultItems = 2 + static_cast<int>(currlevel) / 5;
+			const int goldPiles = 2 + static_cast<int>(currlevel) / 10;
+			for (int i = 0; i < vaultItems; i++)
+				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/true, /*delta=*/true);
+			for (int i = 0; i < goldPiles; i++)
+				CreateTypeItem(monster.position.tile, /*onlygood=*/false, ItemType::Gold, IMISC_NONE, /*sendmsg=*/true, /*delta=*/true);
 		} else if (GenerateRnd(100) < 3) {
 			DropDungeonScroll(ClampRunDepth(static_cast<int>(currlevel)), monster.position.tile, dropDiff, true);
 		}

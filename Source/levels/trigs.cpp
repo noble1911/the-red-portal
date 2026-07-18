@@ -913,12 +913,11 @@ void CheckTriggers()
 			break;
 		case WM_DIABPREVLVL:
 			if (RunsModEnabled) {
-				// [RUNS MOD] The run's up-stairs return to the hub. The next run
-				// goes deeper only if you beat this run's boss. Route via TWARPUP
-				// because PREVLVL only does currlevel-- and can't jump to town.
+				// [RUNS MOD] The run's up-stairs return to the hub. Depth is defined
+				// entirely by the scroll opening the next portal; boss rewards all
+				// fire at kill time. Route via TWARPUP because PREVLVL only does
+				// currlevel-- and can't jump to town.
 				TWarpFrom = currlevel;
-				if (RunBossDefeated)
-					AdvanceRunDepth();
 				StartNewLvl(myPlayer, WM_DIABTWARPUP, 0);
 			} else {
 				StartNewLvl(myPlayer, trigs[i]._tmsg, currlevel - 1);
@@ -964,8 +963,6 @@ void CheckTriggers()
 			break;
 		case WM_DIABTWARPUP:
 			TWarpFrom = currlevel;
-			if (RunsModEnabled && RunBossDefeated) // [RUNS MOD] only advance if the run was beaten
-				AdvanceRunDepth();
 			StartNewLvl(myPlayer, trigs[i]._tmsg, 0);
 			break;
 		default:

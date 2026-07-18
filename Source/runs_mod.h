@@ -94,10 +94,6 @@ extern bool RunBossDefeated;
 // first hub visit. Defined in diablo.cpp.
 extern bool DungeonVendorRestockPending;
 
-// Advance to the next (deeper) run. Called on return to the hub only when the
-// run's boss was defeated.
-void AdvanceRunDepth();
-
 // Prepare a fresh run at `level` for a dungeon-scroll portal: reseed that level
 // (new layout) and prime it, WITHOUT teleporting. Called when the scroll is used.
 // Defined in diablo.cpp.
