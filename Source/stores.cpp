@@ -1204,7 +1204,7 @@ void ResolveGamble()
 				GamblerJackpot.clear();
 				DropPrizeItem(prize, myPlayer.position.tile);
 				GambleWon = true;
-				GambleResultLine = fmt::format(fmt::runtime(_("JACKPOT! {:s} is yours!")), prize.getName());
+				GambleResultLine = fmt::format(fmt::runtime(_("JACKPOT! {:s} is yours!")), prize.getName().str());
 			} else {
 				// The displayed prize was already claimed; crowns still pay big gold.
 				AwardGambleGold(stake * 10);
