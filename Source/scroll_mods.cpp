@@ -66,7 +66,14 @@ enum class Effect : uint8_t {
 	MonsterHp,
 	BossHp,
 	MonsterDmg,
-	Collapse, // [RUNS MOD] the push-your-luck clock runs this much faster
+	Collapse,    // [RUNS MOD] the push-your-luck clock runs this much faster
+	MonsterPack, // more monsters are placed on the level
+	Champions,   // this % of monsters are champions (tough, guaranteed drop)
+	MonsterSpeed, // monsters animate (walk/attack) faster
+	ElemResist,  // this % of monsters resist fire & lightning
+	Chests,      // extra random chests
+	Shrines,     // extra random shrines
+	TwinBoss,    // a second run boss spawns (its own vault + scroll)
 };
 
 struct AffixData {
@@ -82,7 +89,7 @@ struct AffixData {
 };
 
 // Indexed by ScrollAffix. Each affix is a boon paired with an offsetting bane.
-constexpr std::array<AffixData, 6> Affixes = { {
+constexpr std::array<AffixData, 13> Affixes = { {
     // Avaricious: +gold / monsters have more life
     { "Avaricious", Effect::GoldFind, 40, 70, 3, Effect::MonsterHp, 15, 30, 2 },
     // Enchanted: +magic find / boss has more life & damage
@@ -95,7 +102,42 @@ constexpr std::array<AffixData, 6> Affixes = { {
     { "Savage", Effect::GoldFind, 30, 55, 3, Effect::MonsterDmg, 20, 40, 3 },
     // Volatile: big +item drops / the run clock (grace, waves, collapse) runs faster
     { "Volatile", Effect::ItemQuantity, 40, 80, 4, Effect::Collapse, 30, 60, 2 },
+    // Teeming: +experience / the dungeon holds more monsters
+    { "Teeming", Effect::Experience, 25, 45, 3, Effect::MonsterPack, 30, 60, 3 },
+    // Tyrannical: +magic find / part of the population are champions
+    { "Tyrannical", Effect::MagicFind, 15, 30, 2, Effect::Champions, 10, 20, 1 },
+    // Frenzied: +gold / monsters act faster
+    { "Frenzied", Effect::GoldFind, 35, 60, 3, Effect::MonsterSpeed, 15, 30, 1 },
+    // Hexbound: +magic find / part of the population resists fire & lightning
+    { "Hexbound", Effect::MagicFind, 18, 35, 2, Effect::ElemResist, 35, 65, 2 },
+    // Gilded: extra chests / monsters deal more damage (the treasure is guarded)
+    { "Gilded", Effect::Chests, 40, 80, 4, Effect::MonsterDmg, 15, 30, 2 },
+    // Hallowed: extra shrines / monsters have more life
+    { "Hallowed", Effect::Shrines, 50, 100, 4, Effect::MonsterHp, 20, 40, 2 },
+    // Twinned: a second boss and its whole jackpot / both bosses are tougher.
+    // The boon pct is unused (presence is the boon); the bane pct feeds BossHp.
+    { "Twinned", Effect::TwinBoss, 0, 0, 0, Effect::BossHp, 20, 40, 3 },
 } };
+
+/** Magnitude multiplier (percent) per tier: tier 2/3 rolls run hotter on BOTH sides. */
+constexpr int TierScalePct[3] = { 100, 150, 220 };
+
+/** [RUNS MOD] Tyrannical champion stat boosts (on top of the scroll's flat mods). */
+constexpr int ChampionHpBonusPct = 150;
+constexpr int ChampionDmgBonusPct = 40;
+
+/** Stream salts so the champion and elemental per-monster rolls are independent. */
+constexpr uint32_t ChampionSalt = 0xC4A1101u;
+constexpr uint32_t ElemResistSalt = 0xE1E4E57u;
+
+/** Deterministic per-monster roll in [0,100) for population effects: derived from the
+ * synced portal seed and the monster's id, so every client (and any later recompute,
+ * e.g. the champion death payout) gets the same answer with no stored state. */
+int PerMonsterRoll(unsigned monsterId, uint32_t salt)
+{
+	ModRng rng(DungeonPortalSeed ^ salt ^ (static_cast<uint32_t>(monsterId) * 0x9E3779B9u));
+	return rng.range(0, 99);
+}
 
 const AffixData &DataFor(ScrollAffix affix)
 {
@@ -129,6 +171,27 @@ void ApplyEffect(RunModMultipliers &out, Effect effect, int pct)
 	case Effect::Collapse:
 		out.collapsePct += pct;
 		break;
+	case Effect::MonsterPack:
+		out.packPct += pct;
+		break;
+	case Effect::Champions:
+		out.championPct += pct;
+		break;
+	case Effect::MonsterSpeed:
+		out.speedPct += pct;
+		break;
+	case Effect::ElemResist:
+		out.elemResistPct += pct;
+		break;
+	case Effect::Chests:
+		out.chestsPct += pct;
+		break;
+	case Effect::Shrines:
+		out.shrinesPct += pct;
+		break;
+	case Effect::TwinBoss:
+		out.twinBoss = true;
+		break;
 	}
 }
 
@@ -153,6 +216,20 @@ std::string DescribeEffect(Effect effect, int pct, bool full)
 		return fmt::format(fmt::runtime(full ? _("monsters +{:d}% damage") : _("mob dmg +{:d}%")), pct);
 	case Effect::Collapse:
 		return fmt::format(fmt::runtime(full ? _("the dungeon destabilizes {:d}% faster") : _("clock +{:d}%")), pct);
+	case Effect::MonsterPack:
+		return fmt::format(fmt::runtime(full ? _("the dungeon teems with {:d}% more monsters") : _("mobs +{:d}%")), pct);
+	case Effect::Champions:
+		return fmt::format(fmt::runtime(full ? _("{:d}% of monsters are champions") : _("champs {:d}%")), pct);
+	case Effect::MonsterSpeed:
+		return fmt::format(fmt::runtime(full ? _("monsters are {:d}% faster") : _("mob spd +{:d}%")), pct);
+	case Effect::ElemResist:
+		return fmt::format(fmt::runtime(full ? _("{:d}% of monsters resist fire and lightning") : _("warded {:d}%")), pct);
+	case Effect::Chests:
+		return fmt::format(fmt::runtime(full ? _("+{:d}% chests") : _("+{:d}% chests")), pct);
+	case Effect::Shrines:
+		return fmt::format(fmt::runtime(full ? _("+{:d}% shrines") : _("+{:d}% shrines")), pct);
+	case Effect::TwinBoss:
+		return std::string(full ? _("the boss is twinned (a second vault awaits)") : _("twin boss"));
 	}
 	return {};
 }
@@ -197,6 +274,13 @@ ScrollModSet RollScrollMods(uint32_t seed, int level, int count)
 		mod.affix = affix;
 		mod.boonPct = rng.range(data.boonLo, data.boonHi) + data.boonPerLevel * (level - 1);
 		mod.banePct = rng.range(data.baneLo, data.baneHi) + data.banePerLevel * (level - 1);
+		// Tier scales BOTH sides (bigger reward, bigger risk). Rolled per pick, after
+		// the magnitudes, so lower-count prefixes stay stable for the Add-modifier craft.
+		const int tierRoll = rng.range(0, 99);
+		mod.tier = tierRoll < 60 ? 1 : (tierRoll < 90 ? 2 : 3);
+		const int tierPct = TierScalePct[mod.tier - 1];
+		mod.boonPct = mod.boonPct * tierPct / 100;
+		mod.banePct = mod.banePct * tierPct / 100;
 	}
 	return set;
 }
@@ -204,11 +288,18 @@ ScrollModSet RollScrollMods(uint32_t seed, int level, int count)
 std::string DescribeScrollMod(const ScrollMod &mod, bool full)
 {
 	const AffixData &data = DataFor(mod.affix);
+	// Tier shows as a roman numeral on the name; tier 1 stays bare so common
+	// scrolls read like they always did.
+	std::string name(_(data.name));
+	if (mod.tier == 2)
+		name += " II";
+	else if (mod.tier == 3)
+		name += " III";
 	const std::string_view fmtStr = full
 	    ? _(/* TRANSLATORS: scroll modifier: "Name: +boon, but +bane" */ "{:s}: {:s}, but {:s}")
 	    : _(/* TRANSLATORS: scroll modifier: "Name: boon, bane" */ "{:s}: {:s}, {:s}");
 	return fmt::format(fmt::runtime(fmtStr),
-	    _(data.name), DescribeEffect(data.boon, mod.boonPct, full), DescribeEffect(data.bane, mod.banePct, full));
+	    name, DescribeEffect(data.boon, mod.boonPct, full), DescribeEffect(data.bane, mod.banePct, full));
 }
 
 RunModMultipliers AggregateRunMods(const ScrollModSet &set)
@@ -220,6 +311,12 @@ RunModMultipliers AggregateRunMods(const ScrollModSet &set)
 		ApplyEffect(out, data.bane, set.mods[i].banePct);
 	}
 	return out;
+}
+
+bool IsRunChampion(unsigned monsterId)
+{
+	return ActiveRunMods.championPct > 0
+	    && PerMonsterRoll(monsterId, ChampionSalt) < ActiveRunMods.championPct;
 }
 
 void RefreshActiveRunMods()
@@ -276,18 +373,31 @@ void ScaleRunMonsters()
 		}
 
 		// Regular monsters and any non-boss uniques: apply the scroll's flat modifiers.
-		if (ActiveRunMods.monsterHpPct != 0) {
-			monster.maxHitPoints = ApplyPct(monster.maxHitPoints, ActiveRunMods.monsterHpPct);
+		// [RUNS MOD] Tyrannical champions stack a big personal boost on top; the pick is
+		// re-derivable (IsRunChampion), so the death hook can pay out their loot without
+		// any stored state. HP/damage/resistance are all delta-saved fields, so buffs
+		// applied here survive save/resume (this only runs on fresh generation).
+		const bool champion = IsRunChampion(static_cast<unsigned>(monster.getId()));
+		const int hpPct = ActiveRunMods.monsterHpPct + (champion ? ChampionHpBonusPct : 0);
+		const int dmgPct = ActiveRunMods.monsterDmgPct + (champion ? ChampionDmgBonusPct : 0);
+		if (hpPct != 0) {
+			monster.maxHitPoints = ApplyPct(monster.maxHitPoints, hpPct);
 			monster.hitPoints = monster.maxHitPoints;
 		}
-		if (ActiveRunMods.monsterDmgPct != 0) {
-			const auto scaleDmg = [](uint8_t dmg) {
-				return static_cast<uint8_t>(std::min(ApplyPct(dmg, ActiveRunMods.monsterDmgPct), 255));
+		if (dmgPct != 0) {
+			const auto scaleDmg = [dmgPct](uint8_t dmg) {
+				return static_cast<uint8_t>(std::min(ApplyPct(dmg, dmgPct), 255));
 			};
 			monster.minDamage = scaleDmg(monster.minDamage);
 			monster.maxDamage = scaleDmg(monster.maxDamage);
 			monster.minDamageSpecial = scaleDmg(monster.minDamageSpecial);
 			monster.maxDamageSpecial = scaleDmg(monster.maxDamageSpecial);
+		}
+		// [RUNS MOD] Hexbound: part of the population gains fire+lightning resistance.
+		// Per-monster deterministic roll; `resistance` is a persisted field.
+		if (ActiveRunMods.elemResistPct > 0
+		    && PerMonsterRoll(static_cast<unsigned>(monster.getId()), ElemResistSalt) < ActiveRunMods.elemResistPct) {
+			monster.resistance |= RESIST_FIRE | RESIST_LIGHTNING;
 		}
 	}
 }

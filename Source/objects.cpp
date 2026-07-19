@@ -40,6 +40,7 @@
 #include "monster.h"
 #include "options.h"
 #include "qol/stash.h"
+#include "scroll_mods.h"
 #include "stores.h"
 #include "tables/objdat.h"
 #include "towners.h"
@@ -3968,6 +3969,26 @@ void InitObjects()
 			AddObjTraps();
 		if (IsAnyOf(leveltype, DTYPE_CATACOMBS, DTYPE_CAVES, DTYPE_HELL, DTYPE_NEST))
 			AddChestTraps();
+		// [RUNS MOD] Gilded / Hallowed boons: extra chests and shrines. Appended at the
+		// TAIL of the level-seed RNG stream so no vanilla placement shifts, and counts
+		// derive from ActiveRunMods (the synced portal scroll) so every co-op client
+		// generates identical objects. Baselines the pcts scale: ~15 random chests, 2
+		// shrines. AddObject rolls chest contents / the shrine effect itself.
+		if (ActiveRunMods.chestsPct > 0) {
+			const int extraChests = std::max(1, 15 * ActiveRunMods.chestsPct / 100);
+			for (int i = 0; i < extraChests; i++) {
+				const _object_id chestType = PickRandomlyAmong({ OBJ_CHEST1, OBJ_CHEST2, OBJ_CHEST3 });
+				if (std::optional<Point> position = GetRandomObjectPosition({ 1, 1 }))
+					AddObject(chestType, *position);
+			}
+		}
+		if (ActiveRunMods.shrinesPct > 0) {
+			const int extraShrines = std::max(1, 2 * ActiveRunMods.shrinesPct / 100);
+			for (int i = 0; i < extraShrines; i++) {
+				if (std::optional<Point> position = GetRandomObjectPosition({ 1, 1 }))
+					AddObject(FlipCoin() ? OBJ_SHRINEL : OBJ_SHRINER, *position);
+			}
+		}
 	}
 }
 

@@ -23,14 +23,26 @@ enum class ScrollAffix : uint8_t {
 	Erudite,     // +experience        / monsters have more life
 	Savage,      // +gold found        / monsters deal more damage
 	Volatile,    // +extra item drops  / the run clock ticks faster (see run_clock)
-	Last = Volatile,
+	// [RUNS MOD] Expansion wave (PoE-map direction): density/elite/speed/elemental/
+	// object banes and boons, plus the twinned boss.
+	Teeming,     // +experience        / the dungeon holds more monsters
+	Tyrannical,  // +magic find        / some monsters are champions (tough, drop loot)
+	Frenzied,    // +gold found        / monsters act faster
+	Hexbound,    // +magic find        / some monsters resist fire & lightning
+	Gilded,      // +chests spawn      / monsters deal more damage
+	Hallowed,    // +shrines spawn     / monsters have more life
+	Twinned,     // a second run boss (and its vault) / both bosses have more life
+	Last = Twinned,
 };
 
-/** One rolled modifier: an affix plus the magnitudes (percent) of its boon/bane. */
+/** One rolled modifier: an affix plus the magnitudes (percent) of its boon/bane.
+ * The tier (1-3, rolled rare-high) scales BOTH sides: a high-tier roll is a bigger
+ * reward and a bigger risk, giving crafting rerolls texture beyond the affix pick. */
 struct ScrollMod {
 	ScrollAffix affix;
 	int boonPct;
 	int banePct;
+	int tier;
 };
 
 constexpr int MaxScrollMods = 3;
@@ -67,14 +79,22 @@ std::string DescribeScrollMod(const ScrollMod &mod, bool full = false);
 
 /** The aggregate percentage effects a run applies while the scroll is active. */
 struct RunModMultipliers {
-	int monsterHpPct = 0;  // extra monster max HP
-	int bossHpPct = 0;     // extra boss HP (on top of monsterHpPct)
-	int monsterDmgPct = 0; // extra monster damage
-	int goldPct = 0;       // extra gold from piles
-	int itemQtyPct = 0;    // extra item-drop chance
-	int magicFindPct = 0;  // bias toward higher-quality items
-	int xpPct = 0;         // extra experience from kills
-	int collapsePct = 0;   // run clock compression: grace/waves/collapse all faster
+	int monsterHpPct = 0;   // extra monster max HP
+	int bossHpPct = 0;      // extra boss HP (on top of monsterHpPct)
+	int monsterDmgPct = 0;  // extra monster damage
+	int goldPct = 0;        // extra gold from piles
+	int itemQtyPct = 0;     // extra item-drop chance
+	int magicFindPct = 0;   // bias toward higher-quality items
+	int xpPct = 0;          // extra experience from kills
+	int collapsePct = 0;    // run clock compression: grace/waves/collapse all faster
+	// [RUNS MOD] Expansion wave:
+	int packPct = 0;        // extra monster placement budget (more packs on the level)
+	int championPct = 0;    // chance per monster to be a champion (tough, drops loot)
+	int speedPct = 0;       // monsters animate (walk/attack) this much faster
+	int elemResistPct = 0;  // chance per monster to gain fire+lightning resistance
+	int chestsPct = 0;      // extra random chests (relative to the vanilla baseline)
+	int shrinesPct = 0;     // extra random shrines (relative to a 2-shrine baseline)
+	bool twinBoss = false;  // a second run boss (and second vault) spawns
 };
 
 /** @brief Sums a modifier set into the aggregate run multipliers. */
@@ -94,6 +114,14 @@ void RefreshActiveRunMods();
  * (monster/boss HP and monster damage). Call once after InitMonsters().
  */
 void ScaleRunMonsters();
+
+/**
+ * @brief [RUNS MOD] Whether the Tyrannical bane made this monster a champion.
+ * Derived from the portal seed and the monster's id (no stored state), so the
+ * SAME answer is available at generation time (to buff it) and at death time
+ * (to drop its guaranteed loot), on every client and across save/resume.
+ */
+bool IsRunChampion(unsigned monsterId);
 
 /** @brief Applies a +pct multiplier to a value, guarding against overflow. */
 inline int ApplyPct(int value, int pct)

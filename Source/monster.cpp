@@ -625,6 +625,11 @@ tl::expected<void, std::string> PlaceQuestMonsters()
 		if (RunsModEnabled && currlevel >= 1) {
 			RunBossType = PickRunBoss(currlevel);
 			RETURN_IF_ERROR(PlaceUniqueMonst(RunBossType, 0, 0));
+			// [RUNS MOD] Twinned affix: a second copy of the SAME boss spawns elsewhere.
+			// Each twin pays its own vault + next-depth scroll on death; run progression
+			// fires only on the first kill (guarded in MonsterDeath).
+			if (ActiveRunMods.twinBoss)
+				RETURN_IF_ERROR(PlaceUniqueMonst(RunBossType, 0, 0));
 		}
 		if (Quests[Q_BUTCHER].IsAvailable()) {
 			RETURN_IF_ERROR(PlaceUniqueMonst(UniqueMonsterType::Butcher, 0, 0));
@@ -755,7 +760,14 @@ void DeleteMonster(size_t activeIndex)
 void NewMonsterAnim(Monster &monster, MonsterGraphic graphic, Direction md, AnimationDistributionFlags flags = AnimationDistributionFlags::None, int8_t numSkippedFrames = 0, int8_t distributeFramesBeforeFrame = 0)
 {
 	const auto &animData = monster.type().getAnimData(graphic);
-	monster.animInfo.setNewAnimation(animData.spritesForDirection(md), animData.frames, animData.rate, flags, numSkippedFrames, distributeFramesBeforeFrame);
+	// [RUNS MOD] Frenzied bane: monsters animate -- and therefore walk, attack and
+	// recover -- faster. Applied here (the funnel every action animation goes through)
+	// rather than at spawn, because each anim change re-reads the shared per-type rate.
+	// ActiveRunMods is identical on every client on the run level, so this stays in sync.
+	int8_t rate = animData.rate;
+	if (ActiveRunMods.speedPct > 0 && !monster.isPlayerMinion())
+		rate = std::max<int8_t>(1, static_cast<int8_t>(static_cast<int>(rate) * 100 / (100 + ActiveRunMods.speedPct)));
+	monster.animInfo.setNewAnimation(animData.spritesForDirection(md), animData.frames, rate, flags, numSkippedFrames, distributeFramesBeforeFrame);
 	monster.flags &= ~(MFLAG_LOCK_ANIMATION | MFLAG_ALLOW_SPECIAL);
 	monster.direction = md;
 }
@@ -3828,6 +3840,11 @@ tl::expected<void, std::string> InitMonsters()
 		size_t numplacemonsters = na / 30;
 		if (gbIsMultiplayer)
 			numplacemonsters += numplacemonsters / 2;
+		// [RUNS MOD] Teeming bane: grow the placement budget before the cap below so
+		// MaxMonsters still protects us. Driven by ActiveRunMods (derived from the
+		// synced portal scroll), so every client grows the count identically.
+		if (ActiveRunMods.packPct > 0)
+			numplacemonsters = static_cast<size_t>(ApplyPct(static_cast<int>(numplacemonsters), ActiveRunMods.packPct));
 		if (ActiveMonsterCount + numplacemonsters > MaxMonsters - 10)
 			numplacemonsters = MaxMonsters - 10 - ActiveMonsterCount;
 		totalmonsters = ActiveMonsterCount + numplacemonsters;
@@ -4157,6 +4174,10 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 	// beaten; only then does returning to the hub advance to a deeper run.
 	const bool isRunBoss = RunsModEnabled && monster.isUnique() && monster.uniqueType == RunBossType;
 	if (isRunBoss) {
+		// [RUNS MOD] With the Twinned affix BOTH bosses come through here: each pays its
+		// own vault below, and a twin's death re-arms the collapse window, but per-run
+		// progression (the inventory row) fires only on the first kill.
+		const bool firstRunBossKill = !RunBossDefeated;
 		RunBossDefeated = true;
 		// [RUNS MOD] The boss's death starts the collapse countdown (push-your-luck:
 		// finish looting and get out before the run seals).
@@ -4165,7 +4186,8 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 		// hub visit.
 		DungeonVendorRestockPending = true;
 		// [RUNS MOD] Deep-enough clears grow the extended inventory (each client its own).
-		TryUnlockInventoryRowForDepth(currlevel);
+		if (firstRunBossKill)
+			TryUnlockInventoryRowForDepth(currlevel);
 		// [RUNS MOD] Clearing the boss at the unlock depth opens the next difficulty tier
 		// (Normal -> Nightmare -> Hell), tracked per character in pDiabloKillLevel (stored
 		// as clearedDifficulty + 1, matching vanilla's Diablo-kill difficulty gate).
@@ -4210,8 +4232,13 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/true, /*delta=*/true);
 			for (int i = 0; i < goldPiles; i++)
 				CreateTypeItem(monster.position.tile, /*onlygood=*/false, ItemType::Gold, IMISC_NONE, /*sendmsg=*/true, /*delta=*/true);
-		} else if (GenerateRnd(100) < 3) {
-			DropDungeonScroll(ClampRunDepth(static_cast<int>(currlevel)), monster.position.tile, dropDiff, true);
+		} else {
+			// [RUNS MOD] Tyrannical champions always pay out: one good item at the
+			// corpse (the pick is re-derived, so no champion state is stored).
+			if (IsRunChampion(static_cast<unsigned>(monster.getId())))
+				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/true, /*delta=*/true);
+			if (GenerateRnd(100) < 3)
+				DropDungeonScroll(ClampRunDepth(static_cast<int>(currlevel)), monster.position.tile, dropDiff, true);
 		}
 	}
 

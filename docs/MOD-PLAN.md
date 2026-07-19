@@ -34,8 +34,12 @@ Last updated: **2026-07-18** (v0.3.0).
   the merchant). A starter scroll is granted only when the player has none anywhere and
   no portal is open.
 - **Modifiers**: 1-3 seeded affixes per scroll, each a boon paired with an offsetting
-  bane — Avaricious (gold), Enchanted (magic find), Bountiful (drops), Erudite (XP),
-  Savage (damage); magnitudes scale with scroll level.
+  bane, from a 13-affix pool — gold/magic-find/drops/XP boons vs monster stat banes
+  (Avaricious, Enchanted, Bountiful, Erudite, Savage, Volatile) plus the 2026-07-19
+  expansion wave: Teeming (density), Tyrannical (champions), Frenzied (speed), Hexbound
+  (elemental resists), Gilded (chests), Hallowed (shrines), Twinned (double boss). Each
+  roll has a tier (I-III, rare-high) scaling boon AND bane; magnitudes also scale with
+  scroll level.
 - **Bosses**: per-tileset pools (incl. six Nest/Crypt bosses), stats normalized to the
   run level so any boss is level-appropriate; boss kill gates progression, restocks the
   vendor, and (at the deepest level) unlocks the next difficulty tier.
@@ -69,6 +73,10 @@ Last updated: **2026-07-18** (v0.3.0).
 - [ ] Two-client co-op determinism test (the M3 make-or-break; needs 2 instances or
       2 consoles).
 - [ ] Crafting flow edge cases (slice 10 was never fully gameplay-tested).
+- [ ] Expansion affixes (2026-07-19): each of the 7 new affixes fires correctly
+      (density, champions, speed, resists, chests, shrines, twin boss), tier II/III
+      names + longer lines still fit the 288px compact info box, and champion drops
+      arrive in co-op.
 - [ ] Real-Switch hardware test (releases are only CI-verified).
 
 **Known gaps**
@@ -151,9 +159,24 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   container slots, belt-as-safe-pocket, "hardcore" scroll affix for the knife-edge
   crowd.
 
+**Scroll modifier expansion** ✅ shipped 2026-07-19 (PoE-map direction)
+- Affix pool doubled 6 → 13: **Teeming** (+XP / more monsters — scales the
+  `InitMonsters` placement budget before the MaxMonsters cap), **Tyrannical** (+magic
+  find / 10-20% of monsters are champions: +150% HP, +40% dmg, guaranteed good drop on
+  death), **Frenzied** (+gold / monsters act faster — anim rate scaled in
+  NewMonsterAnim, the funnel all action animations pass through), **Hexbound** (+magic
+  find / part of the population gains fire+lightning resistance — persisted per-monster
+  field), **Gilded** (+chests / monsters +dmg), **Hallowed** (+shrines / monsters
+  +life — both appended at the TAIL of InitObjects' seed stream so vanilla placement
+  is untouched), **Twinned** (a second run boss with its own vault + next-depth scroll /
+  both bosses tougher; per-run progression fires on first kill only).
+- **Affix tiers**: each rolled mod gets tier I/II/III (60/30/10), scaling BOTH boon and
+  bane (x1 / x1.5 / x2.2); II/III show as roman numerals on the name. Tier rolls after
+  the magnitudes per pick, so Add-modifier's prefix stability holds.
+- Champion/resist picks are derived from portal seed + monster id (`IsRunChampion`) —
+  no stored state, same answer at generation and death, on every client.
+- **Save note**: the roll stream changed (tier roll + larger pool), so scrolls saved
+  before this build silently re-roll their modifiers once. Accepted pre-1.0.
+
 **Feature ideas (next slices)**
-- [ ] **Scroll modifier expansion** (PoE-map direction): more affix variety — pack
-      density, extra elites, monster speed, elemental-heavy rolls, shrine/chest density,
-      boss mods (e.g. twinned) — plus a wider risk/reward magnitude spread and affix
-      tiers so crafting rerolls have texture. Pairs with E2's risk affixes.
 - [ ] Loot tuning pass via TSV (M4 remainder).
