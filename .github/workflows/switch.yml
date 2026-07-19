@@ -43,7 +43,10 @@ jobs:
       - name: Stage release package
         run: |
           mkdir -p package
-          cp ./build/devilutionx.nro package/
+          # [RUNS MOD] Ship the binary under the mod's own name; the build tree keeps
+          # upstream's target names so merges stay clean.
+          cp ./build/devilutionx.nro package/the-red-portal.nro
+          cp ./Packaging/switch/README.txt package/README.txt
           cp -r ./build/mods package/mods
           cd package && zip -r ../the-red-portal-switch.zip .
 

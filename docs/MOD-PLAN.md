@@ -61,7 +61,13 @@ Last updated: **2026-07-19** (v0.4.0).
   boss slain, vendor stock depth, pack rows + next-row depth, difficulty ladder
   status, total monster kills, and active Preservation marks.
 - **Presentation**: red-portal home-menu icon, no pregame difficulty screen (difficulty
-  comes from scrolls), multiplayer unblocked. (Torch flicker + dynamic wall shadows were
+  comes from scrolls), multiplayer unblocked.
+- **Own identity** (2026-07-19, v0.4.1): release artifacts ship as `the-red-portal.exe` /
+  `.nro` (renamed at packaging time only — build-tree targets stay `devilutionx` for
+  clean upstream merges), and the save/config namespace is `diasurgical/the-red-portal`
+  (paths.cpp PrefPath/ConfigPath), fully separate from vanilla DevilutionX installs —
+  mod heroes carry item types vanilla cannot load, so shared saves were a footgun.
+  Migration = copy saves from the old `devilution` folder; documented in both READMEs. (Torch flicker + dynamic wall shadows were
   tried 2026-07-18 and reverted the same day: the flicker read as jarring, and the
   shadows were visually redundant with fog-of-war darkness.)
 

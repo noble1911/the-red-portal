@@ -111,7 +111,11 @@ const std::string &PrefPath()
 #elif defined(NXDK)
 		prefPath = NxdkGetPrefPath();
 #else
-		prefPath = FromSDL(SDL_GetPrefPath("diasurgical", "devilution"));
+		// [RUNS MOD] The mod owns its save namespace ("the-red-portal", upstream:
+		// "devilution") so saves/config/stash never collide with a vanilla DevilutionX
+		// install on the same machine -- mod heroes carry item types vanilla cannot
+		// load. Existing vanilla saves are never touched.
+		prefPath = FromSDL(SDL_GetPrefPath("diasurgical", "the-red-portal"));
 #if !defined(__amigaos__) && !defined(__DJGPP__)
 		if (FileExistsAndIsWriteable("diablo.ini")) {
 			prefPath = std::string();
@@ -132,7 +136,8 @@ const std::string &ConfigPath()
 #elif defined(NXDK)
 		configPath = NxdkGetPrefPath();
 #else
-		configPath = FromSDL(SDL_GetPrefPath("diasurgical", "devilution"));
+		// [RUNS MOD] Same namespace split as PrefPath above.
+		configPath = FromSDL(SDL_GetPrefPath("diasurgical", "the-red-portal"));
 #if !defined(__amigaos__) && !defined(__DJGPP__)
 		if (FileExistsAndIsWriteable("diablo.ini")) {
 			configPath = std::string();

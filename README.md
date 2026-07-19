@@ -49,19 +49,33 @@ Grab the latest [release](../../releases/latest):
 
 ### Windows
 
-1. Unzip `devilutionx-windows-x64.zip` anywhere.
-2. Copy your game MPQs (see [Game data](#game-data)) next to `devilutionx.exe`.
-3. Run `devilutionx.exe`.
+1. Unzip `the-red-portal-windows.zip` anywhere.
+2. Copy your game MPQs (see [Game data](#game-data)) next to `the-red-portal.exe`.
+3. Run `the-red-portal.exe`.
 
 ### Nintendo Switch (homebrew)
 
-1. Unzip `the-red-portal-switch.zip` and copy `devilutionx.nro` **and the
-   `mods` folder** to `/switch/devilutionx/` on your SD card. The `mods/Hellfire`
+1. Unzip `the-red-portal-switch.zip` and copy `the-red-portal.nro` **and the
+   `mods` folder** to `/switch/the-red-portal/` on your SD card. The `mods/Hellfire`
    folder is required for the Hellfire content — the MPQs alone are not enough.
-2. Copy your game MPQs to `/switch/devilutionx/`.
+2. Copy your game MPQs to `/switch/the-red-portal/`.
 3. Launch via title takeover (hold **R** while opening any installed game — the
    album applet has too little memory). See
    [Packaging/switch/README.txt](Packaging/switch/README.txt) for controls.
+
+### Saves
+
+The mod keeps its saves in its **own folder**, fully separate from any vanilla
+DevilutionX install on the same device — your DevilutionX characters are never
+touched (and mod characters carry items vanilla can't load, so don't move them
+by hand into a vanilla install):
+
+- Windows: `%AppData%\diasurgical\the-red-portal\`
+- Switch: `/switch/the-red-portal/`
+
+Upgrading from a pre-v0.4.1 build of this mod: copy your saves (`*.sv`,
+`*.hsv`, `diablo.ini`) from the old location (`%AppData%\diasurgical\devilution\`
+on Windows, `/switch/devilutionx/` on Switch) into the new folder.
 
 ### Game data
 

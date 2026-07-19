@@ -38,6 +38,19 @@ jobs:
       shell: bash
       run: cmake --build build -j $(nproc) --target package
 
+    # [RUNS MOD] Ship the binary under the mod's own name: repack the CPack zip with
+    # the exe and top folder renamed. The build tree keeps upstream's target names so
+    # merges stay clean; devilutionx.mpq keeps its name (the engine loads it by name).
+    - name: Rebrand package
+      working-directory: ${{github.workspace}}
+      shell: bash
+      run: >
+        cd build && rm -rf repack && mkdir repack &&
+        unzip -q devilutionx.zip -d repack &&
+        mv repack/devilutionx/devilutionx.exe repack/devilutionx/the-red-portal.exe &&
+        mv repack/devilutionx repack/the-red-portal &&
+        (cd repack && zip -qr ../the-red-portal-windows.zip the-red-portal)
+
     # [RUNS MOD] Non-fatal: the release asset below is what matters; a full Actions
     # artifact-storage quota must not abort the job before it is attached.
     - name: Upload-Package
@@ -45,16 +58,16 @@ jobs:
       continue-on-error: true
       uses: actions/upload-artifact@v7
       with:
-        name: devilutionx_x64.zip
-        path: build/devilutionx.zip
+        name: the-red-portal-windows.zip
+        path: build/the-red-portal-windows.zip
 
     # [RUNS MOD] Attach the Windows package to the GitHub release.
     - name: Update Release
       if: ${{ github.event_name == 'release' && !env.ACT }}
       uses: svenstaro/upload-release-action@v2
       with:
-        asset_name: devilutionx-windows-x64.zip
-        file: build/devilutionx.zip
+        asset_name: the-red-portal-windows.zip
+        file: build/the-red-portal-windows.zip
         overwrite: true
 
     - name: Move artifacts to new folder and split exe and other data into two folders

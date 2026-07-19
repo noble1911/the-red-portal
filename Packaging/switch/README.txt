@@ -2,17 +2,20 @@
 # A PvE-extraction total conversion built on DevilutionX (requires your own Diablo game data)
 
 # How To Install:
- - Put `devilutionx.nro` into `/switch/devilutionx`
- - Copy diabdat.mpq from your CD (or GoG install folder) to `/switch/devilutionx`.
- - To run the Diablo: Hellfire expansion you will need to also copy hellfire.mpq, hfmonk.mpq, hfmusic.mpq, hfvoice.mpq.
+ - Put `the-red-portal.nro` into `/switch/the-red-portal`
+ - Copy diabdat.mpq from your CD (or GoG install folder) to `/switch/the-red-portal`.
+ - For the Hellfire content (deeper runs) you will need to also copy hellfire.mpq, hfmonk.mpq, hfmusic.mpq, hfvoice.mpq.
  - Hellfire also needs its data files: copy the `mods` folder from this release next to
-   `devilutionx.nro`, so you end up with `/switch/devilutionx/mods/Hellfire/`. The MPQs on
+   `the-red-portal.nro`, so you end up with `/switch/the-red-portal/mods/Hellfire/`. The MPQs on
    their own are not enough -- without this folder Hellfire stays greyed out. Then enable
    it in-game under Settings -> Mods.
+ - Saves live in `/switch/the-red-portal/` -- fully separate from any vanilla DevilutionX
+   install. Upgrading from a pre-v0.4.1 build of this mod: copy your saves (*.sv, *.hsv,
+   diablo.ini) from `/switch/devilutionx/` into this folder.
  - For Chinese, Japanese, and Korean text support download https://github.com/diasurgical/devilutionx-assets/releases/latest/download/fonts.mpq and add it to the game folder.
  - For the Polish voice pack download https://github.com/diasurgical/devilutionx-assets/releases/latest/download/pl.mpq.
  - For the Russian voice pack download https://github.com/diasurgical/devilutionx-assets/releases/latest/download/ru.mpq.
- - Launch `devilutionx.nro`. (Do not use album to launch; see the note below.)
+ - Launch `the-red-portal.nro`. (Do not use album to launch; see the note below.)
  - *Note:* Hold R on any installed game and launch it. Do not use album to launch. If you use album, the homebrew will only have a small amount memory available, and the touch keyboard won't work. This is true for all homebrew, not just DevilutionX.
 
 # Joycon Controls
