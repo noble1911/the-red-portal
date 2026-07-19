@@ -1329,15 +1329,28 @@ void DrawGambleReels(const Surface &out)
 	// outcome (GambleReels + payout) was locked in at pull time, so nothing here can
 	// desync -- this only decides WHEN each reel shows its final face.
 	//
-	// Each reel draws left-aligned in its own fixed column (playtest: one centered
-	// concatenated row re-flowed every frame as word widths changed and was
-	// unreadable). The separators sit at fixed positions between the columns.
-	constexpr int ReelColumnX[3] = { 120, 270, 420 };
-	constexpr int SeparatorX[2] = { 225, 375 };
+	// Each reel draws CENTERED in its own fixed column rect via DrawString directly.
+	// PrintSString cannot place columns: its `margin` narrows the line from BOTH
+	// sides (stores.cpp PrintSString: width -= margin * 2), which truncated the
+	// middle reel to ~35px and gave the right reel negative width (playtest
+	// screenshot: three chars then a wrap, third reel invisible). The geometry
+	// below mirrors PrintSString's: text area starts at uiPosition.x + 32 and is
+	// 575 wide for the full-size panel.
+	const Point uiPosition = GetUIRectangle().position;
+	const int baseX = uiPosition.x + 32;
+	const int rowY = uiPosition.y + PaddingTop + TextLine[8].y + TextLine[8]._syoff;
+	constexpr int PanelTextWidth = 575;
+	constexpr int ColumnWidth = 150;
+	constexpr int ColumnSpacing = 170;
+	const int mid = PanelTextWidth / 2;
+
 	const uint32_t elapsed = static_cast<uint32_t>(SDL_GetTicks()) - GambleSpinStartTicks;
 	int stopped = 0;
-	for (const int x : SeparatorX)
-		PrintSString(out, x, 8, "|", UiFlags::ColorWhite);
+	for (int s = 0; s < 2; s++) {
+		const int center = mid - ColumnSpacing / 2 + s * ColumnSpacing;
+		const Rectangle rect { { baseX + center - 10, rowY }, { 20, 0 } };
+		DrawString(out, "|", rect, { .flags = UiFlags::ColorWhite | UiFlags::AlignCenter });
+	}
 	for (int i = 0; i < 3; i++) {
 		GambleSymbol shown;
 		if (elapsed >= GambleReelStopMs[i]) {
@@ -1347,7 +1360,9 @@ void DrawGambleReels(const Surface &out)
 			// Cycle a new face every 50 ms, each reel offset so they never look locked.
 			shown = static_cast<GambleSymbol>((elapsed / 50 + static_cast<uint32_t>(i) * 2) % NumGambleSymbols);
 		}
-		PrintSString(out, ReelColumnX[i], 8, _(GambleSymbolName(shown)), GambleSymbolColor(shown));
+		const int center = mid + (i - 1) * ColumnSpacing;
+		const Rectangle rect { { baseX + center - ColumnWidth / 2, rowY }, { ColumnWidth, 0 } };
+		DrawString(out, _(GambleSymbolName(shown)), rect, { .flags = GambleSymbolColor(shown) | UiFlags::AlignCenter });
 	}
 	// One click per reel landing; the payout jingle only after the last one.
 	while (GambleReelStopsPlayed < stopped) {
