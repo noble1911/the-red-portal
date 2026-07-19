@@ -898,12 +898,15 @@ void InitTowners()
 			case TOWN_DRUNK: {
 				// Farnham returns as the gambler: same drunk sprite/anims (default init
 				// reads them from this entry), own behavior + name (via TownerLongNames,
-				// as above). Wirt's old relocated spot, known-valid in the plaza.
+				// as above). His art is baked facing SOUTH (screen-down) -- towner
+				// sprites are single-direction, only cows have a sheet -- so he needs
+				// open floor below him: at {33,36} he stared into a wall (playtest).
+				// Cain's row (y=37) provably reads right for south-facing art.
 				auto gamblerBehavior = TownerBehaviors.find(TOWN_GAMBLER);
 				if (gamblerBehavior == TownerBehaviors.end() || gamblerBehavior->second == nullptr)
 					continue;
 				behaviorIt = gamblerBehavior;
-				relocated.position = { 33, 36 };
+				relocated.position = { 32, 37 };
 			} break;
 			case TOWN_PEGBOY: {
 				// Wirt is unused in run mode; repurpose his sprite as the dedicated
