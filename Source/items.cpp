@@ -3072,15 +3072,13 @@ void DropPrizeItem(Item prize, Point position)
 	NetSendCmdPItem(false, CMD_DROPITEM, item.position, item);
 }
 
-void DropGamblePrizeItem(int lvl, Point position)
+Item RollGamblePrizeItem(int lvl)
 {
-	// [RUNS MOD] A good-quality equipment prize around `lvl`, dropped near `position`
-	// (the fruit machine's triple-sword payout). Mirrors a monster "onlygood" drop,
-	// but at the hero's EARNED depth rather than the current (town) level.
-	if (ActiveItemCount >= MAXITEMS)
-		return;
-	const int ii = AllocateItem();
-	Item &item = Items[ii];
+	// [RUNS MOD] A good-quality equipment prize around `lvl` (the fruit machine's
+	// triple-sword payout; the caller drops it via DropPrizeItem when the show ends).
+	// Mirrors a monster "onlygood" drop, but at the hero's EARNED depth rather than
+	// the current (town) level, and with a boss-grade unique chance (uper 15).
+	Item item = {};
 	const _item_indexes idx = GetItemIndexForDroppableItem(true, [lvl](const ItemData &data) {
 		if (lvl < data.iMinMLvl)
 			return false;
@@ -3088,10 +3086,8 @@ void DropGamblePrizeItem(int lvl, Point position)
 			return false;
 		return true;
 	});
-	SetupAllItems(*MyPlayer, item, idx, AdvanceRndSeed(), lvl, 1, /*onlygood=*/true, /*pregen=*/false);
-	GetSuperItemSpace(position, static_cast<int8_t>(ii));
-	item.setNewAnimation(MyPlayer != nullptr && MyPlayer->pLvlLoad == 0);
-	NetSendCmdPItem(false, CMD_DROPITEM, item.position, item);
+	SetupAllItems(*MyPlayer, item, idx, AdvanceRndSeed(), lvl, 15, /*onlygood=*/true, /*pregen=*/false);
+	return item;
 }
 
 void SpawnGamblerJackpot(int qlvlCap)

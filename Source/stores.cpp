@@ -1122,6 +1122,10 @@ constexpr int GambleWeightTotal = 27;
 GambleSymbol GambleReels[3];
 /** The result headline shown on the spin screen (set by ResolveGamble). */
 std::string GambleResultLine;
+/** Item prizes won at pull time but not yet dropped: the payout is decided instantly,
+ * the visible drop waits for the last reel (playtest: a prize thudding onto the floor
+ * mid-spin spoiled the show). Flushed at reveal and on any early exit/re-pull. */
+std::vector<Item> GamblePendingDrops;
 /** True when the pull paid out anything (drives the reveal sound). */
 bool GambleWon;
 /** Reel animation: spin start time, per-stop click bookkeeping, reveal latch. The
@@ -1172,9 +1176,18 @@ void AwardGambleGold(int amount)
 	GambleWon = true;
 }
 
+void FlushGamblePrizes()
+{
+	for (Item &prize : GamblePendingDrops)
+		DropPrizeItem(prize, MyPlayer->position.tile);
+	GamblePendingDrops.clear();
+}
+
 void ResolveGamble()
 {
 	Player &myPlayer = *MyPlayer;
+	// A mashed re-pull mid-show delivers the previous spin's prizes immediately.
+	FlushGamblePrizes();
 	const int stake = GambleStake();
 	TakePlrsMoney(stake);
 	GambleWon = false;
@@ -1196,36 +1209,40 @@ void ResolveGamble()
 	// town can never hand out more than the hero has proven they can reach.
 	const int prizeLevel = std::max<int>(1, myPlayer.pDeepestBeatenDepth);
 
+	// Payouts (tuned after playtest: the first pass paid ~35% EV and felt like a
+	// mugging). Pairs now return the full stake -- at ~44% of pulls that keeps the
+	// wallet alive between hits -- and every triple beats the stake. Overall EV sits
+	// around 65-70% plus the jackpot dream: still a firm gold sink, no longer a scam.
 	if (matched == 3) {
 		switch (symbol) {
 		case GambleSymbol::Crown:
 			if (!GamblerJackpot.isEmpty()) {
-				Item prize = GamblerJackpot;
-				GamblerJackpot.clear();
-				DropPrizeItem(prize, myPlayer.position.tile);
+				GamblePendingDrops.push_back(GamblerJackpot);
+				GambleResultLine = fmt::format(fmt::runtime(_("JACKPOT! {:s} is yours!")), GamblerJackpot.getName().str());
+				GamblerJackpot.clear(); // claimed at pull time so a mashed re-pull can't double-claim
 				GambleWon = true;
-				GambleResultLine = fmt::format(fmt::runtime(_("JACKPOT! {:s} is yours!")), prize.getName().str());
 			} else {
 				// The displayed prize was already claimed; crowns still pay big gold.
-				AwardGambleGold(stake * 10);
-				GambleResultLine = fmt::format(fmt::runtime(_("Three crowns! {:s} gold!")), FormatInteger(stake * 10));
+				AwardGambleGold(stake * 15);
+				GambleResultLine = fmt::format(fmt::runtime(_("Three crowns! {:s} gold!")), FormatInteger(stake * 15));
 			}
 			break;
 		case GambleSymbol::Gold:
-			AwardGambleGold(stake * 8);
-			GambleResultLine = fmt::format(fmt::runtime(_("Three gold piles! {:s} gold!")), FormatInteger(stake * 8));
+			AwardGambleGold(stake * 12);
+			GambleResultLine = fmt::format(fmt::runtime(_("Three gold piles! {:s} gold!")), FormatInteger(stake * 12));
 			break;
-		case GambleSymbol::Sword:
-			DropGamblePrizeItem(prizeLevel, myPlayer.position.tile);
+		case GambleSymbol::Sword: {
+			GamblePendingDrops.push_back(RollGamblePrizeItem(prizeLevel));
 			GambleWon = true;
 			GambleResultLine = _("Three swords! The machine spits out a prize!");
 			break;
+		}
 		case GambleSymbol::Scroll: {
 			Item scroll = {};
 			CreateDungeonScroll(scroll, prizeLevel);
-			DropPrizeItem(scroll, myPlayer.position.tile);
-			GambleWon = true;
-			GambleResultLine = _("Three scrolls! A dungeon scroll clatters out!");
+			GamblePendingDrops.push_back(scroll);
+			AwardGambleGold(stake);
+			GambleResultLine = _("Three scrolls! A dungeon scroll, and your stake back!");
 			break;
 		}
 		case GambleSymbol::Potion:
@@ -1233,10 +1250,10 @@ void ResolveGamble()
 				Item potion = {};
 				InitializeItem(potion, IDI_FULLHEAL);
 				GenerateNewSeed(potion);
-				DropPrizeItem(potion, myPlayer.position.tile);
+				GamblePendingDrops.push_back(potion);
 			}
-			GambleWon = true;
-			GambleResultLine = _("Three potions! Drinks are on the house!");
+			AwardGambleGold(stake * 2);
+			GambleResultLine = fmt::format(fmt::runtime(_("Three potions! Drinks, and {:s} gold!")), FormatInteger(stake * 2));
 			break;
 		case GambleSymbol::Skull:
 			GambleResultLine = _("Three skulls. Farnham laughs himself off his stool.");
@@ -1244,11 +1261,11 @@ void ResolveGamble()
 		}
 	} else if (matched == 2) {
 		if (symbol == GambleSymbol::Crown) {
-			AwardGambleGold(stake * 3);
-			GambleResultLine = fmt::format(fmt::runtime(_("Two crowns -- so close! {:s} gold.")), FormatInteger(stake * 3));
+			AwardGambleGold(stake * 5);
+			GambleResultLine = fmt::format(fmt::runtime(_("Two crowns -- so close! {:s} gold.")), FormatInteger(stake * 5));
 		} else {
-			AwardGambleGold(stake / 2);
-			GambleResultLine = fmt::format(fmt::runtime(_("A pair. {:s} gold back.")), FormatInteger(stake / 2));
+			AwardGambleGold(stake);
+			GambleResultLine = _("A pair. Your stake back.");
 		}
 	} else {
 		GambleResultLine = _("Nothing. The house drinks well tonight.");
@@ -1257,6 +1274,9 @@ void ResolveGamble()
 
 void StartGamble()
 {
+	// Entering (or returning to) the menu delivers any prizes still queued behind an
+	// interrupted spin -- nothing won can ever be lost to an early exit.
+	FlushGamblePrizes();
 	IsTextFullSize = false;
 	HasScrollbar = false;
 	AddSText(0, 1, _("Farnham's One-Armed Bandit"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
@@ -1290,42 +1310,59 @@ void StartGambleSpin()
 	GambleSpinDone = false;
 }
 
+UiFlags GambleSymbolColor(GambleSymbol symbol)
+{
+	switch (symbol) {
+	case GambleSymbol::Gold: return UiFlags::ColorGold;
+	case GambleSymbol::Sword: return UiFlags::ColorWhite;
+	case GambleSymbol::Scroll: return UiFlags::ColorBlue;
+	case GambleSymbol::Potion: return UiFlags::ColorRed;
+	case GambleSymbol::Skull: return UiFlags::ColorOrange;
+	case GambleSymbol::Crown: return UiFlags::ColorWhitegold;
+	}
+	return UiFlags::ColorWhite;
+}
+
 void DrawGambleReels(const Surface &out)
 {
 	// [RUNS MOD] The spinning reels: pure presentation over the static panel. The
 	// outcome (GambleReels + payout) was locked in at pull time, so nothing here can
 	// desync -- this only decides WHEN each reel shows its final face.
+	//
+	// Each reel draws left-aligned in its own fixed column (playtest: one centered
+	// concatenated row re-flowed every frame as word widths changed and was
+	// unreadable). The separators sit at fixed positions between the columns.
+	constexpr int ReelColumnX[3] = { 120, 270, 420 };
+	constexpr int SeparatorX[2] = { 225, 375 };
 	const uint32_t elapsed = static_cast<uint32_t>(SDL_GetTicks()) - GambleSpinStartTicks;
 	int stopped = 0;
-	std::string row("[ ");
+	for (const int x : SeparatorX)
+		PrintSString(out, x, 8, "|", UiFlags::ColorWhite);
 	for (int i = 0; i < 3; i++) {
-		std::string_view name;
+		GambleSymbol shown;
 		if (elapsed >= GambleReelStopMs[i]) {
 			stopped++;
-			name = _(GambleSymbolName(GambleReels[i]));
+			shown = GambleReels[i];
 		} else {
 			// Cycle a new face every 50 ms, each reel offset so they never look locked.
-			const auto cycling = static_cast<GambleSymbol>((elapsed / 50 + static_cast<uint32_t>(i) * 2) % NumGambleSymbols);
-			name = _(GambleSymbolName(cycling));
+			shown = static_cast<GambleSymbol>((elapsed / 50 + static_cast<uint32_t>(i) * 2) % NumGambleSymbols);
 		}
-		row.append(name);
-		if (i < 2)
-			row.append(" | ");
+		PrintSString(out, ReelColumnX[i], 8, _(GambleSymbolName(shown)), GambleSymbolColor(shown));
 	}
-	row.append(" ]");
 	// One click per reel landing; the payout jingle only after the last one.
 	while (GambleReelStopsPlayed < stopped) {
 		PlaySFX(SfxID::MenuMove);
 		GambleReelStopsPlayed++;
 	}
-	PrintSString(out, 0, 8, row, UiFlags::ColorBlue | UiFlags::AlignCenter);
 	if (stopped == 3) {
 		if (!GambleSpinDone) {
 			GambleSpinDone = true;
+			// The show is over: prizes hit the floor now, with the jingle.
+			FlushGamblePrizes();
 			if (GambleWon)
 				PlaySFX(SfxID::ItemGold);
 		}
-		PrintSString(out, 0, 12, GambleResultLine, UiFlags::ColorWhite | UiFlags::AlignCenter);
+		PrintSString(out, 0, 12, GambleResultLine, (GambleWon ? UiFlags::ColorWhitegold : UiFlags::ColorWhite) | UiFlags::AlignCenter);
 	}
 }
 

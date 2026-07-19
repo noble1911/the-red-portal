@@ -195,11 +195,19 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   The outcome is rolled AND paid at pull time; the spin screen is pure presentation —
   reels cycle per-frame (SDL-tick driven in DrawSText), stop left→right at
   750/1250/1750 ms with a click each, payout jingle after the last.
-- Stake = 500 + 250 x deepest-beaten depth. Payouts: triple gold 8x stake; triple
-  sword a good item; triple scroll a dungeon scroll; triple potion two full heals;
-  crown pair 3x, other pairs half back; triple skull nothing. Item/scroll prizes are
-  capped at EARNED depth (same rule as the vendor gate) and drop at the player's
-  feet — no bag-room dialogs.
+- Stake = 500 + 250 x deepest-beaten depth. Payouts (retuned same day after playtest —
+  v1 paid ~35% EV and felt like a mugging; now ~65-70% + the jackpot): any pair
+  returns the FULL stake (~44% of pulls — keeps the wallet alive), crown pair 5x,
+  triple gold 12x, triple crown 15x when the jackpot is claimed; triple sword a good
+  item with boss-grade unique odds (uper 15); triple scroll a dungeon scroll + stake
+  back; triple potion two full heals + 2x stake; triple skull nothing. Item/scroll
+  prizes are capped at EARNED depth (same rule as the vendor gate) and drop at the
+  player's feet — no bag-room dialogs.
+- Playtest fixes (same day): item prizes queue in GamblePendingDrops and hit the
+  floor only when the last reel lands (they dropped mid-spin and spoiled the show),
+  flushed on any early exit so nothing is lost; reels draw in FIXED columns with
+  per-symbol colors (one centered concatenated row re-flowed every frame and was
+  unreadable).
 - **The displayed jackpot**: a pre-rolled unique (droppable base, UIMinLvl <=
   max(4, deepest+1)) shown by name and inspectable; triple crowns (~1 in 2,460)
   claim it. Session state, rerolled with the vendor restock on boss kill; once

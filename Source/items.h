@@ -636,8 +636,8 @@ void SpawnGamblerJackpot(int qlvlCap);
 /** @brief [RUNS MOD] Drops an already-built item near `position`, network-synced
  * (fruit-machine payouts land at the player's feet). */
 void DropPrizeItem(Item prize, Point position);
-/** @brief [RUNS MOD] Drops a good-quality equipment prize rolled around `lvl`. */
-void DropGamblePrizeItem(int lvl, Point position);
+/** @brief [RUNS MOD] Builds (does not drop) a good-quality equipment prize around `lvl`. */
+Item RollGamblePrizeItem(int lvl);
 void SpawnBoy(int lvl);
 void SpawnHealer(int lvl);
 void MakeGoldStack(Item &goldItem, int value);
