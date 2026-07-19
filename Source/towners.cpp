@@ -900,13 +900,13 @@ void InitTowners()
 				// reads them from this entry), own behavior + name (via TownerLongNames,
 				// as above). His art is baked facing SOUTH (screen-down) -- towner
 				// sprites are single-direction, only cows have a sheet -- so he needs
-				// open floor below him: at {33,36} he stared into a wall (playtest).
-				// Cain's row (y=37) provably reads right for south-facing art.
+				// open floor below him. North of Griswold ({22,34}; north on the iso
+				// grid = x and y down together), facing back into the plaza.
 				auto gamblerBehavior = TownerBehaviors.find(TOWN_GAMBLER);
 				if (gamblerBehavior == TownerBehaviors.end() || gamblerBehavior->second == nullptr)
 					continue;
 				behaviorIt = gamblerBehavior;
-				relocated.position = { 32, 37 };
+				relocated.position = { 20, 32 };
 			} break;
 			case TOWN_PEGBOY: {
 				// Wirt is unused in run mode; repurpose his sprite as the dedicated
