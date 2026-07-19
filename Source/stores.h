@@ -76,6 +76,10 @@ enum class TalkID : uint8_t {
 	DungeonVendorCraftMaterial, // pick the scroll to consume as material
 	// [RUNS MOD] Cain's primer on the run rules (paged static text).
 	StorytellerRules,
+	// [RUNS MOD] Farnham's fruit machine.
+	Gamble,            // the menu: stake, jackpot showcase, pull/leave
+	GambleSpin,        // a spin's reels + result
+	GambleJackpotShow, // full-size inspect view of tonight's jackpot item
 };
 
 /** Currently active store */
@@ -110,6 +114,10 @@ extern DVL_API_FOR_TEST StaticVector<Item, NumDungeonVendorItems> DungeonVendorI
 extern DVL_API_FOR_TEST int BoyItemLevel;
 /** Current item sold by Wirt */
 extern DVL_API_FOR_TEST Item BoyItem;
+
+/** [RUNS MOD] Tonight's displayed fruit-machine jackpot (empty = claimed / not rolled).
+ * Session state, rerolled with the vendor restock on boss kill; see SpawnGamblerJackpot. */
+extern DVL_API_FOR_TEST Item GamblerJackpot;
 
 /** Currently selected text line from TextLine */
 extern DVL_API_FOR_TEST int CurrentTextLine;

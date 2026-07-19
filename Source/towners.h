@@ -43,6 +43,9 @@ enum _talker_id : uint8_t {
 	// [RUNS MOD] A chest that opens the shared stash (replaces the barmaid NPC).
 	// Synthesized in run mode from Gillian's (TOWN_BMAID) slot.
 	TOWN_STASHCHEST,
+	// [RUNS MOD] Farnham runs the fruit machine. Synthesized in run mode from the
+	// drunk's (TOWN_DRUNK) sprite/slot.
+	TOWN_GAMBLER,
 	// Note: Enum values are parsed from TSV using magic_enum
 	// The actual count is determined dynamically from TSV data
 };

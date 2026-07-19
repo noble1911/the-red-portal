@@ -77,6 +77,9 @@ Last updated: **2026-07-18** (v0.3.0).
       (density, champions, speed, resists, chests, shrines, twin boss), tier II/III
       names + longer lines still fit the 288px compact info box, and champion drops
       arrive in co-op.
+- [ ] Fruit machine (2026-07-19): stake scaling, every payout row, jackpot
+      display/claim/boss-restock reroll, reel timing + sounds, prize floor-drops,
+      and gamepad navigation of the gamble screens.
 - [ ] Real-Switch hardware test (releases are only CI-verified).
 
 **Known gaps**
@@ -185,5 +188,24 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
 - **Save note**: the roll stream changed (tier roll + larger pool), so scrolls saved
   before this build silently re-roll their modifiers once. Accepted pre-1.0.
 
+**Farnham's fruit machine** ✅ shipped 2026-07-19 (the gamble gold sink)
+- Farnham returns to the hub as **Farnham the Gambler** (drunk sprite, TOWN_GAMBLER
+  behavior, Wirt's old plaza spot {33,36}); the dead SpawnBoy stock is retired.
+- Three weighted reels (Gold/Sword/Scroll/Potion/Skull/Crown, weights 5/4/4/6/6/2).
+  The outcome is rolled AND paid at pull time; the spin screen is pure presentation —
+  reels cycle per-frame (SDL-tick driven in DrawSText), stop left→right at
+  750/1250/1750 ms with a click each, payout jingle after the last.
+- Stake = 500 + 250 x deepest-beaten depth. Payouts: triple gold 8x stake; triple
+  sword a good item; triple scroll a dungeon scroll; triple potion two full heals;
+  crown pair 3x, other pairs half back; triple skull nothing. Item/scroll prizes are
+  capped at EARNED depth (same rule as the vendor gate) and drop at the player's
+  feet — no bag-room dialogs.
+- **The displayed jackpot**: a pre-rolled unique (droppable base, UIMinLvl <=
+  max(4, deepest+1)) shown by name and inspectable; triple crowns (~1 in 2,460)
+  claim it. Session state, rerolled with the vendor restock on boss kill; once
+  claimed it stays gone until the next boss.
+
 **Feature ideas (next slices)**
 - [ ] Loot tuning pass via TSV (M4 remainder).
+- [ ] Fruit machine polish: reel symbols as item icons instead of text, Farnham
+      win/lose voice barks, odds/EV tuning after playtest.

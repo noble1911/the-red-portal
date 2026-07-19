@@ -506,6 +506,13 @@ void TalkToDungeonVendor(Player & /*player*/, Towner & /*vendor*/)
 	StartStore(TalkID::DungeonVendor);
 }
 
+void TalkToGambler(Player & /*player*/, Towner & /*gambler*/)
+{
+	// [RUNS MOD] Opens Farnham's fruit machine. No gossip line (this NPC reuses the
+	// drunk's sprite but is a distinct vendor with no dialog text).
+	StartStore(TalkID::Gamble);
+}
+
 void TalkToStashChest(Player & /*player*/, Towner & /*chest*/)
 {
 	// [RUNS MOD] Opening the chest opens the shared stash directly (this replaces the
@@ -760,6 +767,7 @@ const TownerData TownersData[] = {
 	{ TOWN_GIRL,    nullptr,       TalkToGirl        },
 	{ TOWN_DUNGEONVENDOR, InitDungeonVendor, TalkToDungeonVendor }, // [RUNS MOD]
 	{ TOWN_STASHCHEST,    InitStashChest,    TalkToStashChest    }, // [RUNS MOD]
+	{ TOWN_GAMBLER,       nullptr,           TalkToGambler       }, // [RUNS MOD]
 	// clang-format on
 };
 
@@ -847,6 +855,7 @@ void InitTowners()
 	if (RunsModEnabled) {
 		TownerLongNames.try_emplace(TOWN_STASHCHEST, N_("Stash"));
 		TownerLongNames.try_emplace(TOWN_DUNGEONVENDOR, N_("Dungeon Merchant"));
+		TownerLongNames.try_emplace(TOWN_GAMBLER, N_("Farnham the Gambler"));
 	}
 
 	CowSprites.emplace(LoadCelSheet("towners\\animals\\cow", 128));
@@ -885,6 +894,16 @@ void InitTowners()
 				// (Name comes from TownerLongNames -- see InitTowners -- because a name
 				// set on this LOCAL copy would be viewed, then freed: use-after-free.)
 				relocated.position = { 25, 37 };
+			} break;
+			case TOWN_DRUNK: {
+				// Farnham returns as the gambler: same drunk sprite/anims (default init
+				// reads them from this entry), own behavior + name (via TownerLongNames,
+				// as above). Wirt's old relocated spot, known-valid in the plaza.
+				auto gamblerBehavior = TownerBehaviors.find(TOWN_GAMBLER);
+				if (gamblerBehavior == TownerBehaviors.end() || gamblerBehavior->second == nullptr)
+					continue;
+				behaviorIt = gamblerBehavior;
+				relocated.position = { 33, 36 };
 			} break;
 			case TOWN_PEGBOY: {
 				// Wirt is unused in run mode; repurpose his sprite as the dedicated

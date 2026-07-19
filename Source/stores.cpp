@@ -16,6 +16,13 @@
 
 #include <fmt/format.h>
 
+// [RUNS MOD] SDL ticks drive the fruit machine's reel animation.
+#ifdef USE_SDL3
+#include <SDL3/SDL_timer.h>
+#else
+#include <SDL.h>
+#endif
+
 #include "controls/control_mode.hpp"
 #include "controls/plrctrls.h"
 #include "cursor.h"
@@ -65,6 +72,9 @@ StaticVector<Item, NumDungeonVendorItems> DungeonVendorItems;
 int BoyItemLevel;
 Item BoyItem;
 
+/** [RUNS MOD] Tonight's fruit-machine jackpot (empty = claimed / not yet rolled). */
+Item GamblerJackpot;
+
 /** Remember currently selected text line from TextLine while displaying a dialog */
 int OldTextLine;
 /** Currently selected text line from TextLine */
@@ -90,6 +100,8 @@ const char *TownerNameForTalkID(TalkID s)
 	case TalkID::Storyteller: return "cain";
 	case TalkID::Tavern: return "ogden";
 	case TalkID::Drunk: return "farnham";
+	case TalkID::Gamble: return "farnham"; // [RUNS MOD] Farnham hosts the fruit machine
+
 	case TalkID::Barmaid: return "gillian";
 	case TalkID::DungeonVendor: return "dungeonvendor";
 	default: return nullptr;
@@ -1091,6 +1103,285 @@ void DungeonVendorBuyEnter()
 
 	TempItem = DungeonVendorItems[idx];
 	StartStore(TalkID::Confirm);
+}
+
+// [RUNS MOD] --- Farnham's fruit machine ---
+// Three weighted reels. The outcome is rolled AND paid out the moment the handle is
+// pulled, so the spin screen (and its future reel animation) is pure presentation --
+// it can never desync from the payout, and quitting mid-show loses nothing. Gold
+// prizes go straight to the inventory; item prizes drop at the player's feet: the
+// machine spits them out, it does not open bag-room dialogs.
+
+enum class GambleSymbol : uint8_t { Gold, Sword, Scroll, Potion, Skull, Crown };
+constexpr int NumGambleSymbols = 6;
+// Per-reel symbol weights (sum 27). Crown at 2/27 puts triple-crown -- the displayed
+// unique jackpot -- at ~1 in 2,460 pulls: a real lottery, priced like one.
+constexpr int GambleSymbolWeights[NumGambleSymbols] = { 5, 4, 4, 6, 6, 2 };
+constexpr int GambleWeightTotal = 27;
+
+GambleSymbol GambleReels[3];
+/** The result headline shown on the spin screen (set by ResolveGamble). */
+std::string GambleResultLine;
+/** True when the pull paid out anything (drives the reveal sound). */
+bool GambleWon;
+/** Reel animation: spin start time, per-stop click bookkeeping, reveal latch. The
+ * reels stop left to right at these times; the result shows after the last stop. */
+uint32_t GambleSpinStartTicks;
+int GambleReelStopsPlayed;
+bool GambleSpinDone;
+constexpr uint32_t GambleReelStopMs[3] = { 750, 1250, 1750 };
+
+const char *GambleSymbolName(GambleSymbol symbol)
+{
+	switch (symbol) {
+	case GambleSymbol::Gold: return N_("Gold");
+	case GambleSymbol::Sword: return N_("Sword");
+	case GambleSymbol::Scroll: return N_("Scroll");
+	case GambleSymbol::Potion: return N_("Potion");
+	case GambleSymbol::Skull: return N_("Skull");
+	case GambleSymbol::Crown: return N_("Crown");
+	}
+	return "";
+}
+
+int GambleStake()
+{
+	// Scales with earned depth so the machine stays a real gold sink for rich
+	// late-game ghosts without walling off fresh characters.
+	return 500 + 250 * MyPlayer->pDeepestBeatenDepth;
+}
+
+GambleSymbol RollGambleSymbol()
+{
+	int roll = GenerateRnd(GambleWeightTotal);
+	for (int s = 0; s < NumGambleSymbols - 1; s++) {
+		roll -= GambleSymbolWeights[s];
+		if (roll < 0)
+			return static_cast<GambleSymbol>(s);
+	}
+	return static_cast<GambleSymbol>(NumGambleSymbols - 1);
+}
+
+void AwardGambleGold(int amount)
+{
+	Player &myPlayer = *MyPlayer;
+	AddGoldToInventory(myPlayer, amount);
+	myPlayer._pGold += amount;
+	// No sound here: payouts apply at pull time, but the reveal (and its jingle)
+	// waits for the last reel to land.
+	GambleWon = true;
+}
+
+void ResolveGamble()
+{
+	Player &myPlayer = *MyPlayer;
+	const int stake = GambleStake();
+	TakePlrsMoney(stake);
+	GambleWon = false;
+	for (GambleSymbol &reel : GambleReels)
+		reel = RollGambleSymbol();
+
+	int counts[NumGambleSymbols] = {};
+	for (const GambleSymbol reel : GambleReels)
+		counts[static_cast<size_t>(reel)]++;
+	int best = 0;
+	for (int s = 1; s < NumGambleSymbols; s++) {
+		if (counts[s] > counts[best])
+			best = s;
+	}
+	const auto symbol = static_cast<GambleSymbol>(best);
+	const int matched = counts[best];
+
+	// Prize items are capped at EARNED depth, same rule as the vendor and the craft:
+	// town can never hand out more than the hero has proven they can reach.
+	const int prizeLevel = std::max<int>(1, myPlayer.pDeepestBeatenDepth);
+
+	if (matched == 3) {
+		switch (symbol) {
+		case GambleSymbol::Crown:
+			if (!GamblerJackpot.isEmpty()) {
+				Item prize = GamblerJackpot;
+				GamblerJackpot.clear();
+				DropPrizeItem(prize, myPlayer.position.tile);
+				GambleWon = true;
+				GambleResultLine = fmt::format(fmt::runtime(_("JACKPOT! {:s} is yours!")), prize.getName());
+			} else {
+				// The displayed prize was already claimed; crowns still pay big gold.
+				AwardGambleGold(stake * 10);
+				GambleResultLine = fmt::format(fmt::runtime(_("Three crowns! {:s} gold!")), FormatInteger(stake * 10));
+			}
+			break;
+		case GambleSymbol::Gold:
+			AwardGambleGold(stake * 8);
+			GambleResultLine = fmt::format(fmt::runtime(_("Three gold piles! {:s} gold!")), FormatInteger(stake * 8));
+			break;
+		case GambleSymbol::Sword:
+			DropGamblePrizeItem(prizeLevel, myPlayer.position.tile);
+			GambleWon = true;
+			GambleResultLine = _("Three swords! The machine spits out a prize!");
+			break;
+		case GambleSymbol::Scroll: {
+			Item scroll = {};
+			CreateDungeonScroll(scroll, prizeLevel);
+			DropPrizeItem(scroll, myPlayer.position.tile);
+			GambleWon = true;
+			GambleResultLine = _("Three scrolls! A dungeon scroll clatters out!");
+			break;
+		}
+		case GambleSymbol::Potion:
+			for (int i = 0; i < 2; i++) {
+				Item potion = {};
+				InitializeItem(potion, IDI_FULLHEAL);
+				GenerateNewSeed(potion);
+				DropPrizeItem(potion, myPlayer.position.tile);
+			}
+			GambleWon = true;
+			GambleResultLine = _("Three potions! Drinks are on the house!");
+			break;
+		case GambleSymbol::Skull:
+			GambleResultLine = _("Three skulls. Farnham laughs himself off his stool.");
+			break;
+		}
+	} else if (matched == 2) {
+		if (symbol == GambleSymbol::Crown) {
+			AwardGambleGold(stake * 3);
+			GambleResultLine = fmt::format(fmt::runtime(_("Two crowns -- so close! {:s} gold.")), FormatInteger(stake * 3));
+		} else {
+			AwardGambleGold(stake / 2);
+			GambleResultLine = fmt::format(fmt::runtime(_("A pair. {:s} gold back.")), FormatInteger(stake / 2));
+		}
+	} else {
+		GambleResultLine = _("Nothing. The house drinks well tonight.");
+	}
+}
+
+void StartGamble()
+{
+	IsTextFullSize = false;
+	HasScrollbar = false;
+	AddSText(0, 1, _("Farnham's One-Armed Bandit"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+	AddSLine(3);
+	if (!GamblerJackpot.isEmpty()) {
+		AddSText(0, 7, _("Tonight's jackpot:"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+		AddSText(0, 9, GamblerJackpot.getName(), GamblerJackpot.getTextColorWithStatCheck() | UiFlags::AlignCenter, false);
+	} else {
+		AddSText(0, 7, _("The jackpot is claimed!"), UiFlags::ColorWhite | UiFlags::AlignCenter, false);
+		AddSText(0, 9, _("Beat a boss for a new prize."), UiFlags::ColorWhite | UiFlags::AlignCenter, false);
+	}
+	AddSText(0, 12, fmt::format(fmt::runtime(_("Pull the handle ({:s} gold)")), FormatInteger(GambleStake())), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	if (!GamblerJackpot.isEmpty())
+		AddSText(0, 14, _("Inspect the jackpot"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	AddSText(0, 18, _("Say goodbye"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+}
+
+void StartGambleSpin()
+{
+	IsTextFullSize = true;
+	HasScrollbar = false;
+	AddSText(0, 1, _("Farnham's One-Armed Bandit"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+	AddSLine(3);
+	// Lines 8 (the reels) and 12 (the result) are deliberately left empty: they are
+	// drawn per-frame by DrawGambleReels so the reels spin. "Pull again" stays live
+	// during the show -- gamblers mash, and a re-pull just restarts the spin.
+	AddSText(0, 16, fmt::format(fmt::runtime(_("Pull again ({:s} gold)")), FormatInteger(GambleStake())), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	AddSText(0, BackButtonLine(), _("Back"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	GambleSpinStartTicks = static_cast<uint32_t>(SDL_GetTicks());
+	GambleReelStopsPlayed = 0;
+	GambleSpinDone = false;
+}
+
+void DrawGambleReels(const Surface &out)
+{
+	// [RUNS MOD] The spinning reels: pure presentation over the static panel. The
+	// outcome (GambleReels + payout) was locked in at pull time, so nothing here can
+	// desync -- this only decides WHEN each reel shows its final face.
+	const uint32_t elapsed = static_cast<uint32_t>(SDL_GetTicks()) - GambleSpinStartTicks;
+	int stopped = 0;
+	std::string row("[ ");
+	for (int i = 0; i < 3; i++) {
+		std::string_view name;
+		if (elapsed >= GambleReelStopMs[i]) {
+			stopped++;
+			name = _(GambleSymbolName(GambleReels[i]));
+		} else {
+			// Cycle a new face every 50 ms, each reel offset so they never look locked.
+			const auto cycling = static_cast<GambleSymbol>((elapsed / 50 + static_cast<uint32_t>(i) * 2) % NumGambleSymbols);
+			name = _(GambleSymbolName(cycling));
+		}
+		row.append(name);
+		if (i < 2)
+			row.append(" | ");
+	}
+	row.append(" ]");
+	// One click per reel landing; the payout jingle only after the last one.
+	while (GambleReelStopsPlayed < stopped) {
+		PlaySFX(SfxID::MenuMove);
+		GambleReelStopsPlayed++;
+	}
+	PrintSString(out, 0, 8, row, UiFlags::ColorBlue | UiFlags::AlignCenter);
+	if (stopped == 3) {
+		if (!GambleSpinDone) {
+			GambleSpinDone = true;
+			if (GambleWon)
+				PlaySFX(SfxID::ItemGold);
+		}
+		PrintSString(out, 0, 12, GambleResultLine, UiFlags::ColorWhite | UiFlags::AlignCenter);
+	}
+}
+
+void StartGambleJackpotShow()
+{
+	IsTextFullSize = true;
+	HasScrollbar = false;
+	AddSText(0, 1, _("Farnham's One-Armed Bandit"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+	AddSLine(3);
+	AddSText(0, 7, _("Tonight's jackpot:"), UiFlags::ColorWhite | UiFlags::AlignCenter, false);
+	const UiFlags itemColor = GamblerJackpot.getTextColorWithStatCheck();
+	AddSText(20, 11, GamblerJackpot.getName(), itemColor, false);
+	PrintStoreItem(GamblerJackpot, 12, itemColor);
+	AddSText(0, 18, _("Done"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+}
+
+void GambleEnter()
+{
+	switch (CurrentTextLine) {
+	case 12:
+		if (!PlayerCanAfford(GambleStake())) {
+			OldActiveStore = TalkID::Gamble;
+			OldTextLine = 12;
+			OldScrollPos = 0;
+			StartStore(TalkID::NoMoney);
+			return;
+		}
+		ResolveGamble();
+		StartStore(TalkID::GambleSpin);
+		break;
+	case 14:
+		if (!GamblerJackpot.isEmpty())
+			StartStore(TalkID::GambleJackpotShow);
+		break;
+	case 18:
+		ActiveStore = TalkID::None;
+		break;
+	}
+}
+
+void GambleSpinEnter()
+{
+	if (CurrentTextLine == 16) { // pull again
+		if (!PlayerCanAfford(GambleStake())) {
+			OldActiveStore = TalkID::Gamble;
+			OldTextLine = 12;
+			OldScrollPos = 0;
+			StartStore(TalkID::NoMoney);
+			return;
+		}
+		ResolveGamble();
+		StartStore(TalkID::GambleSpin);
+		return;
+	}
+	StartStore(TalkID::Gamble);
+	CurrentTextLine = 12;
 }
 
 // [RUNS MOD] Scroll crafting: reroll a scroll's modifiers, upgrade its level, or add a
@@ -2713,10 +3004,17 @@ void SetupTownStores()
 	// completed, or on the first visit when it has no stock yet.
 	if (DungeonVendorItems.empty() || DungeonVendorRestockPending) {
 		SpawnDungeonVendor();
+		// [RUNS MOD] The fruit-machine jackpot rerolls with the vendor: session state,
+		// refreshed by a boss kill. The floor keeps the pool interesting for fresh
+		// characters; the cap keeps it at the edge of earned progression.
+		SpawnGamblerJackpot(std::max<int>(4, myPlayer.pDeepestBeatenDepth + 1));
 		DungeonVendorRestockPending = false;
 	}
 	SpawnHealer(l);
-	SpawnBoy(myPlayer.getCharacterLevel());
+	// [RUNS MOD] Wirt's shop has no NPC in run mode (his sprite hosts the Dungeon
+	// Merchant), so don't stock it; Farnham's fruit machine is the gamble sink instead.
+	if (!RunsModEnabled)
+		SpawnBoy(myPlayer.getCharacterLevel());
 	SpawnPremium(myPlayer);
 }
 
@@ -2889,6 +3187,15 @@ void StartStore(TalkID s)
 	case TalkID::DungeonVendorCraftMaterial:
 		StartDungeonVendorCraftMaterial();
 		break;
+	case TalkID::Gamble: // [RUNS MOD]
+		StartGamble();
+		break;
+	case TalkID::GambleSpin: // [RUNS MOD]
+		StartGambleSpin();
+		break;
+	case TalkID::GambleJackpotShow: // [RUNS MOD]
+		StartGambleJackpotShow();
+		break;
 	case TalkID::NoMoney:
 		StoreNoMoney();
 		break;
@@ -3026,6 +3333,10 @@ void DrawSText(const Surface &out)
 			PrintSString(out, TextLine[i]._sx, i, TextLine[i].text, TextLine[i].flags, TextLine[i]._sval, TextLine[i].cursId, TextLine[i].cursIndent);
 	}
 
+	// [RUNS MOD] The fruit machine's reels animate per-frame over the static panel.
+	if (ActiveStore == TalkID::GambleSpin)
+		DrawGambleReels(out);
+
 	if (RenderGold) {
 		PrintSString(out, 28, 1, fmt::format(fmt::runtime(_("Your gold: {:s}")), FormatInteger(TotalPlayerGold())).c_str(), UiFlags::ColorWhitegold | UiFlags::AlignRight);
 	}
@@ -3054,6 +3365,7 @@ void StoreESC()
 	case TalkID::Drunk:
 	case TalkID::Barmaid:
 	case TalkID::DungeonVendor:
+	case TalkID::Gamble: // [RUNS MOD]
 		ActiveStore = TalkID::None;
 		break;
 	case TalkID::Gossip:
@@ -3098,6 +3410,11 @@ void StoreESC()
 		break;
 	case TalkID::DungeonVendorCraftMaterial:
 		StartStore(TalkID::DungeonVendorCraftTarget);
+		break;
+	case TalkID::GambleSpin: // [RUNS MOD]
+	case TalkID::GambleJackpotShow:
+		StartStore(TalkID::Gamble);
+		CurrentTextLine = 12;
 		break;
 	case TalkID::HealerBuy:
 		StartStore(TalkID::Healer);
@@ -3308,6 +3625,16 @@ void StoreEnter()
 		break;
 	case TalkID::DungeonVendorCraftMaterial:
 		DungeonVendorCraftMaterialEnter();
+		break;
+	case TalkID::Gamble: // [RUNS MOD]
+		GambleEnter();
+		break;
+	case TalkID::GambleSpin: // [RUNS MOD]
+		GambleSpinEnter();
+		break;
+	case TalkID::GambleJackpotShow: // [RUNS MOD]
+		StartStore(TalkID::Gamble);
+		CurrentTextLine = 14;
 		break;
 	case TalkID::NoMoney:
 	case TalkID::NoRoom:

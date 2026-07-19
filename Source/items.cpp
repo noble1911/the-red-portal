@@ -3057,6 +3057,78 @@ void DropDungeonScroll(int level, Point position, int difficulty, bool sendmsg)
 		NetSendCmdPItem(false, CMD_DROPITEM, item.position, item);
 }
 
+void DropPrizeItem(Item prize, Point position)
+{
+	// [RUNS MOD] Drop an already-built item on the ground near `position`, synced like
+	// a monster drop. Used for fruit-machine payouts: the machine spits prizes at the
+	// player's feet instead of opening bag-room dialogs.
+	if (prize.isEmpty() || ActiveItemCount >= MAXITEMS)
+		return;
+	const int ii = AllocateItem();
+	Item &item = Items[ii];
+	item = prize;
+	GetSuperItemSpace(position, static_cast<int8_t>(ii));
+	item.setNewAnimation(MyPlayer != nullptr && MyPlayer->pLvlLoad == 0);
+	NetSendCmdPItem(false, CMD_DROPITEM, item.position, item);
+}
+
+void DropGamblePrizeItem(int lvl, Point position)
+{
+	// [RUNS MOD] A good-quality equipment prize around `lvl`, dropped near `position`
+	// (the fruit machine's triple-sword payout). Mirrors a monster "onlygood" drop,
+	// but at the hero's EARNED depth rather than the current (town) level.
+	if (ActiveItemCount >= MAXITEMS)
+		return;
+	const int ii = AllocateItem();
+	Item &item = Items[ii];
+	const _item_indexes idx = GetItemIndexForDroppableItem(true, [lvl](const ItemData &data) {
+		if (lvl < data.iMinMLvl)
+			return false;
+		if (IsAnyOf(data.itype, ItemType::Gold, ItemType::Misc))
+			return false;
+		return true;
+	});
+	SetupAllItems(*MyPlayer, item, idx, AdvanceRndSeed(), lvl, 1, /*onlygood=*/true, /*pregen=*/false);
+	GetSuperItemSpace(position, static_cast<int8_t>(ii));
+	item.setNewAnimation(MyPlayer != nullptr && MyPlayer->pLvlLoad == 0);
+	NetSendCmdPItem(false, CMD_DROPITEM, item.position, item);
+}
+
+void SpawnGamblerJackpot(int qlvlCap)
+{
+	// [RUNS MOD] Roll tonight's displayed fruit-machine jackpot: a random unique whose
+	// base item is actually droppable (excludes quest bases) and whose level fits the
+	// cap -- the jackpot sits at the edge of earned progression, never past it. The
+	// item is display state only until triple crowns claim it (see ResolveGamble).
+	GamblerJackpot.clear();
+	if (!RunsModEnabled)
+		return;
+	std::vector<std::pair<size_t, _item_indexes>> pool;
+	for (size_t uid = 0; uid < UniqueItems.size(); uid++) {
+		const UniqueItem &unique = UniqueItems[uid];
+		if (unique.UIMinLvl > qlvlCap)
+			continue;
+		for (size_t idx = 0; idx < AllItemsList.size(); idx++) {
+			const ItemData &base = AllItemsList[idx];
+			if (base.iItemId != unique.UIItemId)
+				continue;
+			if (base.dropRate == 0 || !IsItemAvailable(static_cast<int>(idx)))
+				break; // quest-only or unavailable base: this unique can't be a prize
+			pool.emplace_back(uid, static_cast<_item_indexes>(idx));
+			break;
+		}
+	}
+	if (pool.empty())
+		return;
+	const auto &[uid, baseIdx] = pool[static_cast<size_t>(GenerateRnd(static_cast<int>(pool.size())))];
+	Item &item = GamblerJackpot;
+	GetItemAttrs(item, baseIdx, std::max<int>(1, UniqueItems[uid].UIMinLvl));
+	GetUniqueItem(*MyPlayer, item, static_cast<_unique_items>(uid));
+	SetupItem(item);
+	item._iIdentified = true;
+	item.updateRequiredStatsCacheForPlayer(*MyPlayer);
+}
+
 bool PlayerHasDungeonScroll(const Player &player)
 {
 	// [RUNS MOD] True if the player is already carrying a dungeon scroll (inventory

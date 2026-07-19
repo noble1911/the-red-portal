@@ -630,6 +630,14 @@ void SpawnPremium(const Player &player);
 void SpawnWitch(int lvl);
 /** @brief [RUNS MOD] Stocks the dungeon merchant with level-appropriate scrolls. */
 void SpawnDungeonVendor();
+/** @brief [RUNS MOD] Rolls the displayed fruit-machine jackpot into GamblerJackpot:
+ * a random droppable-base unique with UIMinLvl <= qlvlCap (empty if none qualify). */
+void SpawnGamblerJackpot(int qlvlCap);
+/** @brief [RUNS MOD] Drops an already-built item near `position`, network-synced
+ * (fruit-machine payouts land at the player's feet). */
+void DropPrizeItem(Item prize, Point position);
+/** @brief [RUNS MOD] Drops a good-quality equipment prize rolled around `lvl`. */
+void DropGamblePrizeItem(int lvl, Point position);
 void SpawnBoy(int lvl);
 void SpawnHealer(int lvl);
 void MakeGoldStack(Item &goldItem, int value);
