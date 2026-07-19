@@ -1,5 +1,5 @@
-# Diablo: The Red Portal -- Nintendo Switch
-# A roguelike-run total conversion built on DevilutionX (Diablo)
+# The Red Portal -- Nintendo Switch
+# A PvE-extraction total conversion built on DevilutionX (requires your own Diablo game data)
 
 # How To Install:
  - Put `devilutionx.nro` into `/switch/devilutionx`

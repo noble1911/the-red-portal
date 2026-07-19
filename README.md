@@ -1,102 +1,112 @@
-# Diablo: The Red Portal
+# The Red Portal
 
-A roguelike-run total conversion of Diablo 1, built on this fork of DevilutionX for
-desktop and Nintendo Switch (with Switch-to-Switch co-op). Tristram becomes a compact
-hub; dungeon scrolls open a red portal to single-level runs with a guaranteed boss —
-beat it, return, go deeper. Requires your own Diablo (and optionally Hellfire) MPQs.
+**A PvE-extraction total conversion of the classic Diablo engine**, built on
+[DevilutionX](https://github.com/diasurgical/devilutionX) for Windows and Nintendo
+Switch (homebrew), with cross-device co-op.
 
-> Private project. If this is ever distributed publicly, the name drops to
-> "The Red Portal" (Diablo is a Blizzard trademark).
+The linear sixteen-level descent is gone. Tristram is a compact hub; **dungeon
+scrolls** open a red portal to a single, self-contained run. Go in, get greedy,
+and get out — *a run is a heist to survive, not a level to clear.*
 
-Upstream DevilutionX README follows.
+> Requires your own copies of the original game data (see
+> [Game data](#game-data)). This project contains no Blizzard assets.
 
----
+## How it plays
 
-<p align="center">
-  <img width="560" height="144" alt="image" src="https://github.com/user-attachments/assets/7ac73801-ef7b-4cc1-8442-a191a2a0a1ce" />
-</p>
+- **Dungeon scrolls are the only way down.** Each scroll defines its run: depth
+  (1–15, or 1–24 with Hellfire data), difficulty tier (Normal / Nightmare /
+  Hell), rarity, and 1–3 **affixes** — paired boons and banes rolled from a
+  13-affix pool (more gold / magic find / drops / XP against tougher, faster,
+  denser, elementally-warded monsters, extra champions, twinned bosses, richer
+  chests and shrines...). Each affix rolls a tier (I–III) scaling both sides.
+- **The clock is always running.** Five quiet minutes, then the dungeon notices
+  you: hunt waves spawn every minute and keep growing.
+- **Every run has a boss.** Slay it and its vault spills open — a loot shower,
+  gold, and always a scroll one depth deeper — but its death starts a
+  three-minute **collapse**: loot fast and leave, because when the countdown
+  ends the portal seals for good.
+- **Or ghost the run.** Skip the boss, keep everything you found, and slip out.
+  Depth must then be bought: the merchant's scroll-fusion crafting is a real
+  gold sink, and his shelf only stocks depths you have *earned* by beating
+  bosses.
+- **Death is an extraction failure.** Everything you carried drops at your
+  corpse — gear, backpack, belt, half your gold. The run persists behind the
+  portal, so a corpse run can win it back... until the portal closes. A
+  **Scroll of Preservation** insures a single treasured item through one death.
+- **Progression is earned, not bought.** Boss kills extend the merchant's
+  stock, grow your backpack (up to 10x11), and — at the deepest level — unlock
+  the next difficulty tier.
+- **Town has teeth.** Cain explains the rules and chronicles your deeds;
+  Farnham runs a three-reel fruit machine with a displayed unique jackpot
+  (~1 in 2,460 — the house usually drinks well).
 
----
+The full design history, shipped systems, and roadmap live in
+[docs/MOD-PLAN.md](docs/MOD-PLAN.md).
 
-[![Discord Channel](https://img.shields.io/discord/518540764754608128?color=%237289DA&logo=discord&logoColor=%23FFFFFF)](https://discord.gg/devilutionx)
-[![Downloads](https://img.shields.io/github/downloads/diasurgical/devilutionX/total.svg)](https://github.com/diasurgical/devilutionX/releases/latest)
-[![Codecov](https://codecov.io/gh/diasurgical/devilutionX/branch/master/graph/badge.svg)](https://codecov.io/gh/diasurgical/devilutionX)
+## Installation
 
-<p align="center">
-<img width="853" height="480" alt="image" src="https://github.com/user-attachments/assets/ee902926-6382-4ee5-b1c2-7947e8b434e9" />
-</p>
+Grab the latest [release](../../releases/latest):
 
-<sub>*(The health-bar and XP-bar are off by default but can be enabled in the [game settings](https://github.com/diasurgical/DevilutionX/wiki/Config-File). Widescreen can also be disabled if preferred.)*</sub>
+### Windows
 
-# What is DevilutionX
+1. Unzip `devilutionx-windows-x64.zip` anywhere.
+2. Copy your game MPQs (see [Game data](#game-data)) next to `devilutionx.exe`.
+3. Run `devilutionx.exe`.
 
-DevilutionX is a port of Diablo and Hellfire that strives to make it simple to run the game while providing engine improvements, bug fixes, and some optional quality of life features.
+### Nintendo Switch (homebrew)
 
-Check out the [manual](https://github.com/diasurgical/devilutionX/wiki) for available features and how to take advantage of them.
+1. Unzip `the-red-portal-switch.zip` and copy `devilutionx.nro` **and the
+   `mods` folder** to `/switch/devilutionx/` on your SD card. The `mods/Hellfire`
+   folder is required for the Hellfire content — the MPQs alone are not enough.
+2. Copy your game MPQs to `/switch/devilutionx/`.
+3. Launch via title takeover (hold **R** while opening any installed game — the
+   album applet has too little memory). See
+   [Packaging/switch/README.txt](Packaging/switch/README.txt) for controls.
 
-For a full list of changes, see our [changelog](docs/CHANGELOG.md).
+### Game data
 
-# How to Install
+You need data files from a copy of the game you own:
 
-Note: You'll need access to the data from the original game. If you don't have an original CD, you can [buy Diablo from GoG.com](https://www.gog.com/game/diablo) or Battle.net. Alternatively, you can use `spawn.mpq` from the [shareware](https://github.com/diasurgical/devilutionx-assets/releases/latest/download/spawn.mpq) [[2]](http://ftp.blizzard.com/pub/demos/diablosw.exe) version, in place of `DIABDAT.MPQ`, to play the shareware portion of the game.
+- `DIABDAT.MPQ` — from the original CD or the
+  [GOG release](https://www.gog.com/game/diablo).
+- Optional, for the Hellfire depths (runs 17–24): `hellfire.mpq`, `hfmonk.mpq`,
+  `hfmusic.mpq`, `hfvoice.mpq`.
 
-Download the latest [DevilutionX release](https://github.com/diasurgical/devilutionX/releases/latest) and extract the contents to a location of your choosing or [build from source](#building-from-source).
+## Multiplayer
 
-- Copy `DIABDAT.MPQ` from the CD or Diablo installation (or [extract it from the GoG installer](https://github.com/diasurgical/devilutionX/wiki/Extracting-MPQs-from-the-GoG-installer)) to the DevilutionX folder.
-- To run the Diablo: Hellfire expansion, you will also need to copy `hellfire.mpq`, `hfmonk.mpq`, `hfmusic.mpq`, and `hfvoice.mpq`.
+Co-op works on desktop and Switch, including Switch-to-Switch. All players must
+run the **same build** — dungeon layouts are generated deterministically from a
+seed synced between clients, so mixed versions will desync. The scroll owner's
+portal defines the run (depth, difficulty, and affixes) for everyone.
 
-For more detailed instructions: [Installation Instructions](./docs/installing.md).
+## Building from source
 
-# Contributing
+The tree builds both targets:
 
-We are always looking for more people to help with [coding](docs/CONTRIBUTING.md), [documentation](https://github.com/diasurgical/devilutionX/wiki), [testing the latest builds](#test-builds), spreading the word, or simply just hanging out on our [Discord server](https://discord.gg/devilutionx).
+- **Windows (MSVC + vcpkg)**: `scripts/build-desktop.ps1` — see
+  [BUILD-WINDOWS.md](BUILD-WINDOWS.md) for prerequisites and the devkitPro
+  PATH gotchas.
+- **Switch (devkitPro)**: `scripts/build-switch.ps1`, or the
+  `CMake/platforms/switch.cmake` toolchain on Linux/macOS as upstream does.
 
-# Mods
+For everything engine-level (other platforms, options, translations), the
+[upstream DevilutionX docs](https://github.com/diasurgical/devilutionX#readme)
+apply unchanged.
 
-We hope to provide a good starting point for mods. In addition to the full Devilution source code, we also provide modding tools. Check out the list of known [mods based on DevilutionX](https://github.com/diasurgical/devilutionX/wiki/Mods).
+## Credits
 
-# Test Builds
+- Built on **[DevilutionX](https://github.com/diasurgical/devilutionX)** by
+  [Diasurgical and contributors](https://github.com/diasurgical/devilutionX/graphs/contributors)
+  — the engine reconstruction that makes projects like this possible.
+- The Red Portal mod design and implementation: this repository's commits.
 
-If you want to help test the latest development version (make sure to back up your files, as these may contain bugs), you can fetch the test build artifact from one of the build servers:
+## Legal
 
-*Note: You must be logged into GitHub to download the attachments!*
+The source code in this repository is licensed under the
+[Sustainable Use License](LICENSE.md) — non-commercial use and free
+redistribution only.
 
-[![Linux x86_64](https://github.com/diasurgical/devilutionX/actions/workflows/Linux_x86_64.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/Linux_x86_64.yml?query=branch%3Amaster)
-[![Linux AArch64](https://github.com/diasurgical/devilutionX/actions/workflows/Linux_aarch64.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/Linux_aarch64.yml?query=branch%3Amaster)
-[![Linux x86](https://github.com/diasurgical/devilutionX/actions/workflows/Linux_x86.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/Linux_x86.yml?query=branch%3Amaster)
-[![Linux x86_64 SDL1](https://github.com/diasurgical/devilutionX/actions/workflows/Linux_x86_64_SDL1.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/Linux_x86_64_SDL1.yml?query=branch%3Amaster)
-[![macOS x86_64](https://github.com/diasurgical/devilutionX/actions/workflows/macOS_x86_64.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/macOS_x86_64.yml?query=branch%3Amaster)
-[![Windows MinGW x64](https://github.com/diasurgical/devilutionX/actions/workflows/Windows_MinGW_x64.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/Windows_MinGW_x64.yml?query=branch%3Amaster)
-[![Windows MinGW x86](https://github.com/diasurgical/devilutionX/actions/workflows/Windows_MinGW_x86.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/Windows_MinGW_x86.yml?query=branch%3Amaster)
-[![Windows MSVC x64](https://github.com/diasurgical/devilutionX/actions/workflows/Windows_MSVC_x64.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/Windows_MSVC_x64.yml?query=branch%3Amaster)
-[![Android](https://github.com/diasurgical/devilutionX/actions/workflows/Android.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/Android.yml?query=branch%3Amaster)
-[![iOS](https://github.com/diasurgical/devilutionX/actions/workflows/iOS.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/iOS.yml?query=branch%3Amaster)
-[![PS4](https://github.com/diasurgical/devilutionX/actions/workflows/PS4.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/PS4.yml?query=branch%3Amaster)
-[![Original Xbox](https://github.com/diasurgical/devilutionX/actions/workflows/xbox_nxdk.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/xbox_nxdk.yml?query=branch%3Amaster)
-[![Xbox One/Series](https://github.com/diasurgical/devilutionX/actions/workflows/xbox_one.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/xbox_one.yml?query=branch%3Amaster)
-[![Nintendo Switch](https://github.com/diasurgical/devilutionX/actions/workflows/switch.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/switch.yml)
-[![Sony PlayStation Vita](https://github.com/diasurgical/devilutionX/actions/workflows/vita.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/vita.yml)
-[![Nintendo 3DS](https://github.com/diasurgical/devilutionX/actions/workflows/3ds.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/3ds.yml)
-[![Amiga M68K](https://github.com/diasurgical/devilutionX/actions/workflows/amiga-m68k.yml/badge.svg)](https://github.com/diasurgical/devilutionX/actions/workflows/amiga-m68k.yml)
-
-# Building from Source
-
-Want to compile the program by yourself? Great! Simply follow the [build instructions](./docs/building.md).
-
-# Credits
-
-- The original Devilution project: [Devilution](https://github.com/diasurgical/devilution#credits)
-- [Everyone](https://github.com/diasurgical/devilutionX/graphs/contributors) who worked on Devilution/DevilutionX
-- [Nikolay Popov](https://www.instagram.com/nikolaypopovz/) for UI and graphics
-- [WiAParker](https://wiaparker.pl/projekty/diablo-hellfire/) for the Polish voice pack
-- And thanks to all who support the project, report bugs, and help spread the word ❤️
-
-# Legal
-
-DevilutionX is made publicly available and released under the Sustainable Use License (see [LICENSE](LICENSE.md)).
-
-The source code in this repository is for non-commercial use only. If you use the source code, you may not charge others for access to it or any derivative work thereof.
-
-Diablo® - Copyright © 1996 Blizzard Entertainment, Inc. All rights reserved. Diablo and Blizzard Entertainment are trademarks or registered trademarks of Blizzard Entertainment, Inc. in the U.S. and/or other countries.
-
-DevilutionX and any of its maintainers are in no way associated with or endorsed by Blizzard Entertainment®.
+This project may only be used with game assets you own. Diablo® is a
+registered trademark of Blizzard Entertainment, Inc. This project is a fan
+modification of a community engine reconstruction; it is in no way associated
+with or endorsed by Blizzard Entertainment.

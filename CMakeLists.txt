@@ -485,11 +485,9 @@ if(APPLE)
 endif()
 
 if(NINTENDO_SWITCH)
-  # [RUNS MOD] The Switch home-menu title carries the mod's name. NOTE: contains a
-  # Blizzard trademark -- fine for private builds; drop to "The Red Portal" for any
-  # public distribution.
+  # [RUNS MOD] The Switch home-menu title carries the mod's name (trademark-free).
   nx_generate_nacp (${BIN_TARGET}.nacp
-    NAME    "Diablo: The Red Portal"
+    NAME    "The Red Portal"
     AUTHOR  "Devilution Team"
     VERSION "${PROJECT_VERSION}"
   )

@@ -1,4 +1,4 @@
-# Diablo: The Red Portal — Mod Plan & Roadmap
+# The Red Portal — Mod Plan & Roadmap
 
 The mod: a **roguelike-run total conversion** of Diablo 1 on top of DevilutionX. A compact
 hub town replaces Tristram; **dungeon scrolls** open red portals to seeded, self-contained
@@ -6,11 +6,13 @@ dungeon runs with scaled bosses and loot. Builds for **Windows and Nintendo Swit
 one tree; co-op requires all clients on the same build (layouts are deterministic from a
 synced seed).
 
-Branding is presentation-layer only ("Diablo: The Red Portal" in window title / menu /
-Switch NACP); binary and project stay `devilutionx` so upstream merges stay clean.
-Public distribution must drop the "Diablo" mark and ship as **The Red Portal**.
+Branding is presentation-layer only (**The Red Portal** in window title / menu / Switch
+NACP — renamed from the private-era working title on 2026-07-19, ahead of going public);
+binary and project stay `devilutionx` so upstream merges stay clean. Factual references
+to the game the mod requires (e.g. "needs your own Diablo game data") are fine; the mark
+never appears in our product name or branding.
 
-Last updated: **2026-07-18** (v0.3.0).
+Last updated: **2026-07-19** (v0.4.0).
 
 ## Milestones
 
