@@ -4741,28 +4741,33 @@ void SpawnWitch(int lvl)
 	SortVendor(WitchItems, PinnedItemCount);
 }
 
-void SpawnDungeonVendor(int charLevel)
+void SpawnDungeonVendor()
 {
-	// [RUNS MOD] Stock the dungeon merchant with four scrolls at DISTINCT levels around
-	// the character's level (so the difficulty tracks the character and the list has no
-	// confusing duplicate entries). Four items fill the store window exactly, so there
-	// is no scrolling. Each scroll rolls its own modifiers (CreateDungeonScroll assigns
-	// a fresh seed).
+	// [RUNS MOD] Stock the dungeon merchant with scrolls only for depths the hero has
+	// EARNED: up to four distinct levels ending at the deepest beaten depth + 1, so the
+	// boss is the sole gate to new depth on the buy path (scrolls stay cheap -- they are
+	// consumable entry tickets, not the progression itself; the Upgrade craft is the
+	// paid bypass). A fresh character sees a single level-1 scroll; the shelf grows to
+	// the full four with progression. Each scroll rolls its own modifiers
+	// (CreateDungeonScroll assigns a fresh seed).
 	DungeonVendorItems.clear();
 	if (!RunsModEnabled)
 		return;
-	const int base = std::clamp((charLevel + 1) / 2, 1, GetMaxRunDepth());
-	// Start one below the character's level, but keep the top of the range within the
-	// depth cap so all four levels stay distinct.
-	int level = ClampRunDepth(std::clamp(base - 1, 1, GetMaxRunDepth() - 3));
-	for (int i = 0; i < 4; i++) {
+	const int top = ClampRunDepth(MyPlayer->pDeepestBeatenDepth + 1);
+	// Collect the shelf top-down (skipping the arena, which cannot be entered), then
+	// stock in ascending order so the list reads shallow-to-deep.
+	int levels[4];
+	int count = 0;
+	for (int depth = top; depth >= 1 && count < 4; depth--) {
+		if (depth == ArenaRunDepth)
+			continue;
+		levels[count++] = depth;
+	}
+	for (int i = count - 1; i >= 0; i--) {
 		Item scroll = {};
-		CreateDungeonScroll(scroll, level);
+		CreateDungeonScroll(scroll, levels[i]);
 		scroll._iStatFlag = true;
 		DungeonVendorItems.push_back(scroll);
-		// Step with NextRunDepth rather than lowest+i so the range steps over the arena
-		// instead of stocking a scroll for a level that cannot be entered.
-		level = NextRunDepth(level);
 	}
 
 	// [RUNS MOD] The insurance offer: one Scroll of Preservation, always in stock.

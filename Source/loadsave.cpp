@@ -35,6 +35,7 @@
 #include "pfile.h"
 #include "plrmsg.h"
 #include "qol/stash.h"
+#include "runs_mod.h"
 #include "stores.h"
 #include "tables/playerdat.hpp"
 #include "utils/algorithm/container.hpp"
@@ -2722,7 +2723,8 @@ void SaveHeroItems(SaveWriter &saveWriter, Player &player)
 // carried-bag feature so existing heroes migrate in place).
 // v0/v1: the old separate 10x8 bag (items + uint16 grid [+ unlockedRows in v1]).
 // v2: extraInvRows + items anchored by their top-left cell in the unified grid.
-constexpr uint8_t InventoryExtensionVersion = 2;
+// v3: v2 + deepestBeatenDepth (gates the Dungeon Merchant's scroll stock).
+constexpr uint8_t InventoryExtensionVersion = 3;
 
 /**
  * @brief [RUNS MOD] Inserts an item at an exact inventory grid cell, if the cells are
@@ -2772,6 +2774,7 @@ void LoadInventoryExtension()
 {
 	Player &player = *MyPlayer;
 	player.pExtraInvRows = InitialExtraInventoryRows;
+	player.pDeepestBeatenDepth = 0;
 
 	// Idempotence: strip anything already sitting on the extended rows before
 	// re-reading them (the loader may run again on a reload).
@@ -2794,6 +2797,13 @@ void LoadInventoryExtension()
 
 	if (version >= 2) {
 		player.pExtraInvRows = std::clamp<uint8_t>(file.NextLE<uint8_t>(), InitialExtraInventoryRows, MaxExtraInventoryRows);
+		if (version >= 3) {
+			player.pDeepestBeatenDepth = static_cast<uint8_t>(std::min<int>(file.NextLE<uint8_t>(), GetMaxRunDepth()));
+		} else {
+			// Pre-v3 saves never tracked beaten depth; infer it from the unlocked rows
+			// (each row required a boss kill at depth 2k) so veterans keep vendor access.
+			player.pDeepestBeatenDepth = static_cast<uint8_t>((player.pExtraInvRows - InitialExtraInventoryRows) * 2);
+		}
 		const uint32_t itemCount = file.NextLE<uint32_t>();
 		for (uint32_t i = 0; i < itemCount; i++) {
 			const uint8_t anchor = file.NextLE<uint8_t>();
@@ -2816,6 +2826,8 @@ void LoadInventoryExtension()
 		if (version >= 1)
 			unlockedRows = std::clamp<uint8_t>(file.NextLE<uint8_t>(), 3, 8);
 		player.pExtraInvRows = std::clamp<uint8_t>(unlockedRows, InitialExtraInventoryRows, MaxExtraInventoryRows);
+		// Same pre-v3 inference as above: unlocked rows imply the depths beaten.
+		player.pDeepestBeatenDepth = static_cast<uint8_t>((player.pExtraInvRows - InitialExtraInventoryRows) * 2);
 		// Anchor of each bag item = its topmost-leftmost cell, scanned row-major.
 		for (uint32_t i = 0; i < itemCount; i++) {
 			int anchor = -1;
@@ -2865,12 +2877,13 @@ void SaveInventoryExtension(SaveWriter &saveWriter)
 	}
 
 	const int itemSize = (gbIsHellfire ? HellfireItemSaveSize : DiabloItemSaveSize);
-	const size_t size = 3 * sizeof(uint8_t) + sizeof(uint32_t)
+	const size_t size = 4 * sizeof(uint8_t) + sizeof(uint32_t)
 	    + entries.size() * (sizeof(uint8_t) + static_cast<size_t>(itemSize));
 	SaveHelper file(saveWriter, "herobag", size);
 	file.WriteLE<uint8_t>(InventoryExtensionVersion);
 	file.WriteLE<uint8_t>(gbIsHellfire ? 1 : 0);
 	file.WriteLE<uint8_t>(player.pExtraInvRows);
+	file.WriteLE<uint8_t>(player.pDeepestBeatenDepth);
 	file.WriteLE<uint32_t>(static_cast<uint32_t>(entries.size()));
 	for (const ExtensionEntry &entry : entries) {
 		file.WriteLE<uint8_t>(entry.anchor);

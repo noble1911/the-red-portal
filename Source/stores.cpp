@@ -2712,7 +2712,7 @@ void SetupTownStores()
 	// shrinks as you buy, down to a floor of 1); it fully restocks after a dungeon is
 	// completed, or on the first visit when it has no stock yet.
 	if (DungeonVendorItems.empty() || DungeonVendorRestockPending) {
-		SpawnDungeonVendor(myPlayer.getCharacterLevel());
+		SpawnDungeonVendor();
 		DungeonVendorRestockPending = false;
 	}
 	SpawnHealer(l);

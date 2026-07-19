@@ -29,9 +29,9 @@ Last updated: **2026-07-18** (v0.3.0).
 - **Dungeon scrolls** define runs on three axes packed in `_iCreateInfo`
   (recreation-safe, synced): level (bits 0-5), rarity = modifier count (bits 6-7:
   Common/Magic/Rare), difficulty (bits 8-9: Normal/Nightmare/Hell = real engine
-  difficulty). Scrolls are bought (infinite restock, 4 distinct levels), dropped (boss
-  always drops next-level scroll; trash ~3%), and crafted (Reroll / Upgrade / Add-mod at
-  the merchant). A starter scroll is granted only when the player has none anywhere and
+  difficulty). Scrolls are bought (restocks on boss kill; up to 4 distinct levels, capped
+  at the hero's deepest beaten depth + 1), dropped (boss always drops next-level scroll;
+  trash ~3%), and crafted (Reroll / Upgrade / Add-mod at the merchant). A starter scroll is granted only when the player has none anywhere and
   no portal is open.
 - **Modifiers**: 1-3 seeded affixes per scroll, each a boon paired with an offsetting
   bane, from a 13-affix pool — gold/magic-find/drops/XP boons vs monster stat banes
@@ -139,6 +139,13 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   deeper now takes four same-depth scrolls total (target + 3 materials, from 3% trash
   drops or the vendor when your character level keeps pace), while the boss stays the
   fast lane. Reroll/Add-modifier still burn one scroll of any level.
+- **Vendor stock is progression-gated** (follow-up, 2026-07-19): the merchant now sells
+  scrolls only up to the hero's **deepest beaten depth + 1** (`pDeepestBeatenDepth`,
+  persisted in the herobag side file v3; pre-v3 saves infer it from unlocked inventory
+  rows). Stock previously tracked character level and sold a level-4 scroll for 200g to
+  a fresh character, undercutting both the boss lane and the quadratic Upgrade craft.
+  Scrolls stay cheap (level x 50) -- they are entry tickets; depth access is the earned
+  thing. A fresh character sees one level-1 scroll; the shelf grows to four levels.
 - Vestigial `AdvanceRunDepth` retired (depth is scroll-defined; boss rewards all fire
   at kill time). A physical vault room was rejected: theme rooms don't generate on
   Nest/Crypt/many layouts.

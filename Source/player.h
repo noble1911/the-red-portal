@@ -312,6 +312,11 @@ struct Player {
 	 * not the vanilla-shaped player serialization; not network-synced (remote players
 	 * keep the default -- only explicit grid-index messages touch their extra rows). */
 	uint8_t pExtraInvRows = InitialExtraInventoryRows;
+	/** [RUNS MOD] Deepest run depth whose boss this character has beaten (0 = none).
+	 * Gates the Dungeon Merchant's scroll stock to earned depths + 1. Saved in the
+	 * per-hero side file alongside pExtraInvRows; not network-synced (each client
+	 * gates its own vendor). */
+	uint8_t pDeepestBeatenDepth = 0;
 
 	uint8_t plrlevel;
 	bool plrIsOnSetLevel;

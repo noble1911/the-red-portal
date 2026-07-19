@@ -4188,6 +4188,11 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 		// [RUNS MOD] Deep-enough clears grow the extended inventory (each client its own).
 		if (firstRunBossKill)
 			TryUnlockInventoryRowForDepth(currlevel);
+		// [RUNS MOD] Record the hero's deepest beaten depth (each client its own); the
+		// Dungeon Merchant only stocks scrolls up to this + 1, so the boss is the sole
+		// gate to new depth on the buy path.
+		if (currlevel > MyPlayer->pDeepestBeatenDepth)
+			MyPlayer->pDeepestBeatenDepth = static_cast<uint8_t>(std::min<int>(currlevel, GetMaxRunDepth()));
 		// [RUNS MOD] Clearing the boss at the unlock depth opens the next difficulty tier
 		// (Normal -> Nightmare -> Hell), tracked per character in pDiabloKillLevel (stored
 		// as clearedDifficulty + 1, matching vanilla's Diablo-kill difficulty gate).

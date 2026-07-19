@@ -629,7 +629,7 @@ void ReplacePremium(const Player &player, int idx);
 void SpawnPremium(const Player &player);
 void SpawnWitch(int lvl);
 /** @brief [RUNS MOD] Stocks the dungeon merchant with level-appropriate scrolls. */
-void SpawnDungeonVendor(int charLevel);
+void SpawnDungeonVendor();
 void SpawnBoy(int lvl);
 void SpawnHealer(int lvl);
 void MakeGoldStack(Item &goldItem, int value);
