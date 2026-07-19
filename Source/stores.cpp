@@ -1534,8 +1534,59 @@ void StartStoryteller()
 	AddSText(0, 9, _("Would you like to:"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
 	AddSText(0, 12, _("Talk to Cain"), UiFlags::ColorBlue | UiFlags::AlignCenter, true);
 	AddSText(0, 14, _("Identify an item"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	// [RUNS MOD] Cain doubles as the in-game manual: a short primer on the run rules.
+	if (RunsModEnabled)
+		AddSText(0, 16, _("Ask about the rules"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 	AddSText(0, 18, _("Say goodbye"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 	AddSLine(5);
+}
+
+// [RUNS MOD] Which page of Cain's rules primer is showing.
+int RulesPage = 0;
+constexpr int NumRulesPages = 2;
+
+// [RUNS MOD] Cain's rules primer: the whole loop in two static pages. Kept to short
+// hand-broken lines -- the store panel does not word-wrap. Body lines start at 5 and
+// must end by 18 so the nav line at BackButtonLine() (20 with tall fonts) stays clear.
+void StartStorytellerRules()
+{
+	IsTextFullSize = true;
+	HasScrollbar = false;
+	int l = 5;
+	if (RulesPage == 0) {
+		AddSText(0, 1, _("The Rules of the Run (1 of 2)"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+		AddSLine(3);
+		AddSText(20, l++, _("A dungeon scroll opens the red portal to a run of its depth."), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("Deeper runs hold deadlier foes -- and richer spoils."), UiFlags::ColorWhite, false);
+		l++;
+		AddSText(20, l++, _("You have five quiet minutes. Then the dungeon takes notice"), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("and sends ever-larger packs hunting you, minute by minute."), UiFlags::ColorWhite, false);
+		l++;
+		AddSText(20, l++, _("Every run has a boss. Slay it and its vault spills open:"), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("treasure, gold, and always a scroll one depth deeper."), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("Its death starts the collapse: three minutes to loot and go."), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("Then the portal seals, and what still lies below is lost."), UiFlags::ColorWhite, false);
+		l++;
+		AddSText(20, l++, _("Too fearsome? Ghost the run: take what you find, slip out,"), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("and keep it all. But depth must then be bought, not won."), UiFlags::ColorWhite, false);
+		AddSText(0, BackButtonLine(), _("Next"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	} else {
+		AddSText(0, 1, _("The Rules of the Run (2 of 2)"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+		AddSLine(3);
+		AddSText(20, l++, _("Death is costly: everything you carried falls where you die"), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("-- gear, pack, and half your gold. Your corpse waits in the"), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("run while its portal stands. A Scroll of Preservation"), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("shields one carried item from death."), UiFlags::ColorWhite, false);
+		l++;
+		AddSText(20, l++, _("The Dungeon Merchant sells scrolls for conquered depths;"), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("beating a boss restocks his shelf, one depth deeper."), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("For gold he will also reroll, upgrade or empower a scroll."), UiFlags::ColorWhite, false);
+		l++;
+		AddSText(20, l++, _("Boss kills at depths 2, 4, 6 and 8 grow your pack a row."), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("Fell the boss at depth 15 to unlock the next difficulty."), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("The chest in the square is your stash; its goods are safe."), UiFlags::ColorWhite, false);
+		AddSText(0, BackButtonLine(), _("Done"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	}
 }
 
 bool IdItemOk(Item *i)
@@ -2401,10 +2452,27 @@ void StorytellerEnter()
 	case 14:
 		StartStore(TalkID::StorytellerIdentify);
 		break;
+	// [RUNS MOD] The rules primer, from page one.
+	case 16:
+		RulesPage = 0;
+		StartStore(TalkID::StorytellerRules);
+		break;
 	case 18:
 		ActiveStore = TalkID::None;
 		break;
 	}
+}
+
+// [RUNS MOD] Enter on the primer's nav line: page forward, then back to Cain's menu.
+void StorytellerRulesEnter()
+{
+	if (RulesPage + 1 < NumRulesPages) {
+		RulesPage++;
+		StartStore(TalkID::StorytellerRules);
+		return;
+	}
+	StartStore(TalkID::Storyteller);
+	CurrentTextLine = 16;
 }
 
 void StorytellerIdentifyEnter()
@@ -2849,6 +2917,9 @@ void StartStore(TalkID s)
 	case TalkID::StorytellerIdentify:
 		StartStorytellerIdentify();
 		break;
+	case TalkID::StorytellerRules: // [RUNS MOD]
+		StartStorytellerRules();
+		break;
 	case TalkID::SmithPremiumBuy:
 		if (!StartSmithPremiumBuy())
 			return;
@@ -3035,6 +3106,10 @@ void StoreESC()
 	case TalkID::StorytellerIdentify:
 		StartStore(TalkID::Storyteller);
 		CurrentTextLine = 14;
+		break;
+	case TalkID::StorytellerRules: // [RUNS MOD]
+		StartStore(TalkID::Storyteller);
+		CurrentTextLine = 16;
 		break;
 	case TalkID::StorytellerIdentifyShow:
 		StartStore(TalkID::StorytellerIdentify);
@@ -3260,6 +3335,9 @@ void StoreEnter()
 		break;
 	case TalkID::StorytellerIdentify:
 		StorytellerIdentifyEnter();
+		break;
+	case TalkID::StorytellerRules: // [RUNS MOD]
+		StorytellerRulesEnter();
 		break;
 	case TalkID::Gossip:
 		TalkEnter();

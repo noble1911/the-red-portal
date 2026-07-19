@@ -74,6 +74,8 @@ enum class TalkID : uint8_t {
 	DungeonVendorBuy,
 	DungeonVendorCraftTarget,   // pick the scroll to craft on
 	DungeonVendorCraftMaterial, // pick the scroll to consume as material
+	// [RUNS MOD] Cain's primer on the run rules (paged static text).
+	StorytellerRules,
 };
 
 /** Currently active store */
