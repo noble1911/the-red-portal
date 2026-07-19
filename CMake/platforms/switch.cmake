@@ -12,6 +12,13 @@ set(PREFILL_PLAYER_NAME ON)
 set(DEVILUTIONX_GAMEPAD_TYPE Nintendo)
 set(NOEXIT ON)
 
+# [RUNS MOD] The extended inventory needs a >=683px-tall render to fit every unlocked
+# row above the main panel; the engine default (640x480, fit-to-screen widened) left
+# the extra rows under the HUD wings on hardware. 720p is the Switch's native
+# handheld resolution and fits all rows.
+set(DEFAULT_WIDTH 1280)
+set(DEFAULT_HEIGHT 720)
+
 set(JOY_BUTTON_DPAD_LEFT 16)
 set(JOY_BUTTON_DPAD_UP 17)
 set(JOY_BUTTON_DPAD_RIGHT 18)

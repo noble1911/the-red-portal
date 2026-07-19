@@ -226,7 +226,18 @@ int UnlockedExtraInventoryRows(const Player &player)
 {
 	if (!RunsModEnabled)
 		return 0;
-	return std::min<int>(player.pExtraInvRows, MaxExtraInventoryRows);
+	int rows = std::min<int>(player.pExtraInvRows, MaxExtraInventoryRows);
+	// [RUNS MOD] Cap to the rows that physically fit between the inventory art and
+	// the main panel. On small render heights (Switch hardware playtest: a fresh
+	// 480-height config) the extra rows otherwise draw under the HUD wings and off
+	// the screen bottom. Rows that don't fit behave exactly like locked rows; note
+	// that extension items from a taller-screen save then restore via the auto-place
+	// fallback rather than their saved cells. 1280x720 (the Switch default) fits all
+	// MaxExtraInventoryRows.
+	const int panelTop = GetRightPanel().position.y;
+	const int available = gnScreenHeight - GetMainPanel().size.height - panelTop
+	    - InvLastRowBottom - InvBottomBorderHeight;
+	return std::clamp(rows, 0, std::max(0, available / InvRowPitch));
 }
 
 int UnlockedInventoryGridCells(const Player &player)
