@@ -76,6 +76,8 @@ enum class TalkID : uint8_t {
 	DungeonVendorCraftMaterial, // pick the scroll to consume as material
 	// [RUNS MOD] Cain's primer on the run rules (paged static text).
 	StorytellerRules,
+	// [RUNS MOD] Cain's progression report (deepest boss, pack rows, difficulty...).
+	StorytellerProgress,
 	// [RUNS MOD] Farnham's fruit machine.
 	Gamble,            // the menu: stake, jackpot showcase, pull/leave
 	GambleSpin,        // a spin's reels + result

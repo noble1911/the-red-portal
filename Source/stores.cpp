@@ -35,6 +35,7 @@
 #include "game_mode.hpp"
 #include "lua/lua_event.hpp"
 #include "minitext.h"
+#include "monster.h"
 #include "multi.h"
 #include "options.h"
 #include "panels/info_box.hpp"
@@ -1874,14 +1875,85 @@ void StartStoryteller()
 	IsTextFullSize = false;
 	HasScrollbar = false;
 	AddSText(0, 2, _("The Town Elder"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
-	AddSText(0, 9, _("Would you like to:"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
-	AddSText(0, 12, _("Talk to Cain"), UiFlags::ColorBlue | UiFlags::AlignCenter, true);
-	AddSText(0, 14, _("Identify an item"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
-	// [RUNS MOD] Cain doubles as the in-game manual: a short primer on the run rules.
-	if (RunsModEnabled)
-		AddSText(0, 16, _("Ask about the rules"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	AddSText(0, 8, _("Would you like to:"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+	AddSText(0, 10, _("Talk to Cain"), UiFlags::ColorBlue | UiFlags::AlignCenter, true);
+	AddSText(0, 12, _("Identify an item"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	// [RUNS MOD] Cain doubles as the in-game manual and the hero's chronicler: a
+	// short primer on the run rules, and a report of earned progression.
+	if (RunsModEnabled) {
+		AddSText(0, 14, _("Ask about the rules"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+		AddSText(0, 16, _("Ask about your deeds"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	}
 	AddSText(0, 18, _("Say goodbye"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 	AddSLine(5);
+}
+
+// [RUNS MOD] Cain's progression report: everything the hero has EARNED, in one place
+// -- the numbers that gate the vendor, the pack, and the difficulty ladder.
+void StartStorytellerProgress()
+{
+	IsTextFullSize = true;
+	HasScrollbar = false;
+	AddSText(0, 1, _("Your Deeds"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+	AddSLine(3);
+	const Player &myPlayer = *MyPlayer;
+	int l = 5;
+
+	if (myPlayer.pDeepestBeatenDepth > 0)
+		AddSText(20, l++, fmt::format(fmt::runtime(_("Deepest boss slain: depth {:d} of {:d}.")), myPlayer.pDeepestBeatenDepth, GetMaxRunDepth()), UiFlags::ColorWhite, false);
+	else
+		AddSText(20, l++, _("No run boss has fallen to you yet."), UiFlags::ColorWhite, false);
+	AddSText(20, l++, fmt::format(fmt::runtime(_("The Dungeon Merchant stocks scrolls to depth {:d}.")), ClampRunDepth(myPlayer.pDeepestBeatenDepth + 1)), UiFlags::ColorWhite, false);
+	l++;
+
+	const int extraRows = myPlayer.pExtraInvRows - InitialExtraInventoryRows;
+	const int maxExtraRows = MaxExtraInventoryRows - InitialExtraInventoryRows;
+	if (myPlayer.pExtraInvRows >= MaxExtraInventoryRows) {
+		AddSText(20, l++, fmt::format(fmt::runtime(_("Pack rows earned: {:d} of {:d} -- fully grown.")), extraRows, maxExtraRows), UiFlags::ColorWhite, false);
+	} else {
+		const int nextRowDepth = (myPlayer.pExtraInvRows - InitialExtraInventoryRows + 1) * 2;
+		AddSText(20, l++, fmt::format(fmt::runtime(_("Pack rows earned: {:d} of {:d}; the next needs a boss at depth {:d}.")), extraRows, maxExtraRows, nextRowDepth), UiFlags::ColorWhite, false);
+	}
+	l++;
+
+	switch (std::min<int>(myPlayer.pDiabloKillLevel, 3)) {
+	case 0:
+		AddSText(20, l++, fmt::format(fmt::runtime(_("Only Normal lies open. Fell the boss at depth {:d} to unlock Nightmare.")), DifficultyUnlockDepth), UiFlags::ColorWhite, false);
+		break;
+	case 1:
+		AddSText(20, l++, fmt::format(fmt::runtime(_("Nightmare is unlocked. Fell its depth-{:d} boss to open Hell.")), DifficultyUnlockDepth), UiFlags::ColorWhite, false);
+		break;
+	case 2:
+		AddSText(20, l++, _("Hell is unlocked. Nothing deeper remains."), UiFlags::ColorWhite, false);
+		break;
+	default:
+		AddSText(20, l++, _("Hell itself has been conquered."), UiFlags::ColorWhitegold, false);
+		break;
+	}
+	l++;
+
+	int totalKills = 0;
+	for (int i = 0; i < NUM_MAX_MTYPES; i++)
+		totalKills += MonsterKillCounts[i];
+	AddSText(20, l++, fmt::format(fmt::runtime(_("Monsters slain: {:s}.")), FormatInteger(totalKills)), UiFlags::ColorWhite, false);
+
+	int preservedCount = 0;
+	for (const Item &item : myPlayer.InvBody) {
+		if (!item.isEmpty() && item.isPreserved())
+			preservedCount++;
+	}
+	for (int i = 0; i < myPlayer._pNumInv; i++) {
+		if (myPlayer.InvList[i].isPreserved())
+			preservedCount++;
+	}
+	for (const Item &item : myPlayer.SpdList) {
+		if (!item.isEmpty() && item.isPreserved())
+			preservedCount++;
+	}
+	if (preservedCount > 0)
+		AddSText(20, l++, fmt::format(fmt::runtime(_("Items preserved against death: {:d}.")), preservedCount), UiFlags::ColorWhite, false);
+
+	AddSText(0, 18, _("Done"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 }
 
 // [RUNS MOD] Which page of Cain's rules primer is showing.
@@ -2786,19 +2858,23 @@ void HealerBuyEnter()
 void StorytellerEnter()
 {
 	switch (CurrentTextLine) {
-	case 12:
-		OldTextLine = 12;
+	case 10:
+		OldTextLine = 10;
 		TownerId = TOWN_STORY;
 		OldActiveStore = TalkID::Storyteller;
 		StartStore(TalkID::Gossip);
 		break;
-	case 14:
+	case 12:
 		StartStore(TalkID::StorytellerIdentify);
 		break;
 	// [RUNS MOD] The rules primer, from page one.
-	case 16:
+	case 14:
 		RulesPage = 0;
 		StartStore(TalkID::StorytellerRules);
+		break;
+	// [RUNS MOD] The progression report.
+	case 16:
+		StartStore(TalkID::StorytellerProgress);
 		break;
 	case 18:
 		ActiveStore = TalkID::None;
@@ -2815,7 +2891,7 @@ void StorytellerRulesEnter()
 		return;
 	}
 	StartStore(TalkID::Storyteller);
-	CurrentTextLine = 16;
+	CurrentTextLine = 14;
 }
 
 void StorytellerIdentifyEnter()
@@ -3279,6 +3355,9 @@ void StartStore(TalkID s)
 	case TalkID::StorytellerRules: // [RUNS MOD]
 		StartStorytellerRules();
 		break;
+	case TalkID::StorytellerProgress: // [RUNS MOD]
+		StartStorytellerProgress();
+		break;
 	case TalkID::SmithPremiumBuy:
 		if (!StartSmithPremiumBuy())
 			return;
@@ -3474,9 +3553,13 @@ void StoreESC()
 		break;
 	case TalkID::StorytellerIdentify:
 		StartStore(TalkID::Storyteller);
-		CurrentTextLine = 14;
+		CurrentTextLine = 12;
 		break;
 	case TalkID::StorytellerRules: // [RUNS MOD]
+		StartStore(TalkID::Storyteller);
+		CurrentTextLine = 14;
+		break;
+	case TalkID::StorytellerProgress: // [RUNS MOD]
 		StartStore(TalkID::Storyteller);
 		CurrentTextLine = 16;
 		break;
@@ -3717,6 +3800,10 @@ void StoreEnter()
 		break;
 	case TalkID::StorytellerRules: // [RUNS MOD]
 		StorytellerRulesEnter();
+		break;
+	case TalkID::StorytellerProgress: // [RUNS MOD] Done -> back to Cain's menu
+		StartStore(TalkID::Storyteller);
+		CurrentTextLine = 16;
 		break;
 	case TalkID::Gossip:
 		TalkEnter();

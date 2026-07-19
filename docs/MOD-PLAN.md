@@ -52,9 +52,12 @@ Last updated: **2026-07-18** (v0.3.0).
   hero files and network packs stay vanilla-shaped (40 cells); extension items live in a
   per-hero side file with migration from old bag saves. Remote players see only the base
   40 cells (extension is local, like the stash).
-- **In-game manual** (2026-07-19): Cain's menu gained "Ask about the rules" — a two-page
-  static primer (TalkID::StorytellerRules) covering the run loop, clocks, ghost/boss
-  split, death rules, crafting, and progression unlocks. Update it when rules change.
+- **In-game manual + chronicle** (2026-07-19): Cain's menu gained "Ask about the rules"
+  — a two-page static primer (TalkID::StorytellerRules) covering the run loop, clocks,
+  ghost/boss split, death rules, crafting, and progression unlocks (update it when
+  rules change) — and "Ask about your deeds" (TalkID::StorytellerProgress): deepest
+  boss slain, vendor stock depth, pack rows + next-row depth, difficulty ladder
+  status, total monster kills, and active Preservation marks.
 - **Presentation**: red-portal home-menu icon, no pregame difficulty screen (difficulty
   comes from scrolls), multiplayer unblocked. (Torch flicker + dynamic wall shadows were
   tried 2026-07-18 and reverted the same day: the flicker read as jarring, and the
