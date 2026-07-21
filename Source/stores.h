@@ -82,6 +82,9 @@ enum class TalkID : uint8_t {
 	Gamble,            // the menu: stake, jackpot showcase, pull/leave
 	GambleSpin,        // a spin's reels + result
 	GambleJackpotShow, // full-size inspect view of tonight's jackpot item
+	// [RUNS MOD] Cain's hero guides: class list, then one class's build primer.
+	StorytellerGuides,
+	StorytellerGuideShow,
 };
 
 /** Currently active store */

@@ -182,11 +182,17 @@ void SelheroListSelect(size_t value)
 				continue;
 			}
 
-			if (heroClass == HeroClass::Bard && !HaveBardAssets() && !(*GetOptions().Gameplay.testBard)) {
+			// [RUNS MOD] The Bard and Barbarian are full roster members in run mode
+			// (Hellfire sessions, like the Monk): their class data ships with the mod
+			// and the engine substitutes Rogue/Warrior art when the dedicated sprite
+			// packs are absent. Vanilla keeps them behind assets or the test option.
+			if (heroClass == HeroClass::Bard && !(RunsModEnabled && gbIsHellfire)
+			    && !HaveBardAssets() && !(*GetOptions().Gameplay.testBard)) {
 				continue;
 			}
 
-			if (heroClass == HeroClass::Barbarian && !HaveBarbarianAssets() && !(*GetOptions().Gameplay.testBarbarian)) {
+			if (heroClass == HeroClass::Barbarian && !(RunsModEnabled && gbIsHellfire)
+			    && !HaveBarbarianAssets() && !(*GetOptions().Gameplay.testBarbarian)) {
 				continue;
 			}
 

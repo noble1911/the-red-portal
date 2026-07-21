@@ -105,3 +105,9 @@ MT_SPIDLORD	Vessik the Broodlord	general	0	550	AcidUnique	3	18	30	0	0	0	0	0	0	IM
 MT_LICH	Gravelord Vhassk	general	0	600	Lich	3	20	35	0	0	0	0	0	0	IMMUNE_MAGIC,RESIST_FIRE	None	0	0	
 MT_ARCHLICH	The Pale Regent	general	0	750	ArchLich	3	25	40	0	0	0	0	0	0	IMMUNE_MAGIC,IMMUNE_FIRE	None	0	0	
 MT_BICLOPS	Kargol the Twice-Crowned	general	0	800	SkeletonMelee	3	30	50	0	0	0	0	0	0	RESIST_FIRE,RESIST_LIGHTNING	None	0	0	
+MT_REDDTH	The Red Death	general	0	600	Storm	3	20	35	0	0	0	0	0	0	IMMUNE_MAGIC,IMMUNE_FIRE	None	0	0	
+MT_BONEDMN	Marrowgrave	general	0	600	Storm	3	20	35	0	0	0	0	0	0	IMMUNE_MAGIC	None	0	0	
+MT_LRDSAYTR	Satyr Lord	general	0	600	SkeletonMelee	3	20	35	0	0	0	0	0	0	RESIST_FIRE,RESIST_LIGHTNING	None	0	0	
+MT_INVILORD	The Invisible Lord	general	0	600	SkeletonMelee	3	20	35	0	0	0	0	0	0	RESIST_MAGIC,RESIST_FIRE,RESIST_LIGHTNING	None	0	0	
+MT_BIGFALL	Gorefang the Brute	general	0	600	SkeletonMelee	3	20	35	0	0	0	0	0	0	RESIST_FIRE,RESIST_LIGHTNING	None	0	0	
+MT_HELLBURN	The First Flame	general	0	600	Magma	3	20	35	0	0	0	0	0	0	IMMUNE_MAGIC,IMMUNE_FIRE,RESIST_LIGHTNING	None	0	0	

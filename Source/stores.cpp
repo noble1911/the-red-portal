@@ -1136,19 +1136,6 @@ int GambleReelStopsPlayed;
 bool GambleSpinDone;
 constexpr uint32_t GambleReelStopMs[3] = { 750, 1250, 1750 };
 
-const char *GambleSymbolName(GambleSymbol symbol)
-{
-	switch (symbol) {
-	case GambleSymbol::Gold: return N_("Gold");
-	case GambleSymbol::Sword: return N_("Sword");
-	case GambleSymbol::Scroll: return N_("Scroll");
-	case GambleSymbol::Potion: return N_("Potion");
-	case GambleSymbol::Skull: return N_("Skull");
-	case GambleSymbol::Crown: return N_("Crown");
-	}
-	return "";
-}
-
 int GambleStake()
 {
 	// Scales with earned depth so the machine stays a real gold sink for rich
@@ -1311,17 +1298,20 @@ void StartGambleSpin()
 	GambleSpinDone = false;
 }
 
-UiFlags GambleSymbolColor(GambleSymbol symbol)
+// [RUNS MOD] Each reel face is a real item icon from the cursor sheet -- text reels
+// were unreadable in playtests. Icons are deliberately iconic silhouettes: gold pile,
+// short sword, scroll, red potion, skull cap and crown.
+int GambleSymbolCursor(GambleSymbol symbol)
 {
 	switch (symbol) {
-	case GambleSymbol::Gold: return UiFlags::ColorGold;
-	case GambleSymbol::Sword: return UiFlags::ColorWhite;
-	case GambleSymbol::Scroll: return UiFlags::ColorBlue;
-	case GambleSymbol::Potion: return UiFlags::ColorRed;
-	case GambleSymbol::Skull: return UiFlags::ColorOrange;
-	case GambleSymbol::Crown: return UiFlags::ColorWhitegold;
+	case GambleSymbol::Gold: return ICURS_GOLD_LARGE;
+	case GambleSymbol::Sword: return ICURS_SHORT_SWORD;
+	case GambleSymbol::Scroll: return ICURS_SCROLL_OF;
+	case GambleSymbol::Potion: return ICURS_POTION_OF_FULL_HEALING;
+	case GambleSymbol::Skull: return ICURS_SKULL_CAP;
+	case GambleSymbol::Crown: return ICURS_CROWN;
 	}
-	return UiFlags::ColorWhite;
+	return ICURS_GOLD_SMALL;
 }
 
 void DrawGambleReels(const Surface &out)
@@ -1339,19 +1329,16 @@ void DrawGambleReels(const Surface &out)
 	// 575 wide for the full-size panel.
 	const Point uiPosition = GetUIRectangle().position;
 	const int baseX = uiPosition.x + 32;
-	const int rowY = uiPosition.y + PaddingTop + TextLine[8].y + TextLine[8]._syoff;
+	// Icons stand on a common shelf (the bottom of line 11): mixed icon heights
+	// (28px potions to 84px swords) grow upward into the panel's empty lines, and
+	// the result line at 12 stays clear.
+	const int shelfY = uiPosition.y + PaddingTop + TextLine[11].y + TextLine[11]._syoff;
 	constexpr int PanelTextWidth = 575;
-	constexpr int ColumnWidth = 150;
 	constexpr int ColumnSpacing = 170;
 	const int mid = PanelTextWidth / 2;
 
 	const uint32_t elapsed = static_cast<uint32_t>(SDL_GetTicks()) - GambleSpinStartTicks;
 	int stopped = 0;
-	for (int s = 0; s < 2; s++) {
-		const int center = mid - ColumnSpacing / 2 + s * ColumnSpacing;
-		const Rectangle rect { { baseX + center - 10, rowY }, { 20, 0 } };
-		DrawString(out, "|", rect, { .flags = UiFlags::ColorWhite | UiFlags::AlignCenter });
-	}
 	for (int i = 0; i < 3; i++) {
 		GambleSymbol shown;
 		if (elapsed >= GambleReelStopMs[i]) {
@@ -1362,8 +1349,8 @@ void DrawGambleReels(const Surface &out)
 			shown = static_cast<GambleSymbol>((elapsed / 50 + static_cast<uint32_t>(i) * 2) % NumGambleSymbols);
 		}
 		const int center = mid + (i - 1) * ColumnSpacing;
-		const Rectangle rect { { baseX + center - ColumnWidth / 2, rowY }, { ColumnWidth, 0 } };
-		DrawString(out, _(GambleSymbolName(shown)), rect, { .flags = GambleSymbolColor(shown) | UiFlags::AlignCenter });
+		const ClxSprite sprite = GetInvItemSprite(static_cast<int>(CURSOR_FIRSTITEM) + GambleSymbolCursor(shown));
+		ClxDraw(out, { baseX + center - sprite.width() / 2, shelfY }, sprite);
 	}
 	// One click per reel landing; the payout jingle only after the last one.
 	while (GambleReelStopsPlayed < stopped) {
@@ -1883,9 +1870,124 @@ void StartStoryteller()
 	if (RunsModEnabled) {
 		AddSText(0, 14, _("Ask about the rules"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 		AddSText(0, 16, _("Ask about your deeds"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+		AddSText(0, 18, _("Ask about the heroes"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 	}
-	AddSText(0, 18, _("Say goodbye"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	AddSText(0, RunsModEnabled ? 20 : 18, _("Say goodbye"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 	AddSLine(5);
+}
+
+// [RUNS MOD] The class whose guide page Cain is showing.
+HeroClass GuideClass = HeroClass::Warrior;
+
+// [RUNS MOD] Cain's hero guides: pick a class, get a short build primer (what stats
+// matter, how the class plays, and one run-specific tip). The Hellfire trio shows
+// only when Hellfire is active -- the same gate as hero creation.
+void StartStorytellerGuides()
+{
+	IsTextFullSize = true;
+	HasScrollbar = false;
+	AddSText(0, 1, _("The Heroes"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+	AddSLine(3);
+	AddSText(0, 5, _("Whose tale would you hear?"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+	AddSText(0, 7, _("The Warrior"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	AddSText(0, 9, _("The Rogue"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	AddSText(0, 11, _("The Sorcerer"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	if (gbIsHellfire) {
+		AddSText(0, 13, _("The Monk"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+		AddSText(0, 15, _("The Bard"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+		AddSText(0, 17, _("The Barbarian"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	}
+	AddSText(0, BackButtonLine(), _("Back"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+}
+
+// [RUNS MOD] One class's guide page. Which class is in GuideClass.
+void StartStorytellerGuideShow()
+{
+	IsTextFullSize = true;
+	HasScrollbar = false;
+	AddSLine(3);
+	int l = 5;
+	const auto say = [&l](const char *text) {
+		AddSText(20, l++, _(text), UiFlags::ColorWhite, false);
+	};
+	const auto gap = [&l] { l++; };
+	switch (GuideClass) {
+	case HeroClass::Warrior:
+		AddSText(0, 1, _("The Warrior"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+		say("Strength drives his blows and carries the heaviest plate;");
+		say("Dexterity lands them; Vitality lets him trade hit for hit.");
+		gap();
+		say("A frontline brawler: simple, sturdy, gear-hungry. His craft");
+		say("mends gear in the field, at a small cost to its durability.");
+		gap();
+		say("In a run: hold a doorway when the dungeon wakes, and spend");
+		say("your gold at the smithy -- plate is his second health bar.");
+		break;
+	case HeroClass::Rogue:
+		AddSText(0, 1, _("The Rogue"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+		say("Dexterity is everything: her damage, her aim, her armor.");
+		say("A little Magic for utility; Vitality enough to survive a");
+		say("mistake.");
+		gap();
+		say("She wins by never being touched, and her craft disarms the");
+		say("traps that chests and doors love to hide.");
+		gap();
+		say("In a run: the waves die before they arrive if you keep");
+		say("moving. A cornered rogue is a dead rogue -- kite wide.");
+		break;
+	case HeroClass::Sorcerer:
+		AddSText(0, 1, _("The Sorcerer"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+		say("Magic rules all: his spell damage, his mana, the books he");
+		say("can read. Vitality is precious; little else stands between");
+		say("him and the teeth.");
+		gap();
+		say("Frail at dawn, a god by dusk. Books raise his spells, his");
+		say("craft recharges staves, and Mana Shield turns mana to life.");
+		gap();
+		say("In a run: buy every book Adria sells, open with the staff,");
+		say("and never melee anything you could have burned.");
+		break;
+	case HeroClass::Monk:
+		AddSText(0, 1, _("The Monk"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+		say("Balance Dexterity and Strength. He shuns heavy armor --");
+		say("cloth suits him best -- and his staff strikes several foes");
+		say("in a single sweep.");
+		gap();
+		say("Fast and mobile, at his best in the open where he can");
+		say("weave. His craft is Search, laying bare what the floor hides.");
+		gap();
+		say("In a run: he thrives against the waves -- wade in, sweep");
+		say("the pack, and be gone before the dungeon closes its fist.");
+		break;
+	case HeroClass::Bard:
+		AddSText(0, 1, _("The Bard"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+		say("Split her points between Strength and Dexterity, with");
+		say("Magic enough to read what she finds. She fights with a");
+		say("blade in each hand.");
+		gap();
+		say("The flexible one: a rogue's speed up close, a passable");
+		say("caster in a pinch. Her craft identifies loot on the spot.");
+		gap();
+		say("In a run: two fast blades shred a boss; keep one spell");
+		say("ready for the pack that gets too friendly.");
+		break;
+	case HeroClass::Barbarian:
+		AddSText(0, 1, _("The Barbarian"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+		say("Strength beyond reason and the Vitality to match; Magic");
+		say("was never his language. He swings two-handed steel in a");
+		say("single fist.");
+		gap();
+		say("Pure violence, with a Rage that trades safety for");
+		say("slaughter when the crowd presses close.");
+		gap();
+		say("In a run: the waves only feed him. Mind the collapse");
+		say("clock -- slaughter has made many a hero late.");
+		break;
+	default:
+		AddSText(0, 1, _("The Heroes"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+		break;
+	}
+	AddSText(0, BackButtonLine(), _("Done"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 }
 
 // [RUNS MOD] Cain's progression report: everything the hero has EARNED, in one place
@@ -2880,10 +2982,38 @@ void StorytellerEnter()
 	case 16:
 		StartStore(TalkID::StorytellerProgress);
 		break;
+	// [RUNS MOD] The hero guides (in run mode; otherwise 18 is goodbye).
 	case 18:
+		if (RunsModEnabled) {
+			StartStore(TalkID::StorytellerGuides);
+			break;
+		}
+		ActiveStore = TalkID::None;
+		break;
+	case 20:
 		ActiveStore = TalkID::None;
 		break;
 	}
+}
+
+// [RUNS MOD] Enter on the hero-guides list: pick a class or go back to Cain.
+void StorytellerGuidesEnter()
+{
+	if (CurrentTextLine == BackButtonLine()) {
+		StartStore(TalkID::Storyteller);
+		CurrentTextLine = 18;
+		return;
+	}
+	switch (CurrentTextLine) {
+	case 7: GuideClass = HeroClass::Warrior; break;
+	case 9: GuideClass = HeroClass::Rogue; break;
+	case 11: GuideClass = HeroClass::Sorcerer; break;
+	case 13: GuideClass = HeroClass::Monk; break;
+	case 15: GuideClass = HeroClass::Bard; break;
+	case 17: GuideClass = HeroClass::Barbarian; break;
+	default: return;
+	}
+	StartStore(TalkID::StorytellerGuideShow);
 }
 
 // [RUNS MOD] Enter on the primer's nav line: page forward, then back to Cain's menu.
@@ -3362,6 +3492,12 @@ void StartStore(TalkID s)
 	case TalkID::StorytellerProgress: // [RUNS MOD]
 		StartStorytellerProgress();
 		break;
+	case TalkID::StorytellerGuides: // [RUNS MOD]
+		StartStorytellerGuides();
+		break;
+	case TalkID::StorytellerGuideShow: // [RUNS MOD]
+		StartStorytellerGuideShow();
+		break;
 	case TalkID::SmithPremiumBuy:
 		if (!StartSmithPremiumBuy())
 			return;
@@ -3566,6 +3702,13 @@ void StoreESC()
 	case TalkID::StorytellerProgress: // [RUNS MOD]
 		StartStore(TalkID::Storyteller);
 		CurrentTextLine = 16;
+		break;
+	case TalkID::StorytellerGuides: // [RUNS MOD]
+		StartStore(TalkID::Storyteller);
+		CurrentTextLine = 18;
+		break;
+	case TalkID::StorytellerGuideShow: // [RUNS MOD]
+		StartStore(TalkID::StorytellerGuides);
 		break;
 	case TalkID::StorytellerIdentifyShow:
 		StartStore(TalkID::StorytellerIdentify);
@@ -3808,6 +3951,12 @@ void StoreEnter()
 	case TalkID::StorytellerProgress: // [RUNS MOD] Done -> back to Cain's menu
 		StartStore(TalkID::Storyteller);
 		CurrentTextLine = 16;
+		break;
+	case TalkID::StorytellerGuides: // [RUNS MOD]
+		StorytellerGuidesEnter();
+		break;
+	case TalkID::StorytellerGuideShow: // [RUNS MOD] Done -> back to the class list
+		StartStore(TalkID::StorytellerGuides);
 		break;
 	case TalkID::Gossip:
 		TalkEnter();
