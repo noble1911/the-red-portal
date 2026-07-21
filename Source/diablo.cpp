@@ -2762,6 +2762,12 @@ bool StartGame(bool bNewGame, bool bSinglePlayer)
 			InitDungMsgs(*MyPlayer);
 			DeltaSyncJunk();
 		}
+		// [RUNS MOD] Every game starts with a clean run session; without this, the
+		// session-only portal/run globals leak across quit-to-menu into the next
+		// game in this process (the "ghost portal" loop). LoadGame resets again
+		// after reading the save, but new games only pass through here.
+		if (RunsModEnabled)
+			ResetRunSession();
 		giNumberOfLevels = gbIsHellfire ? 25 : 17;
 		interface_mode uMsg = WM_DIABNEWGAME;
 		if (gbValidSaveFile && gbLoadGame) {
@@ -3168,6 +3174,18 @@ void SetRndSeedForDungeonLevel()
 int RunDepth = 1;
 bool RunBossDefeated = false;
 bool DungeonVendorRestockPending = true;
+bool RunForfeitPending = false;
+
+void ResetRunSession()
+{
+	// [RUNS MOD] See runs_mod.h: run state never survives a game-start or game-load
+	// boundary. One scroll buys one session.
+	CloseDungeonPortal();
+	RunDepth = 1;
+	RunBossDefeated = false;
+	RunForfeitPending = false;
+	ResetRunClock();
+}
 
 int GetMaxRunDepth()
 {
@@ -3636,6 +3654,24 @@ tl::expected<void, std::string> LoadGameLevel(bool firstflag, lvl_entry lvldir)
 
 	SyncPortals();
 	SyncDungeonPortal(); // [RUNS MOD] re-spawn the dungeon-portal visual in the hub
+
+	// [RUNS MOD] An abandoned boss recovers: re-entering the run level heals the run
+	// boss back to full unless another player held the level the whole time. This
+	// kills the poke-and-retreat loop (wound the boss, town-trip for potions, repeat)
+	// -- the boss must be beaten in one committed stay.
+	if (RunsModEnabled && lvldir != ENTRY_LOAD && leveltype != DTYPE_TOWN
+	    && currlevel == RunDepth && !RunBossDefeated) {
+		bool held = false;
+		for (const Player &other : Players) {
+			if (other.plractive && &other != MyPlayer && other.isOnLevel(static_cast<uint8_t>(currlevel))) {
+				held = true;
+				break;
+			}
+		}
+		if (!held)
+			HealAbandonedRunBoss();
+	}
+
 	LoadGameLevelSyncPlayerEntry(lvldir);
 
 	IncProgress();

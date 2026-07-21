@@ -588,6 +588,10 @@ void SpawnGolem(const Player &player, Point position, uint8_t spellLevel);
  * already registered on the level can spawn) using the caller's deterministic
  * `rngValue`, and routes through SpawnMonster (level-owner gated + broadcast). */
 void SpawnRunWaveMonster(Point target, uint32_t rngValue);
+/** @brief [RUNS MOD] Heals any wounded, living run boss to full. Called when the run
+ * level is re-entered after being abandoned (no player held it), so the boss cannot
+ * be whittled down across potion trips to town. */
+void HealAbandonedRunBoss();
 bool CanTalkToMonst(const Monster &monster);
 uint8_t encode_enemy(Monster &monster);
 void decode_enemy(Monster &monster, uint8_t enemyId);

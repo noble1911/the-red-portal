@@ -3,7 +3,9 @@
  *
  * [RUNS MOD] The push-your-luck clock for dungeon runs. Two pressures:
  *  - Escalation: after a grace period, monster waves spawn near a player every
- *    interval while anyone is on the run level, growing in size.
+ *    interval while anyone is on the run level, growing in size. The clock also
+ *    festers while the portal stands open with nobody inside -- waves keep growing
+ *    (without spawning), so town trips return to a hotter dungeon.
  *  - Collapse: killing the run boss arms a countdown; at zero the hub portal seals
  *    for good (no re-entry, corpse loot lost) and waves shift into overtime pace
  *    while anyone lingers. The up-stairs always work -- sealed never means trapped.

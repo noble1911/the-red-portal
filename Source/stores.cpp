@@ -1974,8 +1974,9 @@ void StartStorytellerRules()
 		AddSText(20, l++, _("A dungeon scroll opens the red portal to a run of its depth."), UiFlags::ColorWhite, false);
 		AddSText(20, l++, _("Deeper runs hold deadlier foes -- and richer spoils."), UiFlags::ColorWhite, false);
 		l++;
-		AddSText(20, l++, _("You have five quiet minutes. Then the dungeon takes notice"), UiFlags::ColorWhite, false);
-		AddSText(20, l++, _("and sends ever-larger packs hunting you, minute by minute."), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("A portal's clock starts as it opens: five quiet minutes,"), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("then ever-larger packs hunt you, minute by minute. The"), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("dungeon festers on even while you linger back in town."), UiFlags::ColorWhite, false);
 		l++;
 		AddSText(20, l++, _("Every run has a boss. Slay it and its vault spills open:"), UiFlags::ColorWhite, false);
 		AddSText(20, l++, _("treasure, gold, and always a scroll one depth deeper."), UiFlags::ColorWhite, false);
@@ -2000,6 +2001,9 @@ void StartStorytellerRules()
 		AddSText(20, l++, _("Boss kills at depths 2, 4, 6 and 8 grow your pack a row."), UiFlags::ColorWhite, false);
 		AddSText(20, l++, _("Fell the boss at depth 15 to unlock the next difficulty."), UiFlags::ColorWhite, false);
 		AddSText(20, l++, _("The chest in the square is your stash; its goods are safe."), UiFlags::ColorWhite, false);
+		l++;
+		AddSText(20, l++, _("A run lives only while you play: leave the game and its"), UiFlags::ColorWhite, false);
+		AddSText(20, l++, _("portal seals. A boss left wounded greets you healed."), UiFlags::ColorWhite, false);
 		AddSText(0, BackButtonLine(), _("Done"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 	}
 }

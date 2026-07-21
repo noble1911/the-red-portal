@@ -93,6 +93,19 @@ extern bool RunBossDefeated;
 // first hub visit. Defined in diablo.cpp.
 extern bool DungeonVendorRestockPending;
 
+// Set when a save made inside a run is loaded: the session (and its portal) did not
+// survive the reload, so the first standing tick walks the player back out to the
+// hub and explains why. Defined in diablo.cpp, consumed in run_clock.cpp.
+extern bool RunForfeitPending;
+
+// Wipe every trace of a run from this process: portal sealed, depth and boss ledger
+// cleared, clock zeroed. Run state is deliberately session-only, but the process
+// outlives quit-to-menu, so game start and game load must reset it explicitly --
+// otherwise a portal opened last session "ghosts" into the next one and re-enters a
+// freshly regenerated dungeon, yielding infinite runs from one scroll. Defined in
+// diablo.cpp.
+void ResetRunSession();
+
 // Prepare a fresh run at `level` for a dungeon-scroll portal: reseed that level
 // (new layout) and prime it, WITHOUT teleporting. Called when the scroll is used.
 // Defined in diablo.cpp.

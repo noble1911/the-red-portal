@@ -14,7 +14,9 @@
 #include "diablo.h"
 #include "diablo_msg.hpp"
 #include "engine/render/text_render.hpp"
+#include "interfac.h"
 #include "levels/gendung.h"
+#include "levels/trigs.h"
 #include "monster.h"
 #include "multi.h"
 #include "player.h"
@@ -44,7 +46,9 @@ constexpr int CollapseSeconds = 180;
 /** Overtime wave interval once the run has sealed with players still inside. */
 constexpr int OvertimeWaveSeconds = 10;
 
-/** Ticks spent on the run level (drives grace + wave pacing; pauses while outside). */
+/** Ticks accrued by the run (drives grace + wave pacing). Runs while anyone is on
+ * the run level OR while the portal stands open (fester), so leaving to restock
+ * never pauses the dungeon's escalation. */
 int RunClockTicks = 0;
 int WavesSpawned = 0;
 bool Warned30 = false;
@@ -111,6 +115,21 @@ void ProcessRunClock()
 	if (!RunsModEnabled)
 		return;
 
+	// [RUNS MOD] A save made inside a run loads back into a sealed session (see
+	// LoadGame): walk the player out to the hub on the first standing tick. The flag
+	// stays set through the level transition and is cleared, with the notice, once
+	// the hub loads.
+	if (RunForfeitPending) {
+		if (leveltype == DTYPE_TOWN) {
+			RunForfeitPending = false;
+			InitDiabloMsg(_("The dungeon sealed itself while you were away!"));
+		} else if (MyPlayer->_pmode == PM_STAND) {
+			TWarpFrom = currlevel;
+			StartNewLvl(*MyPlayer, WM_DIABTWARPUP, 0);
+		}
+		return;
+	}
+
 	// Collapse countdown runs in real ticks once armed, everywhere (also while players
 	// shop in the hub -- the countdown is the window for looting and corpse runs).
 	// Each client seals locally when its own countdown expires: the portal state is
@@ -133,7 +152,13 @@ void ProcessRunClock()
 		}
 	}
 
-	if (!OnRunLevel())
+	// [RUNS MOD] Fester: while the portal stands open the run's clock keeps accruing
+	// even with nobody inside -- grace burns down and wave sizes grow, though actual
+	// spawns only happen on the run level. Every potion trip to town means a hotter
+	// dungeon on return. Portal state is mirrored on every client, so accrual stays
+	// identical everywhere.
+	const bool onRunLevel = OnRunLevel();
+	if (!onRunLevel && !DungeonPortalOpen)
 		return;
 
 	RunClockTicks++;
@@ -142,18 +167,22 @@ void ProcessRunClock()
 	if (overtime) {
 		// Post-seal: relentless max-size waves until everyone leaves. RunClockTicks
 		// advances exactly once per tick, so the modulo fires once per interval.
-		if (RunClockTicks % ScaledTicks(OvertimeWaveSeconds) == 0)
+		if (onRunLevel && RunClockTicks % ScaledTicks(OvertimeWaveSeconds) == 0)
 			SpawnWave(WaveSizeCap);
 		return;
 	}
 
-	// Baseline escalation: quiet through the grace period, then a growing wave per interval.
+	// Baseline escalation: quiet through the grace period, then a growing wave per
+	// interval. Waves that come due off-level still grow the count (fester) but only
+	// spawn while someone is there to hunt; the first-notice message shows anywhere,
+	// warning a lingering player that the dungeon is now awake.
 	const int nextWaveTick = ScaledTicks(GraceSeconds) + WavesSpawned * ScaledTicks(WaveIntervalSeconds);
 	if (RunClockTicks >= nextWaveTick) {
 		WavesSpawned++;
-		SpawnWave(std::min(WavesSpawned, WaveSizeCap));
 		if (WavesSpawned == 1)
 			InitDiabloMsg(_("The dungeon has noticed you..."));
+		if (onRunLevel)
+			SpawnWave(std::min(WavesSpawned, WaveSizeCap));
 	}
 }
 

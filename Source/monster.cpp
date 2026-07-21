@@ -39,6 +39,7 @@
 #include "cursor.h"
 #include "dead.h"
 #include "diablo.h"
+#include "diablo_msg.hpp"
 #include "dvlnet/leaveinfo.hpp"
 #include "effects.h"
 #include "engine/animationinfo.h"
@@ -4014,6 +4015,25 @@ void SpawnRunWaveMonster(Point target, uint32_t rngValue)
 	}).value_or(target + Displacement { 1, 1 });
 
 	SpawnMonster(spawnAt, tmpl.direction, typeIndex);
+}
+
+void HealAbandonedRunBoss()
+{
+	// [RUNS MOD] Called on re-entering the run level after it sat empty: any wounded,
+	// living run boss (both twins under the Twinned affix) is restored to full health.
+	// Purely local monster state, mirroring how each client resumes the level.
+	bool healed = false;
+	for (size_t i = 0; i < ActiveMonsterCount; i++) {
+		Monster &monster = Monsters[ActiveMonsters[i]];
+		if (!monster.isUnique() || monster.uniqueType != RunBossType)
+			continue;
+		if (monster.hitPoints <= 0 || monster.hitPoints >= monster.maxHitPoints)
+			continue;
+		monster.hitPoints = monster.maxHitPoints;
+		healed = true;
+	}
+	if (healed)
+		InitDiabloMsg(_("The dungeon's master has recovered!"));
 }
 
 void AddDoppelganger(Monster &monster)

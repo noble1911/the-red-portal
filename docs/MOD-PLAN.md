@@ -136,6 +136,28 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   SpawnMonster + broadcast; only level-native types spawn), seal = local
   CloseDungeonPortal on countdown expiry per client. Full co-op verification folds
   into the existing deferred 2-client test.
+- **Anti-exploit trio** (follow-up, 2026-07-21), closing the two playtest exploits
+  (ghost-portal reload loop; boss poke-and-retreat):
+  - **One scroll, one session**: run state never survives a game start/load boundary.
+    `ResetRunSession()` (diablo.cpp) seals the portal + zeroes depth/boss/clock; called
+    from StartGame for every game and from LoadGame after reading the save. Root cause:
+    portal globals are session-only but the process outlives quit-to-menu, so a portal
+    "ghosted" into the reloaded game while LoadGame wiped LevelSeeds — one scroll
+    re-entered a freshly regenerated dungeon forever.
+  - **Mid-run saves are forfeited**: loading a save made inside a run sets
+    `RunForfeitPending`; the first standing tick (ProcessRunClock) warps the player to
+    the hub via TWARPUP with "The dungeon sealed itself while you were away!". Also
+    kills the save-scum variants (clock/modifier stripping, boss whittling via reload).
+  - **Fester clock**: RunClockTicks accrues while the portal is open even with nobody
+    inside (spawns still on-level only; wave COUNT grows silently, first-notice message
+    shows anywhere). Town supply trips now cost escalation time; grace starts at portal
+    open, not first entry.
+  - **Boss heals on abandon**: re-entering the run level restores any wounded living
+    run boss to full (`HealAbandonedRunBoss`, monster.cpp) unless another player held
+    the level throughout — the boss must be beaten in one committed stay (or a co-op
+    partner holds the door).
+  - Cain's rules primer updated (fester line on page 1; session/boss-heal lines on
+    page 2).
 
 **E3 — Boss-optional runs** ✅ shipped 2026-07-18
 - The incentive split is now intentional: **ghost = wealth, boss = progression +

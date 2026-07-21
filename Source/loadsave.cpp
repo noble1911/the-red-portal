@@ -2540,6 +2540,18 @@ tl::expected<void, std::string> LoadGame(bool firstflag)
 	for (int i = 0; i < MAXPORTAL; i++)
 		LoadPortal(&file, i);
 
+	// [RUNS MOD] One scroll, one session: the dungeon portal and its run never
+	// survive a save/load boundary. The portal state is session-only, but quitting
+	// to the menu keeps this process (and those globals) alive, which used to let a
+	// single scroll's portal "ghost" into the reloaded game and re-enter a freshly
+	// regenerated dungeon forever. Reloading always wakes up with the portal sealed;
+	// a save made inside a run forfeits it -- the pending flag walks the player back
+	// to the hub on the first tick (see ProcessRunClock).
+	if (RunsModEnabled) {
+		ResetRunSession();
+		RunForfeitPending = leveltype != DTYPE_TOWN;
+	}
+
 	if (gbIsHellfireSaveGame != gbIsHellfire) {
 		RETURN_IF_ERROR(pfile_convert_levels());
 		RemoveEmptyInventory(myPlayer);
