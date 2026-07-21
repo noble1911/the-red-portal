@@ -33,6 +33,7 @@
 #include "controls/controller_buttons.h"
 #include "cursor.h"
 #include "diablo.h"
+#include "diablo_msg.hpp"
 #include "doom.h"
 #include "effects.h"
 #include "engine/animationinfo.h"
@@ -3057,6 +3058,65 @@ void DropDungeonScroll(int level, Point position, int difficulty, bool sendmsg)
 		NetSendCmdPItem(false, CMD_DROPITEM, item.position, item);
 }
 
+// [RUNS MOD] The classic quest uniques are unobtainable in run mode: their quests are
+// retired and their base items never drop (dropRate 0), which left the most iconic
+// items in the game as dead data. They return as RELICS -- a small chance in every
+// boss vault, gated by depth roughly in order of power. Duplicates are allowed;
+// relics are loot, not achievements.
+struct RunRelic {
+	_unique_items uid;
+	int minDepth;
+	bool hellfireOnly;
+};
+
+constexpr RunRelic RunRelics[] = {
+	{ UITEM_HARCREST, 2, false },   // Harlequin Crest
+	{ UITEM_TRING, 3, false },      // Ring of Truth
+	{ UITEM_INFRARING, 4, false },  // Empyrean Band
+	{ UITEM_OPTAMULET, 5, false },  // Optic Amulet
+	// The Undead Crown is deliberately absent: the Skeleton King's base type carries
+	// Uniq(SKCROWN) treasure, so he already drops it whenever he is the run boss.
+	{ UITEM_BOVINE, 6, true },      // Bovine Plate
+	{ UITEM_GRISWOLD, 8, false },   // Griswold's Edge
+	{ UITEM_ARMOFVAL, 10, false },  // Arkaine's Valor
+	{ UITEM_STEELVEIL, 12, false }, // Veil of Steel
+};
+
+/** Chance (percent) that a boss vault also holds a relic. */
+constexpr int RunRelicChancePct = 8;
+
+void TryDropRunRelic(int depth, Point position)
+{
+	if (GenerateRnd(100) >= RunRelicChancePct)
+		return;
+	_unique_items pool[std::size(RunRelics)];
+	size_t count = 0;
+	for (const RunRelic &relic : RunRelics) {
+		if (depth < relic.minDepth)
+			continue;
+		if (relic.hellfireOnly && !gbIsHellfire)
+			continue;
+		pool[count++] = relic.uid;
+	}
+	if (count == 0)
+		return;
+	const auto uid = pool[static_cast<size_t>(GenerateRnd(static_cast<int>(count)))];
+
+	// Build the exact unique (the jackpot's construction pattern). SpawnUnique is
+	// deliberately NOT used: on Nightmare/Hell it substitutes a random item of the
+	// same type (vanilla quest behavior), which would break relics precisely on the
+	// harder runs.
+	std::underlying_type_t<_item_indexes> idx = 0;
+	while (AllItemsList[idx].iItemId != UniqueItems[uid].UIItemId)
+		idx++;
+	Item item = {};
+	GetItemAttrs(item, static_cast<_item_indexes>(idx), UniqueItems[uid].UIMinLvl);
+	GetUniqueItem(*MyPlayer, item, uid);
+	SetupItem(item);
+	DropPrizeItem(item, position);
+	InitDiabloMsg(_("A relic of the old world!"));
+}
+
 void DropPrizeItem(Item prize, Point position)
 {
 	// [RUNS MOD] Drop an already-built item on the ground near `position`, synced like
@@ -3632,9 +3692,18 @@ void SpawnItem(Monster &monster, Point position, bool sendmsg, bool spawn /*= fa
 			NetSendCmdPItem(false, CMD_DROPITEM, uniqueItem->position, *uniqueItem);
 		return;
 	}
+	// [RUNS MOD] The run boss's reward must depend on the DEPTH, not on which boss the
+	// pool rolled: pool bosses' effective levels span 4..56 at the same depth (mlevel*2
+	// or type level + 5), so level-driven loot let a high-level boss drop near-endgame
+	// bases on a depth-1 run and capped a low-level boss at trash bases in Hell.
+	const bool isRunBoss = RunsModEnabled && leveltype != DTYPE_TOWN && monster.isUnique()
+	    && monster.uniqueType == RunBossType;
+
 	if (monster.isUnique() || dropsSpecialTreasure) {
 		// Unique monster is killed => use better item base (for example no gold)
-		idx = RndUItem(&monster);
+		// [RUNS MOD] RndUItem(nullptr) caps the base pick at curlv*2 = twice the depth,
+		// matching the affix level below; RndUItem(&monster) would cap by monster level.
+		idx = isRunBoss ? RndUItem(nullptr) : RndUItem(&monster);
 	} else if (dropBrain && !gbIsMultiplayer) {
 		// Normal monster is killed => need to drop brain to progress the quest
 		Quests[Q_MUSHROOM]._qvar1 = QS_BRAINSPAWNED;
@@ -3669,13 +3738,13 @@ void SpawnItem(Monster &monster, Point position, bool sendmsg, bool spawn /*= fa
 	const int uper = monster.isUnique() ? 15 : 1;
 
 	int8_t mLevel = monster.data().level;
-	// [RUNS MOD] The run boss's base level is fixed and low (the Butcher), so on a deep
-	// run it would drop worse loot than the trash mobs. Scale its loot level with the
-	// run depth (mirrors the curlv*2 item level uniques normally get). Baked into the
-	// item's create-info via the level, so save/load + network recreation stay exact.
-	if (RunsModEnabled && leveltype != DTYPE_TOWN && monster.isUnique()
-	    && monster.uniqueType == RunBossType)
-		mLevel = static_cast<int8_t>(std::clamp(currlevel * 2, static_cast<int>(mLevel), 63));
+	// [RUNS MOD] The run boss's affix level is a flat 2x depth (mirrors the curlv*2
+	// level uniques normally get) -- previously max(2*depth, type level), which leaked
+	// type-level affixes at shallow depths once high-level types joined the boss pools.
+	// Baked into the item's create-info via the level, so save/load + network
+	// recreation stay exact.
+	if (isRunBoss)
+		mLevel = static_cast<int8_t>(std::clamp(currlevel * 2, 1, 63));
 	// [RUNS MOD] Scroll "magic find" raises the effective item level so drops roll
 	// higher-quality affixes. This is baked into the item's create-info (via the
 	// level, capped to CF_LEVEL=63) so save/load + network recreation stay exact.

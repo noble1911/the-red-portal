@@ -136,12 +136,17 @@ namespace {
 // row level never matches a run level, so PlaceUniqueMonsters cannot also spawn them
 // organically (except where noted, which the RunBossType guard there covers). Stats are
 // normalized in ScaleRunMonsters, so only type, AI, color and resistances matter here.
-constexpr std::string_view CathedralRunBosses[] = { "The Butcher", "Skeleton King", "Bonehead Keenaxe", "Rotfeast the Hungry", "Deadeye" };
-constexpr std::string_view CatacombsRunBosses[] = { "Bloodgutter", "Nightwing the Cold", "Baron Sludge", "Bronzefist Firestone", "Wrathfire the Doomed" };
-constexpr std::string_view CavesRunBosses[] = { "Stormbane", "Breakspine", "Warpfire Hellspawn", "Goldblight of the Flame", "Bluehorn" };
-constexpr std::string_view HellRunBosses[] = { "Warlord of Blood", "Red Vex", "Black Jade", "Blackskull", "Dreadjudge" };
-constexpr std::string_view NestRunBosses[] = { "Broodmother Arachnia", "Gorehusk the Sowmaster", "Vessik the Broodlord", "Grimspike" };
-constexpr std::string_view CryptRunBosses[] = { "Gravelord Vhassk", "The Pale Regent", "Kargol the Twice-Crowned", "Doomlock" };
+// The last entry of each pool is a restored CUT monster (graphics shipped in retail
+// DIABDAT.MPQ but never spawned): The Red Death (thin recolor), Marrowgrave (demon
+// skeleton), Satyr Lord (goat lord), The Invisible Lord (dark hidden), Gorefang
+// (giant fallen, Hellfire sounds) and The First Flame (the cut "fireman", firing
+// magma since its own AI was never implemented).
+constexpr std::string_view CathedralRunBosses[] = { "The Butcher", "Skeleton King", "Bonehead Keenaxe", "Rotfeast the Hungry", "Deadeye", "The Red Death" };
+constexpr std::string_view CatacombsRunBosses[] = { "Bloodgutter", "Nightwing the Cold", "Baron Sludge", "Bronzefist Firestone", "Wrathfire the Doomed", "Marrowgrave" };
+constexpr std::string_view CavesRunBosses[] = { "Stormbane", "Breakspine", "Warpfire Hellspawn", "Goldblight of the Flame", "Bluehorn", "Satyr Lord" };
+constexpr std::string_view HellRunBosses[] = { "Warlord of Blood", "Red Vex", "Black Jade", "Blackskull", "Dreadjudge", "The Invisible Lord" };
+constexpr std::string_view NestRunBosses[] = { "Broodmother Arachnia", "Gorehusk the Sowmaster", "Vessik the Broodlord", "Grimspike", "Gorefang the Brute" };
+constexpr std::string_view CryptRunBosses[] = { "Gravelord Vhassk", "The Pale Regent", "Kargol the Twice-Crowned", "Doomlock", "The First Flame" };
 
 /** @brief [RUNS MOD] Resolves a unique_monstdat name to its row; the Butcher on a miss
  * (e.g. a modded TSV), so a run always has a boss. */
@@ -4182,6 +4187,19 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 {
 	if (!monster.isPlayerMinion()) {
 		unsigned exper = monster.exp(sgGameInitInfo.nDifficulty);
+		// [RUNS MOD] The run boss's XP is normalized to the depth, like its stats and
+		// loot: pool bosses' type XP spans 68..4480 at the same depth, a 30x swing for
+		// the same fight. 300/depth tracks the vanilla per-depth boss curve; the
+		// difficulty transform and the 2x unique bonus mirror Monster::exp().
+		if (RunsModEnabled && leveltype != DTYPE_TOWN && monster.isUnique()
+		    && monster.uniqueType == RunBossType) {
+			exper = 300u * currlevel;
+			if (sgGameInitInfo.nDifficulty == DIFF_NIGHTMARE)
+				exper = 2 * (exper + 1000);
+			else if (sgGameInitInfo.nDifficulty == DIFF_HELL)
+				exper = 4 * (exper + 1000);
+			exper *= 2;
+		}
 		// [RUNS MOD] Scroll "experience" modifier boosts XP from kills on the run level.
 		if (ActiveRunMods.xpPct != 0)
 			exper = static_cast<unsigned>(ApplyPct(static_cast<int>(exper), ActiveRunMods.xpPct));
@@ -4257,6 +4275,9 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/true, /*delta=*/true);
 			for (int i = 0; i < goldPiles; i++)
 				CreateTypeItem(monster.position.tile, /*onlygood=*/false, ItemType::Gold, IMISC_NONE, /*sendmsg=*/true, /*delta=*/true);
+			// [RUNS MOD] Rare vault relic: the retired quests' uniques (Harlequin
+			// Crest, Veil of Steel, ...) return as depth-gated chase drops.
+			TryDropRunRelic(static_cast<int>(currlevel), monster.position.tile);
 		} else {
 			// [RUNS MOD] Tyrannical champions always pay out: one good item at the
 			// corpse (the pick is re-derived, so no champion state is stored).

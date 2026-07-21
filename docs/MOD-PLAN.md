@@ -12,7 +12,7 @@ binary and project stay `devilutionx` so upstream merges stay clean. Factual ref
 to the game the mod requires (e.g. "needs your own Diablo game data") are fine; the mark
 never appears in our product name or branding.
 
-Last updated: **2026-07-19** (v0.4.0).
+Last updated: **2026-07-21** (post-v0.4.2: portal-exploit fixes + restored cut content).
 
 ## Milestones
 
@@ -246,7 +246,86 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   claim it. Session state, rerolled with the vendor restock on boss kill; once
   claimed it stays gone until the next boss.
 
+**Restored cut content** ✅ shipped 2026-07-21 (data-only; zero shipped assets)
+- Diablo 1 shipped monster rows that never spawn (`availability=Never`); we verified
+  against the actual MPQ hash tables (scratch tool, StormLib-compatible hashing) which
+  ones have complete sprites+sounds and re-enabled those. The worm family (Wyrm/Cave
+  Slug/Devil Wyrm/Devourer) is truly gone from retail MPQs and stays cut.
+- **New pack monsters** (base + Hellfire TSVs, native Blizzard stat rows):
+  - *Red Death* (dun 8-10), *Litch Demon* (9-11), *Undead Balrog* (11-13) — Storm-AI
+    recolors of the Storm Rider (`thin` + `thinv3.trn`), fully self-contained in D1.
+  - *Bone Fiend* (renamed from placeholder "oldboned", demon-skeleton sprite,
+    re-banded 24 → 7-10 to match its lvl-12 stats; skeleton sounds).
+  - *Incinerator* (13-14) / *Flame Lord* (14-15) / *Doom Fire* (21-23) / *Hell
+    Burner* (22-24) — the cut "fireman"; its FireMan AI was never implemented, so
+    they run Magma AI (magma-ball lobber) with magma-demon sounds.
+  - *The Shredded / Hollow One / Pain Master / Reality Weaver* (17-20, Hellfire only:
+    `unravw.cl2` exists only in hellfire.mpq; the rest live in DIABDAT).
+- **Blizzard's half-finished rows completed**: all Storm/Magma-AI enables had
+  toHitSpecial/animFrameNumSpecial/special damage zeroed (lightning that never fires);
+  filled from Storm Rider / Magma Demon reference values.
+- **Six new run bosses** (unique_monstdat rows appended, level 0 = never organic;
+  stats normalized by ScaleRunMonsters as usual), one per tileset pool: *The Red
+  Death* (cathedral), *Marrowgrave* (catacombs, Bone Fiend), *Satyr Lord* (caves,
+  goatlord sprite — D1 sessions use goat sounds, Hellfire its intended `newsfx\satyr`),
+  *The Invisible Lord* (hell, dark Hidden; `tsneak` sounds don't exist so it borrows
+  `sneak`), *Gorefang the Brute* (nest, giant fallen `bigfall`), *The First Flame*
+  (crypt, fireman).
+- Not restored: worm family (no sprites), Golem/quest types (special-cased).
+
+**Relics: the quest uniques return** ✅ shipped 2026-07-21
+- With quests retired, the classic quest uniques (Harlequin Crest, Ring of Truth,
+  Empyrean Band, Optic Amulet, The Undead Crown, Griswold's Edge, Arkaine's Valor,
+  Veil of Steel, + Bovine Plate on Hellfire) were dead data: their base items have
+  dropRate 0 and nothing referenced them. They now drop as **relics** — an 8% roll
+  per boss vault (`TryDropRunRelic`, items.cpp), uniform over the relics whose
+  depth gate (2/3/4/5/6/6/8/10/12, ordered by power) the run has reached, announced
+  with "A relic of the old world!". Duplicates allowed: relics are loot, not
+  achievements. Twinned runs roll per twin vault.
+- Origin: a survey of permissively-licensed DevilutionX mods (wkdmod SUL, Middle
+  Earth Mod Unlicense) for portable content. Verdict recorded for the future:
+  wkdmod's original items all depend on their custom engine powers (IPL_EMPOWER,
+  IPL_ACIDBOW) and its remaining catalogue is the Hellfire uniques we already have;
+  Middle Earth is a Tolkien re-theme (rebalance reference only). Neither yields
+  direct data ports — the quest-unique gap found during the survey was the prize.
+
+**Boss drop-rate audit** ✅ fixes shipped 2026-07-21
+- A unique's effective level is `mlevel*2` (row level set) or `type level + 5` (row
+  level 0), which drives its base-item pick (RndUItem), pre-fix affix floor, XP and
+  hit math. Pool bosses span effLvl 4 (Bonehead) .. 56 (Doomlock) at the same depth,
+  and the new cut-content bosses widened it (The Red Death effLvl 21 in cathedral).
+- **Fixed — loot**: the boss's base-item pick now uses `RndUItem(nullptr)` (capped at
+  2x depth like the affix level) instead of monster level, and the affix level is a
+  flat `2x depth` (was `max(2x depth, type level)`, which leaked type-level affixes
+  at shallow depths). Every same-depth boss now pays identically; vault (2x depth,
+  uper 1), champion payout, trash, scrolls, relics and gamble were already
+  depth-consistent.
+- **Fixed — XP**: run-boss XP normalized to `300 x depth` (x2 unique, vanilla
+  difficulty transform), replacing type XP that swung 68..4480 (~30x) between
+  same-depth bosses.
+- The Undead Crown left the relic pool: MT_SKING carries `Uniq(SKCROWN)` treasure,
+  so the Skeleton King boss already guarantees it (as the Butcher does his Cleaver).
+- Known, accepted variance (report if playtests feel it): boss toHit/AC and the
+  level term in hit math still come from the base type/row -- combat feel differs
+  per boss (e.g. The Red Death is evasive for depth 1-4 characters); HP/damage are
+  normalized in ScaleRunMonsters. Nest/Crypt outliers Grimspike (38) and Doomlock
+  (56) predate this audit and only affected these same paths.
+
+**Full roster + Cain's hero guides** ✅ shipped 2026-07-21
+- **Bard and Barbarian are roster members** in run mode (Hellfire sessions, same gate
+  as the Monk): selhero no longer hides them behind the sprite packs / test options.
+  Their classdat/sprites TSVs already ship with the mod; the engine renders them with
+  Rogue/Warrior art when dedicated packs are absent.
+- **Cain: "Ask about the heroes"** (menu line 18; goodbye moved to 20): a class list
+  (TalkID::StorytellerGuides; Hellfire trio gated on gbIsHellfire) opening a one-page
+  build primer per class (TalkID::StorytellerGuideShow, GuideClass selector) -- what
+  stats matter, how the class plays, one run-specific tip each.
+
 **Feature ideas (next slices)**
 - [ ] Loot tuning pass via TSV (M4 remainder).
-- [ ] Fruit machine polish: reel symbols as item icons instead of text, Farnham
-      win/lose voice barks, odds/EV tuning after playtest.
+- [ ] Fruit machine polish (remaining): Farnham win/lose voice barks, odds/EV tuning
+      after playtest. (Icon reels shipped 2026-07-21: each face is a cursor-sheet
+      item sprite — gold pile / short sword / scroll / red potion / skull cap /
+      crown — bottom-anchored on a shelf at line 11 via GambleSymbolCursor +
+      ClxDraw, so mixed icon heights grow upward and the result line stays clear.
+      Text reels and their per-symbol colors retired.)

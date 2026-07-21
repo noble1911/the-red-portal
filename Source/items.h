@@ -553,6 +553,9 @@ inline uint16_t MakeDungeonScrollCreateInfo(int level, int modCount, int difficu
 
 /** @brief [RUNS MOD] Drops a dungeon scroll of the given level+difficulty near a position. */
 void DropDungeonScroll(int level, Point position, int difficulty, bool sendmsg);
+/** @brief [RUNS MOD] Rolls the boss vault's relic chance: a retired quest unique
+ * (depth-gated) dropped at `position`. No-op most of the time. */
+void TryDropRunRelic(int depth, Point position);
 
 /** @brief [RUNS MOD] True if the player already carries a dungeon scroll. */
 bool PlayerHasDungeonScroll(const Player &player);
