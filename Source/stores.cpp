@@ -1143,6 +1143,30 @@ int GambleStake()
 	return 500 + 250 * MyPlayer->pDeepestBeatenDepth;
 }
 
+// [RUNS MOD] Gambler's Tokens: dungeon-dropped chips, each worth one free pull at
+// full payouts (a token's value therefore scales with the stake, like everything
+// else on the machine).
+int CountGambleTokens(const Player &player)
+{
+	int count = 0;
+	for (int i = 0; i < player._pNumInv; i++) {
+		if (player.InvList[i].IDidx == IDI_GAMBLETOKEN)
+			count++;
+	}
+	return count;
+}
+
+void ConsumeGambleToken(Player &player)
+{
+	// Highest index first: RemoveInvItem compacts InvList downward.
+	for (int i = player._pNumInv - 1; i >= 0; i--) {
+		if (player.InvList[i].IDidx == IDI_GAMBLETOKEN) {
+			player.RemoveInvItem(i);
+			return;
+		}
+	}
+}
+
 GambleSymbol RollGambleSymbol()
 {
 	int roll = GenerateRnd(GambleWeightTotal);
@@ -1171,13 +1195,18 @@ void FlushGamblePrizes()
 	GamblePendingDrops.clear();
 }
 
-void ResolveGamble()
+void ResolveGamble(bool tokenSpin = false)
 {
 	Player &myPlayer = *MyPlayer;
 	// A mashed re-pull mid-show delivers the previous spin's prizes immediately.
 	FlushGamblePrizes();
+	// [RUNS MOD] A token buys the pull outright; payouts still key off the full
+	// stake value, so a token is worth exactly one gold pull wherever you stand.
 	const int stake = GambleStake();
-	TakePlrsMoney(stake);
+	if (tokenSpin)
+		ConsumeGambleToken(myPlayer);
+	else
+		TakePlrsMoney(stake);
 	GambleWon = false;
 	for (GambleSymbol &reel : GambleReels)
 		reel = RollGambleSymbol();
@@ -1277,8 +1306,13 @@ void StartGamble()
 		AddSText(0, 9, _("Beat a boss for a new prize."), UiFlags::ColorWhite | UiFlags::AlignCenter, false);
 	}
 	AddSText(0, 12, fmt::format(fmt::runtime(_("Pull the handle ({:s} gold)")), FormatInteger(GambleStake())), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	// [RUNS MOD] Tokens buy free pulls; the line only shows while you hold some.
+	// Line numbers are fixed (12 gold / 14 token / 16 jackpot / 18 goodbye) so the
+	// enter handler never has to guess.
+	if (const int tokens = CountGambleTokens(*MyPlayer); tokens > 0)
+		AddSText(0, 14, fmt::format(fmt::runtime(_("Pull with a token ({:d} left)")), tokens), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 	if (!GamblerJackpot.isEmpty())
-		AddSText(0, 14, _("Inspect the jackpot"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+		AddSText(0, 16, _("Inspect the jackpot"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 	AddSText(0, 18, _("Say goodbye"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 }
 
@@ -1291,6 +1325,9 @@ void StartGambleSpin()
 	// Lines 8 (the reels) and 12 (the result) are deliberately left empty: they are
 	// drawn per-frame by DrawGambleReels so the reels spin. "Pull again" stays live
 	// during the show -- gamblers mash, and a re-pull just restarts the spin.
+	// [RUNS MOD] Token re-pulls sit above the gold pull, shown only while held.
+	if (const int tokens = CountGambleTokens(*MyPlayer); tokens > 0)
+		AddSText(0, 14, fmt::format(fmt::runtime(_("Pull again with a token ({:d} left)")), tokens), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 	AddSText(0, 16, fmt::format(fmt::runtime(_("Pull again ({:s} gold)")), FormatInteger(GambleStake())), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 	AddSText(0, BackButtonLine(), _("Back"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 	GambleSpinStartTicks = static_cast<uint32_t>(SDL_GetTicks());
@@ -1396,7 +1433,14 @@ void GambleEnter()
 		ResolveGamble();
 		StartStore(TalkID::GambleSpin);
 		break;
+	// [RUNS MOD] A token pull: free spin, one chip consumed.
 	case 14:
+		if (CountGambleTokens(*MyPlayer) > 0) {
+			ResolveGamble(/*tokenSpin=*/true);
+			StartStore(TalkID::GambleSpin);
+		}
+		break;
+	case 16:
 		if (!GamblerJackpot.isEmpty())
 			StartStore(TalkID::GambleJackpotShow);
 		break;
@@ -1408,6 +1452,14 @@ void GambleEnter()
 
 void GambleSpinEnter()
 {
+	// [RUNS MOD] Token re-pull: free spin while chips last.
+	if (CurrentTextLine == 14) {
+		if (CountGambleTokens(*MyPlayer) > 0) {
+			ResolveGamble(/*tokenSpin=*/true);
+			StartStore(TalkID::GambleSpin);
+		}
+		return;
+	}
 	if (CurrentTextLine == 16) { // pull again
 		if (!PlayerCanAfford(GambleStake())) {
 			OldActiveStore = TalkID::Gamble;

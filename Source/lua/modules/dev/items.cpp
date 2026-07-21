@@ -81,6 +81,30 @@ std::string DebugSpawnItem(std::string itemName)
 
 	AsciiStrToLower(itemName);
 
+	// [RUNS MOD] Items with dropRate 0 (quest items, Gambler's Tokens, ...) can never
+	// come out of the random roller below; an exact name match spawns them directly.
+	for (size_t idx = 0; idx < AllItemsList.size(); idx++) {
+		const ItemData &data = AllItemsList[idx];
+		if (data.dropRate != 0)
+			continue;
+		std::string lowered { data.iName };
+		AsciiStrToLower(lowered);
+		if (lowered != itemName)
+			continue;
+		int ii = AllocateItem();
+		auto &item = Items[ii];
+		InitializeItem(item, static_cast<_item_indexes>(idx));
+		GenerateNewSeed(item);
+		item._iIdentified = true;
+		// InitializeItem does not prepare the ground-drop animation (SetupItem does
+		// that for rolled items); without it the renderer dereferences a null sprite.
+		item.setNewAnimation(MyPlayer != nullptr && MyPlayer->pLvlLoad == 0);
+		Point pos = MyPlayer->position.tile;
+		GetSuperItemSpace(pos, ii);
+		NetSendCmdPItem(false, CMD_SPAWNITEM, item.position, item);
+		return StrCat("Spawned ", data.iName, " directly (dropRate 0).");
+	}
+
 	Item testItem;
 
 	uint32_t begin = SDL_GetTicks();

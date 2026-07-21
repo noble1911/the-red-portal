@@ -82,7 +82,8 @@ enum _item_indexes : int16_t { // TODO defines all indexes in AllItemsList
 	IDI_SORCERER_DIABLO,
 	IDI_ARENAPOT,
 	IDI_DUNGEONSCROLL,  // [RUNS MOD] itemdat.tsv rows must stay in this order
-	IDI_PRESERVESCROLL, // [RUNS MOD] must be the LAST row of itemdat.tsv
+	IDI_PRESERVESCROLL, // [RUNS MOD]
+	IDI_GAMBLETOKEN,    // [RUNS MOD] must be the LAST row of itemdat.tsv
 
 	IDI_NUM_DEFAULT_ITEMS,
 	IDI_NONE = -1,

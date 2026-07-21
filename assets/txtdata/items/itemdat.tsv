@@ -169,3 +169,4 @@ IDI_SHORT_BATTLE_BOW	2	Weapon	Two-handed	SHORT_BATTLE_BOW	Bow	NONE	Short Battle 
 IDI_ARENAPOT	0	Misc	Unequippable	ARENA_POTION	Misc	NONE	Arena Potion		7	0	0	0	0	0	0	0	0		ARENAPOT	Null	true	0
 IDI_DUNGEONSCROLL	0	Misc	Unequippable	SCROLL_OF	Misc	NONE	Dungeon Scroll		1	0	0	0	0	0	0	0	0		DUNGEONSCROLL	Null	true	500
 IDI_PRESERVESCROLL	0	Misc	Unequippable	SCROLL_OF	Misc	NONE	Scroll of Preservation		1	0	0	0	0	0	0	0	0		PRESERVE	Null	true	50000
+IDI_GAMBLETOKEN	0	Misc	Unequippable	BLOOD_STONE	Misc	NONE	Gambler's Token		1	0	0	0	0	0	0	0	0		NONE	Null	false	150

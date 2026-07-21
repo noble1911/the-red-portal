@@ -556,6 +556,8 @@ void DropDungeonScroll(int level, Point position, int difficulty, bool sendmsg);
 /** @brief [RUNS MOD] Rolls the boss vault's relic chance: a retired quest unique
  * (depth-gated) dropped at `position`. No-op most of the time. */
 void TryDropRunRelic(int depth, Point position);
+/** @brief [RUNS MOD] Drops a Gambler's Token (one free pull at Farnham's machine). */
+void DropGambleToken(Point position, bool sendmsg);
 
 /** @brief [RUNS MOD] True if the player already carries a dungeon scroll. */
 bool PlayerHasDungeonScroll(const Player &player);

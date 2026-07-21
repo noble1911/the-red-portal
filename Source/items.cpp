@@ -3058,6 +3058,23 @@ void DropDungeonScroll(int level, Point position, int difficulty, bool sendmsg)
 		NetSendCmdPItem(false, CMD_DROPITEM, item.position, item);
 }
 
+void DropGambleToken(Point position, bool sendmsg)
+{
+	// [RUNS MOD] Drop a Gambler's Token on the ground near `position` -- one free
+	// pull on Farnham's machine. Placement and sync mirror DropDungeonScroll.
+	if (ActiveItemCount >= MAXITEMS)
+		return;
+	const int ii = AllocateItem();
+	Item &item = Items[ii];
+	InitializeItem(item, IDI_GAMBLETOKEN);
+	GenerateNewSeed(item);
+	item._iIdentified = true;
+	GetSuperItemSpace(position, static_cast<int8_t>(ii));
+	item.setNewAnimation(MyPlayer != nullptr && MyPlayer->pLvlLoad == 0);
+	if (sendmsg)
+		NetSendCmdPItem(false, CMD_DROPITEM, item.position, item);
+}
+
 // [RUNS MOD] The classic quest uniques are unobtainable in run mode: their quests are
 // retired and their base items never drop (dropRate 0), which left the most iconic
 // items in the game as dead data. They return as RELICS -- a small chance in every

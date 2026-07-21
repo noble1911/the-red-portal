@@ -324,7 +324,20 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
 **Feature ideas (next slices)**
 - [ ] Loot tuning pass via TSV (M4 remainder).
 - [ ] Fruit machine polish (remaining): Farnham win/lose voice barks, odds/EV tuning
-      after playtest. (Icon reels shipped 2026-07-21: each face is a cursor-sheet
+      after playtest.
+
+**Gambler's Tokens** ✅ shipped 2026-07-21
+- New base item `IDI_GAMBLETOKEN` (itemdat.tsv last row + enum; BLOOD_STONE icon,
+  dropRate 0, value 150): each token is ONE free pull at Farnham's at full payouts,
+  so a token's worth scales with the stake like everything else on the machine.
+- Drops from run-level trash at 2% (scrolls are 3%; tokens don't stack, so rarer
+  keeps the pack breathing) via DropGambleToken, mirroring DropDungeonScroll.
+- Farnham's menus grow fixed-position token lines while chips are held (menu:
+  12 gold / 14 token / 16 jackpot / 18 goodbye; spin screen: 14 token re-pull /
+  16 gold re-pull). ResolveGamble(tokenSpin) consumes a chip instead of gold.
+- Dev QoL: `dev.items.spawn` gained a direct path for dropRate-0 items (exact name
+  match) -- they can never come out of the random roller; the path also sets the
+  ground-drop animation InitializeItem skips (null-sprite crash otherwise). (Icon reels shipped 2026-07-21: each face is a cursor-sheet
       item sprite — gold pile / short sword / scroll / red potion / skull cap /
       crown — bottom-anchored on a shelf at line 11 via GambleSymbolCursor +
       ClxDraw, so mixed icon heights grow upward and the result line stays clear.

@@ -4285,6 +4285,10 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/true, /*delta=*/true);
 			if (GenerateRnd(100) < 3)
 				DropDungeonScroll(ClampRunDepth(static_cast<int>(currlevel)), monster.position.tile, dropDiff, true);
+			// [RUNS MOD] Gambler's Tokens: one free pull each. Rarer than scrolls --
+			// they don't stack, so the pack should never drown in chips.
+			if (GenerateRnd(100) < 2)
+				DropGambleToken(monster.position.tile, true);
 		}
 	}
 
