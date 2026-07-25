@@ -964,6 +964,12 @@ int CraftTargetInv = -1;
 constexpr int MaxCraftMaterials = 3;
 int CraftMaterialInvs[MaxCraftMaterials] = { -1, -1, -1 };
 int CraftMaterialCount = 0;
+// Snapshot of the pick count taken when the confirm opens. CraftApply MUST use this,
+// not CraftMaterialCount: rendering the confirm re-renders the material screen
+// underneath it (StoreConfirm -> StartStore(OldActiveStore)), whose cancelled-confirm
+// clamp decrements CraftMaterialCount -- which used to make CraftApply silently bail
+// on every craft (no gold taken, nothing applied).
+int CraftMaterialsLocked = 0;
 
 int MaterialsRequired()
 {
@@ -1486,12 +1492,17 @@ int CraftGoldCost(const Item &scroll)
 	const int level = std::max(1, DungeonScrollLevel(scroll));
 	switch (CraftOp) {
 	case ScrollCraftOp::Upgrade: {
-		// [RUNS MOD] Upgrading is the ghost-run path to depth (farm wealth, buy your
-		// way deeper without ever facing a boss), so it must be a REAL gold sink:
-		// quadratic in the target level. L1->2 costs 400, L4->5 2,500, L9->10 10,000,
-		// L14->15 22,500 -- affordable early, a serious investment at depth, and
-		// always pricier than just beating the boss for the free next-depth scroll.
 		const int target = level + 1;
+		// [RUNS MOD] Within EARNED depth (the vendor already sells this level) the
+		// craft is just "keep your affixes": it costs the shelf price of the new
+		// level, so catching a stash of low scrolls up to your depth is routine.
+		if (target <= ClampRunDepth(MyPlayer->pDeepestBeatenDepth + 1))
+			return target * 50;
+		// Beyond the earned range, upgrading is the ghost-run path to depth (farm
+		// wealth, buy your way deeper without ever facing a boss), so it must be a
+		// REAL gold sink: quadratic in the target level. L4->5 2,500, L9->10 10,000,
+		// L14->15 22,500 -- a serious investment at depth, and always pricier than
+		// just beating the boss for the free next-depth scroll.
 		return target * target * 100;
 	}
 	case ScrollCraftOp::AddMod:
@@ -1595,6 +1606,7 @@ void StartDungeonVendorCraftTarget()
 {
 	IsTextFullSize = true;
 	CraftMaterialCount = 0; // fresh target choice restarts the material picks
+	CraftMaterialsLocked = 0;
 	if (CountDungeonScrolls() < 1 + MaterialsRequired()) {
 		CurrentItemIndex = 0;
 		ShowScrollListNotice(CraftOp == ScrollCraftOp::Upgrade
@@ -1655,10 +1667,11 @@ void CraftApply()
 	if (target._iMiscId != IMISC_DUNGEONSCROLL)
 		return;
 	// Re-validate every material at apply time (indices can go stale between screens):
-	// all distinct, none the target, each a scroll valid for the operation.
-	if (CraftMaterialCount != MaterialsRequired())
+	// all distinct, none the target, each a scroll valid for the operation. The count
+	// comes from the confirm-time snapshot; see CraftMaterialsLocked.
+	if (CraftMaterialsLocked != MaterialsRequired())
 		return;
-	for (int i = 0; i < CraftMaterialCount; i++) {
+	for (int i = 0; i < CraftMaterialsLocked; i++) {
 		const int inv = CraftMaterialInvs[i];
 		if (inv < 0 || inv >= player._pNumInv || inv == CraftTargetInv)
 			return;
@@ -1690,11 +1703,12 @@ void CraftApply()
 	// Remove materials from the highest inventory index down: RemoveInvItem compacts
 	// InvList, so descending order keeps the remaining picked indices valid.
 	int sorted[MaxCraftMaterials];
-	std::copy(CraftMaterialInvs, CraftMaterialInvs + CraftMaterialCount, sorted);
-	std::sort(sorted, sorted + CraftMaterialCount, std::greater<>());
-	for (int i = 0; i < CraftMaterialCount; i++)
+	std::copy(CraftMaterialInvs, CraftMaterialInvs + CraftMaterialsLocked, sorted);
+	std::sort(sorted, sorted + CraftMaterialsLocked, std::greater<>());
+	for (int i = 0; i < CraftMaterialsLocked; i++)
 		player.RemoveInvItem(sorted[i]);
 	CraftMaterialCount = 0;
+	CraftMaterialsLocked = 0;
 	CalcPlrInv(player, true);
 }
 
@@ -1744,6 +1758,9 @@ void DungeonVendorCraftMaterialEnter()
 		StartStore(TalkID::DungeonVendorCraftMaterial); // pick the next material
 		return;
 	}
+	// Snapshot the full pick count NOW: the confirm's own render clamps
+	// CraftMaterialCount back down (see CraftMaterialsLocked).
+	CraftMaterialsLocked = CraftMaterialCount;
 	OldActiveStore = TalkID::DungeonVendorCraftMaterial;
 	TempItem = MyPlayer->InvList[CraftTargetInv]; // the confirm shows the target scroll
 	StartStore(TalkID::Confirm);
