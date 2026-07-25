@@ -1478,6 +1478,10 @@ void DrawInv(const Surface &out)
 			} else if (RunsModEnabled && myPlayer.InvList[ii].isPreserved()) {
 				// [RUNS MOD] Insured by a Scroll of Preservation: constant gold outline.
 				ClxDrawOutline(out, ICOL_YELLOW, position, sprite);
+			} else if (RunsModEnabled && myPlayer.InvList[ii]._iMiscId == IMISC_DUNGEONSCROLL) {
+				// [RUNS MOD] Dungeon scrolls wear a portal-red outline so they never
+				// blend in with common scrolls in a crowded pack.
+				ClxDrawOutline(out, ICOL_RED, position, sprite);
 			}
 
 			DrawItem(myPlayer.InvList[ii], out, position, sprite);
@@ -1515,6 +1519,9 @@ void DrawInvBelt(const Surface &out)
 		} else if (RunsModEnabled && myPlayer.SpdList[i].isPreserved()) {
 			// [RUNS MOD] Insured by a Scroll of Preservation: constant gold outline.
 			ClxDrawOutline(out, ICOL_YELLOW, position, sprite);
+		} else if (RunsModEnabled && myPlayer.SpdList[i]._iMiscId == IMISC_DUNGEONSCROLL) {
+			// [RUNS MOD] Portal-red outline, as in the inventory grid.
+			ClxDrawOutline(out, ICOL_RED, position, sprite);
 		}
 
 		DrawItem(myPlayer.SpdList[i], out, position, sprite);

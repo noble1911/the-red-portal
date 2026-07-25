@@ -25,6 +25,7 @@
 #include "headless_mode.hpp"
 #include "hwcursor.hpp"
 #include "inv.h"
+#include "runs_mod.h"
 #include "minitext.h"
 #include "stores.h"
 #include "utils/display.h"
@@ -395,6 +396,10 @@ void DrawStash(const Surface &out)
 		if (pcursstashitem == itemId) {
 			const uint8_t color = GetOutlineColor(item, true);
 			ClxDrawOutline(out, color, position, sprite);
+		} else if (RunsModEnabled && item._iMiscId == IMISC_DUNGEONSCROLL) {
+			// [RUNS MOD] Portal-red outline, matching the inventory grid, so scroll
+			// stock stands out from vendor trash in a full stash page.
+			ClxDrawOutline(out, ICOL_RED, position, sprite);
 		}
 
 		DrawItem(item, out, position, sprite);
