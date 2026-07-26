@@ -3223,6 +3223,18 @@ void ApplyRunSeed(int depth, uint32_t seed)
 	DungeonSeeds[depth] = seed;
 	LevelSeeds[depth] = std::nullopt;
 	MyPlayer->_pLvlVisited[depth] = false;
+	// [RUNS MOD] Drop the multiplayer delta for this depth: it describes the PREVIOUS
+	// layout. Vanilla can keep it because a level number always regenerates identically,
+	// but a re-rolled run reuses the level number with a different seed, and DeltaLoadLevel
+	// applies monster state BY INDEX -- the old run's positions, hit points and "this one
+	// is dead" flags land on whatever the new seed placed in those slots, and the old run's
+	// floor items and automap come back with them. Also drops LocalLevels (the automap).
+	//
+	// Never while we are standing on it: this also runs on peers receiving CMD_RUNSEED,
+	// and a peer still inside the old run keeps a live level whose state DeltaSaveLevel
+	// must be able to write back on the way out.
+	if (!MyPlayer->isOnLevel(static_cast<uint8_t>(depth)))
+		DeltaClearLevel(static_cast<uint8_t>(depth));
 }
 
 void StartNewRun()
