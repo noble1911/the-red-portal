@@ -953,6 +953,13 @@ void DeltaLoadItems(const DLevel &deltaLevel)
 			}
 		}
 		if (deltaItem.bCmd == TCmdPItem::DroppedItem) {
+			// The delta holds up to MAXITEMS entries and the freshly generated level has
+			// already spawned its own, so the two together can exceed the item pool.
+			// AllocateItem only asserts (a no-op in release) before indexing ActiveItems,
+			// so without this the overflow reads past the array and writes Items[] out of
+			// bounds. Match the floor-drop helpers and just stop placing.
+			if (ActiveItemCount >= MAXITEMS)
+				break;
 			const int ii = AllocateItem();
 			auto &item = Items[ii];
 			RecreateItem(*MyPlayer, deltaItem, item);
