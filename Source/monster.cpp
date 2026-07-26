@@ -4266,23 +4266,31 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 			DropDungeonScroll(NextRunDepth(static_cast<int>(currlevel)), monster.position.tile, dropDiff, true);
 			// [RUNS MOD] The boss guards the VAULT: a loot shower on top of the normal
 			// unique drop, scaling with depth -- ghost runs farm the floor, but the boss
-			// is the jackpot. Broadcast per item (CMD_DROPITEM) and delta-persisted so
-			// the pile survives exit/re-entry during the collapse window. Gold piles
-			// inherit the Avaricious gold scaling via the GetItemAttrs hook.
+			// is the jackpot. Gold piles inherit the Avaricious gold scaling via the
+			// GetItemAttrs hook.
+			//
+			// sendmsg WITHOUT delta, like every vanilla monster/object drop. `delta` is
+			// forwarded to SetupAllItems as `pregen`, which stamps CF_PREGEN: remote
+			// clients reject a broadcast pregen item outright (IsCreationFlagComboValid),
+			// and the local DeltaAddItem races the loopback of our own CMD_DROPITEM,
+			// tripping DeltaPutItem's floor-item duplication guard -- which drops a
+			// player as a "timeout". The pile still survives exit/re-entry: OnDropItem
+			// delta-persists on every client, the sender included.
 			const int vaultItems = 2 + static_cast<int>(currlevel) / 5;
 			const int goldPiles = 2 + static_cast<int>(currlevel) / 10;
 			for (int i = 0; i < vaultItems; i++)
-				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/true, /*delta=*/true);
+				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/true, /*delta=*/false);
 			for (int i = 0; i < goldPiles; i++)
-				CreateTypeItem(monster.position.tile, /*onlygood=*/false, ItemType::Gold, IMISC_NONE, /*sendmsg=*/true, /*delta=*/true);
+				CreateTypeItem(monster.position.tile, /*onlygood=*/false, ItemType::Gold, IMISC_NONE, /*sendmsg=*/true, /*delta=*/false);
 			// [RUNS MOD] Rare vault relic: the retired quests' uniques (Harlequin
 			// Crest, Veil of Steel, ...) return as depth-gated chase drops.
 			TryDropRunRelic(static_cast<int>(currlevel), monster.position.tile);
 		} else {
 			// [RUNS MOD] Tyrannical champions always pay out: one good item at the
 			// corpse (the pick is re-derived, so no champion state is stored).
+			// sendmsg without delta -- see the vault drop above.
 			if (IsRunChampion(static_cast<unsigned>(monster.getId())))
-				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/true, /*delta=*/true);
+				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/true, /*delta=*/false);
 			if (GenerateRnd(100) < 3)
 				DropDungeonScroll(ClampRunDepth(static_cast<int>(currlevel)), monster.position.tile, dropDiff, true);
 			// [RUNS MOD] Gambler's Tokens: one free pull each. Rarer than scrolls --
