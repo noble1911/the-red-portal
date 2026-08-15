@@ -66,6 +66,15 @@ struct Color {
 extern std::array<SDL_Color, 256> logical_palette;
 
 /**
+ * @brief [RUNS MOD] Bumped every time a palette is loaded.
+ *
+ * Lets code that bakes sprites against the live palette notice when its work has gone
+ * stale without palette.cpp needing to know about that code. Used by the gem icons,
+ * which ship as RGB and are quantised per level (see runs_gems.cpp).
+ */
+extern unsigned PaletteGeneration;
+
+/**
  * @brief This palette is the actual palette used for rendering.
  *
  * It is usually `logical_palette` with the global brightness setting

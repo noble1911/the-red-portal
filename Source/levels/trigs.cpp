@@ -68,6 +68,67 @@ const uint16_t L5DownList[] = { 124, 125, 128, 130, 131, 134, 135, 139, 141 };
 const uint16_t L6TWarpUpList[] = { 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91 };
 const uint16_t L6UpList[] = { 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77 };
 const uint16_t L6DownList[] = { 56, 57, 58, 59, 60, 61, 62, 63 };
+
+/**
+ * @brief [RUNS MOD] What the descent staircase does.
+ *
+ * A run is a single contained level, so the stairs down never descend. Rather than
+ * leave a staircase that silently does nothing (which reads as a broken level), it
+ * becomes a second way out: like the ascent it warps to the hub, keeping the run
+ * clock's promise that the stairs always work even after the portal has sealed.
+ */
+constexpr interface_mode DescentTrigMsg = RunsModEnabled ? WM_DIABTWARPUP : WM_DIABNEXTLVL;
+
+/**
+ * @brief Sentinel stored in TriggerStruct::_tlvl to mark the descent staircase.
+ *
+ * In run mode it shares WM_DIABTWARPUP with the level's own town-warp staircase
+ * (depths 5/9/13/17/21), and "first trigger with this message" would drag the cursor
+ * across the map. Safe to borrow: CheckTriggers hardcodes town for WM_DIABTWARPUP and
+ * ignores _tlvl for WM_DIABNEXTLVL, so nothing reads it for either message.
+ */
+constexpr int DescentTrigLvl = -1;
+
+/**
+ * @brief [RUNS MOD] Labels the hovered ascent staircase.
+ *
+ * CheckTriggers reroutes every run-mode WM_DIABPREVLVL to the hub, so "Up to level N-1"
+ * has always been a lie in run mode -- there is no level N-1 to walk back to.
+ */
+std::string AscentTrigLabel(std::string vanillaLabel)
+{
+	return RunsModEnabled ? std::string(_("Up to town")) : std::move(vanillaLabel);
+}
+
+/** @brief Registers the level's descent staircase. See DescentTrigMsg. */
+void AddDescentTrig(WorldTileCoord x, WorldTileCoord y)
+{
+	trigs[numtrigs].position = { x, y };
+	trigs[numtrigs]._tmsg = DescentTrigMsg;
+	trigs[numtrigs]._tlvl = DescentTrigLvl;
+	numtrigs++;
+}
+
+/**
+ * @brief Labels the hovered descent staircase and snaps the cursor onto its trigger.
+ * @param vanillaLabel what the staircase reads as outside run mode
+ * @return whether a matching trigger was found (the label is set either way, matching
+ *         the surrounding vanilla code)
+ */
+bool ForceDescentTrig(std::string vanillaLabel)
+{
+	// [RUNS MOD] Name where it actually goes, not a depth this run can't reach.
+	InfoString = RunsModEnabled ? std::string(_("Escape to town")) : std::move(vanillaLabel);
+
+	for (int j = 0; j < numtrigs; j++) {
+		if (trigs[j]._tmsg == DescentTrigMsg && trigs[j]._tlvl == DescentTrigLvl) {
+			cursPosition = trigs[j].position;
+			return true;
+		}
+	}
+
+	return false;
+}
 } // namespace
 
 void InitNoTriggers()
@@ -174,14 +235,8 @@ void InitL1Triggers()
 				trigs[numtrigs]._tmsg = WM_DIABPREVLVL;
 				numtrigs++;
 			}
-			// [RUNS MOD] A run is a single contained level: skip the down-stairs
-			// trigger so the player can't descend further. The up-stairs above
-			// remain and return to the hub.
-			if (dPiece[i][j] == 114 && !RunsModEnabled) {
-				trigs[numtrigs].position = { i, j };
-				trigs[numtrigs]._tmsg = WM_DIABNEXTLVL;
-				numtrigs++;
-			}
+			if (dPiece[i][j] == 114)
+				AddDescentTrig(i, j);
 		}
 	}
 	trigflag = false;
@@ -205,11 +260,8 @@ void InitL2Triggers()
 				numtrigs++;
 			}
 
-			if (dPiece[i][j] == 270 && !RunsModEnabled) { // [RUNS MOD] no descent
-				trigs[numtrigs].position = { i, j };
-				trigs[numtrigs]._tmsg = WM_DIABNEXTLVL;
-				numtrigs++;
-			}
+			if (dPiece[i][j] == 270)
+				AddDescentTrig(i, j);
 		}
 	}
 	trigflag = false;
@@ -226,11 +278,8 @@ void InitL3Triggers()
 				numtrigs++;
 			}
 
-			if (dPiece[i][j] == 167 && !RunsModEnabled) { // [RUNS MOD] no descent
-				trigs[numtrigs].position = { i, j };
-				trigs[numtrigs]._tmsg = WM_DIABNEXTLVL;
-				numtrigs++;
-			}
+			if (dPiece[i][j] == 167)
+				AddDescentTrig(i, j);
 
 			if (dPiece[i][j] == 548) {
 				trigs[numtrigs].position = { i, j };
@@ -260,11 +309,8 @@ void InitL4Triggers()
 				numtrigs++;
 			}
 
-			if (dPiece[i][j] == 119 && !RunsModEnabled) { // [RUNS MOD] no descent
-				trigs[numtrigs].position = { i, j };
-				trigs[numtrigs]._tmsg = WM_DIABNEXTLVL;
-				numtrigs++;
-			}
+			if (dPiece[i][j] == 119)
+				AddDescentTrig(i, j);
 		}
 	}
 
@@ -291,11 +337,8 @@ void InitHiveTriggers()
 				numtrigs++;
 			}
 
-			if (dPiece[i][j] == 62) {
-				trigs[numtrigs].position = { i, j };
-				trigs[numtrigs]._tmsg = WM_DIABNEXTLVL;
-				numtrigs++;
-			}
+			if (dPiece[i][j] == 62)
+				AddDescentTrig(i, j);
 
 			if (dPiece[i][j] == 79) {
 				trigs[numtrigs].position = { i, j };
@@ -323,11 +366,8 @@ void InitCryptTriggers()
 				trigs[numtrigs]._tmsg = WM_DIABPREVLVL;
 				numtrigs++;
 			}
-			if (dPiece[i][j] == 125) {
-				trigs[numtrigs].position = { i, j };
-				trigs[numtrigs]._tmsg = WM_DIABNEXTLVL;
-				numtrigs++;
-			}
+			if (dPiece[i][j] == 125)
+				AddDescentTrig(i, j);
 		}
 	}
 	trigflag = false;
@@ -433,7 +473,7 @@ bool ForceL1Trig()
 	for (const uint16_t tileId : L1UpList) {
 		if (dPiece[cursPosition.x][cursPosition.y] == tileId) {
 			if (currlevel > 1)
-				InfoString = fmt::format(fmt::runtime(_("Up to level {:d}")), currlevel - 1);
+				InfoString = AscentTrigLabel(fmt::format(fmt::runtime(_("Up to level {:d}")), currlevel - 1));
 			else
 				InfoString = _("Up to town");
 			for (int j = 0; j < numtrigs; j++) {
@@ -446,13 +486,8 @@ bool ForceL1Trig()
 	}
 	for (const uint16_t tileId : L1DownList) {
 		if (dPiece[cursPosition.x][cursPosition.y] == tileId) {
-			InfoString = fmt::format(fmt::runtime(_("Down to level {:d}")), currlevel + 1);
-			for (int j = 0; j < numtrigs; j++) {
-				if (trigs[j]._tmsg == WM_DIABNEXTLVL) {
-					cursPosition = trigs[j].position;
-					return true;
-				}
-			}
+			if (ForceDescentTrig(fmt::format(fmt::runtime(_("Down to level {:d}")), currlevel + 1)))
+				return true;
 		}
 	}
 
@@ -468,7 +503,7 @@ bool ForceL2Trig()
 					const int dx = std::abs(trigs[j].position.x - cursPosition.x);
 					const int dy = std::abs(trigs[j].position.y - cursPosition.y);
 					if (dx < 4 && dy < 4) {
-						InfoString = fmt::format(fmt::runtime(_("Up to level {:d}")), currlevel - 1);
+						InfoString = AscentTrigLabel(fmt::format(fmt::runtime(_("Up to level {:d}")), currlevel - 1));
 						cursPosition = trigs[j].position;
 						return true;
 					}
@@ -479,13 +514,8 @@ bool ForceL2Trig()
 
 	for (const uint16_t tileId : L2DownList) {
 		if (dPiece[cursPosition.x][cursPosition.y] == tileId) {
-			InfoString = fmt::format(fmt::runtime(_("Down to level {:d}")), currlevel + 1);
-			for (int j = 0; j < numtrigs; j++) {
-				if (trigs[j]._tmsg == WM_DIABNEXTLVL) {
-					cursPosition = trigs[j].position;
-					return true;
-				}
-			}
+			if (ForceDescentTrig(fmt::format(fmt::runtime(_("Down to level {:d}")), currlevel + 1)))
+				return true;
 		}
 	}
 
@@ -514,7 +544,7 @@ bool ForceL3Trig()
 {
 	for (const uint16_t tileId : L3UpList) {
 		if (dPiece[cursPosition.x][cursPosition.y] == tileId) {
-			InfoString = fmt::format(fmt::runtime(_("Up to level {:d}")), currlevel - 1);
+			InfoString = AscentTrigLabel(fmt::format(fmt::runtime(_("Up to level {:d}")), currlevel - 1));
 			for (int j = 0; j < numtrigs; j++) {
 				if (trigs[j]._tmsg == WM_DIABPREVLVL) {
 					const int dx = std::abs(trigs[j].position.x - cursPosition.x);
@@ -531,13 +561,8 @@ bool ForceL3Trig()
 		if (dPiece[cursPosition.x][cursPosition.y] == tileId
 		    || dPiece[cursPosition.x + 1][cursPosition.y] == tileId
 		    || dPiece[cursPosition.x + 2][cursPosition.y] == tileId) {
-			InfoString = fmt::format(fmt::runtime(_("Down to level {:d}")), currlevel + 1);
-			for (int j = 0; j < numtrigs; j++) {
-				if (trigs[j]._tmsg == WM_DIABNEXTLVL) {
-					cursPosition = trigs[j].position;
-					return true;
-				}
-			}
+			if (ForceDescentTrig(fmt::format(fmt::runtime(_("Down to level {:d}")), currlevel + 1)))
+				return true;
 		}
 	}
 
@@ -566,7 +591,7 @@ bool ForceL4Trig()
 {
 	for (const uint16_t tileId : L4UpList) {
 		if (dPiece[cursPosition.x][cursPosition.y] == tileId) {
-			InfoString = fmt::format(fmt::runtime(_("Up to level {:d}")), currlevel - 1);
+			InfoString = AscentTrigLabel(fmt::format(fmt::runtime(_("Up to level {:d}")), currlevel - 1));
 			for (int j = 0; j < numtrigs; j++) {
 				if (trigs[j]._tmsg == WM_DIABPREVLVL) {
 					cursPosition = trigs[j].position;
@@ -578,13 +603,8 @@ bool ForceL4Trig()
 
 	for (const uint16_t tileId : L4DownList) {
 		if (dPiece[cursPosition.x][cursPosition.y] == tileId) {
-			InfoString = fmt::format(fmt::runtime(_("Down to level {:d}")), currlevel + 1);
-			for (int j = 0; j < numtrigs; j++) {
-				if (trigs[j]._tmsg == WM_DIABNEXTLVL) {
-					cursPosition = trigs[j].position;
-					return true;
-				}
-			}
+			if (ForceDescentTrig(fmt::format(fmt::runtime(_("Down to level {:d}")), currlevel + 1)))
+				return true;
 		}
 	}
 
@@ -606,7 +626,9 @@ bool ForceL4Trig()
 		}
 	}
 
-	if (currlevel == 15) {
+	// [RUNS MOD] Depth 15 still generates the hell gate as scenery, but there is no
+	// Diablo behind it and no trigger on it -- don't label it as a way down.
+	if (!RunsModEnabled && currlevel == 15) {
 		for (const uint16_t tileId : L4PentaList) {
 			if (dPiece[cursPosition.x][cursPosition.y] == tileId) {
 				InfoString = _("Down to Diablo");
@@ -627,7 +649,7 @@ bool ForceHiveTrig()
 {
 	for (const uint16_t tileId : L6UpList) {
 		if (dPiece[cursPosition.x][cursPosition.y] == tileId) {
-			InfoString = fmt::format(fmt::runtime(_("Up to Nest level {:d}")), currlevel - 17);
+			InfoString = AscentTrigLabel(fmt::format(fmt::runtime(_("Up to Nest level {:d}")), currlevel - 17));
 			for (int j = 0; j < numtrigs; j++) {
 				if (trigs[j]._tmsg == WM_DIABPREVLVL) {
 					cursPosition = trigs[j].position;
@@ -640,13 +662,8 @@ bool ForceHiveTrig()
 		if (dPiece[cursPosition.x][cursPosition.y] == tileId
 		    || dPiece[cursPosition.x + 1][cursPosition.y] == tileId
 		    || dPiece[cursPosition.x + 2][cursPosition.y] == tileId) {
-			InfoString = fmt::format(fmt::runtime(_("Down to level {:d}")), currlevel - 15);
-			for (int j = 0; j < numtrigs; j++) {
-				if (trigs[j]._tmsg == WM_DIABNEXTLVL) {
-					cursPosition = trigs[j].position;
-					return true;
-				}
-			}
+			if (ForceDescentTrig(fmt::format(fmt::runtime(_("Down to level {:d}")), currlevel - 15)))
+				return true;
 		}
 	}
 
@@ -675,7 +692,7 @@ bool ForceCryptTrig()
 {
 	for (const uint16_t tileId : L5UpList) {
 		if (dPiece[cursPosition.x][cursPosition.y] == tileId) {
-			InfoString = fmt::format(fmt::runtime(_("Up to Crypt level {:d}")), currlevel - 21);
+			InfoString = AscentTrigLabel(fmt::format(fmt::runtime(_("Up to Crypt level {:d}")), currlevel - 21));
 			for (int j = 0; j < numtrigs; j++) {
 				if (trigs[j]._tmsg == WM_DIABPREVLVL) {
 					cursPosition = trigs[j].position;
@@ -690,13 +707,8 @@ bool ForceCryptTrig()
 	}
 	for (const uint16_t tileId : L5DownList) {
 		if (dPiece[cursPosition.x][cursPosition.y] == tileId) {
-			InfoString = fmt::format(fmt::runtime(_("Down to Crypt level {:d}")), currlevel - 19);
-			for (int j = 0; j < numtrigs; j++) {
-				if (trigs[j]._tmsg == WM_DIABNEXTLVL) {
-					cursPosition = trigs[j].position;
-					return true;
-				}
-			}
+			if (ForceDescentTrig(fmt::format(fmt::runtime(_("Down to Crypt level {:d}")), currlevel - 19)))
+				return true;
 		}
 	}
 	if (currlevel == 21) {

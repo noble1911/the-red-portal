@@ -30,6 +30,8 @@ set(libdevilutionx_SRCS
   portal.cpp
   restrict.cpp
   run_clock.cpp
+  runs_gems.cpp
+  runs_icons.cpp
   scroll_mods.cpp
   sync.cpp
   tmsg.cpp

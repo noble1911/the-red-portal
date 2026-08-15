@@ -82,6 +82,7 @@
 #include "player.h"
 #include "quests.h"
 #include "run_clock.h"
+#include "runs_gems.h"
 #include "runs_mod.h"
 #include "scroll_mods.h"
 #include "sound_effect_enums.h"
@@ -132,10 +133,12 @@ namespace {
 // [RUNS MOD] Per-tileset boss pools, so each tileset has its own cast instead of the
 // same few bosses everywhere. Entries name rows of unique_monstdat.tsv (including the
 // mod's own additions for the Hellfire tilesets) and are resolved at runtime, so the
-// pools survive TSV reordering. All picks are combat-clean: no talk/quest AI, and their
-// row level never matches a run level, so PlaceUniqueMonsters cannot also spawn them
-// organically (except where noted, which the RunBossType guard there covers). Stats are
-// normalized in ScaleRunMonsters, so only type, AI, color and resistances matter here.
+// pools survive TSV reordering. All picks are combat-clean: no talk/quest AI. Many DO
+// carry a row level inside their own tileset's depth range (Deadeye 2, Bloodgutter 6,
+// Blackskull 13, ...), so PlaceUniqueMonsters would happily place a second copy on the
+// depth that matches -- its RunBossType skip is what keeps a level to one boss, and it
+// is load-bearing, not belt-and-braces. Stats are normalized in ScaleRunMonsters, so
+// only type, AI, color and resistances matter here.
 // The last entry of each pool is a restored CUT monster (graphics shipped in retail
 // DIABDAT.MPQ but never spawned): The Red Death (thin recolor), Marrowgrave (demon
 // skeleton), Satyr Lord (goat lord), The Invisible Lord (dark hidden), Gorefang
@@ -641,7 +644,13 @@ tl::expected<void, std::string> PlaceQuestMonsters()
 			RETURN_IF_ERROR(PlaceUniqueMonst(UniqueMonsterType::Butcher, 0, 0));
 		}
 
-		if (currlevel == Quests[Q_SKELKING]._qlevel && UseMultiplayerQuests()) {
+		// [RUNS MOD] Campaign content, disabled in run mode. Unlike every quest spawn
+		// around it this one never checked availability -- it keys off _qlevel alone,
+		// which InitQuests still fills in (3) before run mode marks the quest
+		// QUEST_NOTAVAIL. In a multiplayer game without Full Quests that put a second,
+		// non-run Skeleton King (plus a 30-skeleton pack) on every depth-3 run, so the
+		// real run boss went unrecognised and killing it "unexpectedly" armed collapse.
+		if (!RunsModEnabled && currlevel == Quests[Q_SKELKING]._qlevel && UseMultiplayerQuests()) {
 			for (size_t i = 0; i < LevelMonsterTypeCount; i++) {
 				if (IsSkel(LevelMonsterTypes[i].type)) {
 					RETURN_IF_ERROR(PlaceUniqueMonst(UniqueMonsterType::SkeletonKing, i, 30));
@@ -678,7 +687,11 @@ tl::expected<void, std::string> PlaceQuestMonsters()
 			Quests[Q_ZHAR]._qactive = QUEST_NOTAVAIL;
 		}
 
-		if (currlevel == Quests[Q_BETRAYER]._qlevel && UseMultiplayerQuests()) {
+		// [RUNS MOD] Same unguarded-_qlevel spawn as the Skeleton King above, and worse:
+		// Q_BETRAYER's multiplayer level is 15, a valid run depth, and Red Vex and Black
+		// Jade are both in the Hell run-boss pool -- so this could place a SECOND monster
+		// matching RunBossType, paying out a duplicate vault and next-depth scroll.
+		if (!RunsModEnabled && currlevel == Quests[Q_BETRAYER]._qlevel && UseMultiplayerQuests()) {
 			RETURN_IF_ERROR(AddMonsterType(UniqueMonsterType::Lazarus, PLACE_UNIQUE));
 			RETURN_IF_ERROR(AddMonsterType(UniqueMonsterType::RedVex, PLACE_UNIQUE));
 			RETURN_IF_ERROR(PlaceUniqueMonst(UniqueMonsterType::Lazarus, 0, 0));
@@ -3563,7 +3576,14 @@ tl::expected<void, std::string> GetLevelMTypes()
 		RETURN_IF_ERROR(AddMonsterType(MT_HORKSPWN, PLACE_SCATTER));
 	if (currlevel == 19) {
 		RETURN_IF_ERROR(AddMonsterType(MT_HORKSPWN, PLACE_SCATTER));
-		RETURN_IF_ERROR(AddMonsterType(MT_HORKDMN, PLACE_UNIQUE));
+		// [RUNS MOD] The Hork Demon is Hellfire quest content like the Defiler below, but
+		// it reaches the level by a different route: its unique_monstdat row level (19) IS
+		// a run depth, so merely adding its type here was enough for PlaceUniqueMonsters to
+		// place it -- a second boss beside ours on every depth-19 run, handing out a free
+		// level-13 amulet on death (the HorkDemon branch in MonsterDeath). Only the boss
+		// goes; the Hork Spawn scatter population above stays.
+		if (!RunsModEnabled)
+			RETURN_IF_ERROR(AddMonsterType(MT_HORKDMN, PLACE_UNIQUE));
 	}
 	// [RUNS MOD] The Defiler and Na-Krul are quest bosses; run mode disables quests and
 	// supplies its own boss, so don't burn a monster-type slot (and its image budget) on
@@ -3600,7 +3620,10 @@ tl::expected<void, std::string> GetLevelMTypes()
 		if (Quests[Q_WARLORD].IsAvailable())
 			RETURN_IF_ERROR(AddMonsterType(UniqueMonsterType::WarlordOfBlood, PLACE_UNIQUE));
 
-		if (UseMultiplayerQuests() && currlevel == Quests[Q_SKELKING]._qlevel) {
+		// [RUNS MOD] Type budget for the campaign Skeleton King, retired with its spawn in
+		// PlaceQuestMonsters. When the run boss IS the Skeleton King, MT_SKING is already
+		// added above with the rest of the run-boss setup.
+		if (!RunsModEnabled && UseMultiplayerQuests() && currlevel == Quests[Q_SKELKING]._qlevel) {
 
 			RETURN_IF_ERROR(AddMonsterType(MT_SKING, PLACE_UNIQUE));
 
@@ -4282,9 +4305,21 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/true, /*delta=*/false);
 			for (int i = 0; i < goldPiles; i++)
 				CreateTypeItem(monster.position.tile, /*onlygood=*/false, ItemType::Gold, IMISC_NONE, /*sendmsg=*/true, /*delta=*/false);
+			// [RUNS MOD] A fistful of chips for Farnham: beating the boss buys a real
+			// session at the fruit machine rather than the single stray token that trash
+			// drops. The count is flat because a token's WORTH already scales -- each is
+			// one pull at the current stake (500 + 250 x earned depth), so the same
+			// handful is worth more the deeper the hero has got.
+			const int tokens = RandomIntBetween(GambleTokenVaultMin, GambleTokenVaultMax);
+			for (int i = 0; i < tokens; i++)
+				DropGambleToken(monster.position.tile, true);
 			// [RUNS MOD] Rare vault relic: the retired quests' uniques (Harlequin
 			// Crest, Veil of Steel, ...) return as depth-gated chase drops.
 			TryDropRunRelic(static_cast<int>(currlevel), monster.position.tile);
+			// [RUNS MOD] The vault always pays a gem, and its quality is rolled at this
+			// depth -- the boss is the reliable way to move up the gem tiers, the same
+			// way it is the only way to move up depth. sendmsg without delta, as above.
+			DropRandomGem(static_cast<int>(currlevel), monster.position.tile, /*sendmsg=*/true);
 		} else {
 			// [RUNS MOD] Tyrannical champions always pay out: one good item at the
 			// corpse (the pick is re-derived, so no champion state is stored).
@@ -4293,9 +4328,24 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/true, /*delta=*/false);
 			if (GenerateRnd(100) < 3)
 				DropDungeonScroll(ClampRunDepth(static_cast<int>(currlevel)), monster.position.tile, dropDiff, true);
+			// [RUNS MOD] Gems trickle out of ordinary kills, more often the deeper the
+			// run -- the floor is where you farm the low tiers, the boss is where the
+			// good ones come from. sendmsg without delta, as above.
+			if (ShouldDropGem(static_cast<int>(currlevel)))
+				DropRandomGem(static_cast<int>(currlevel), monster.position.tile, /*sendmsg=*/true);
 			// [RUNS MOD] Gambler's Tokens: one free pull each. Rarer than scrolls --
 			// they don't stack, so the pack should never drown in chips.
-			if (GenerateRnd(100) < 2)
+			//
+			// The rate scales with how deep this run is relative to the hero's EARNED
+			// depth, reaching the full 2% only at the deepest run they may enter. A
+			// token buys a pull that pays at earned depth, so a flat rate made a
+			// level-1 scroll the cheapest way to buy top-tier pulls: acquisition cost
+			// set by run depth, payout set by earned depth. Tying the rate to that
+			// ratio closes it -- shallow runs pay shallow-run rates. Capped at the full
+			// rate so a crafted past-earned-depth run is not a token farm either.
+			const int tokenAccessDepth = ClampRunDepth(MyPlayer->pDeepestBeatenDepth + 1);
+			const int tokenDepth = std::min<int>(static_cast<int>(currlevel), tokenAccessDepth);
+			if (GenerateRnd(100 * tokenAccessDepth) < 2 * tokenDepth)
 				DropGambleToken(monster.position.tile, true);
 		}
 	}

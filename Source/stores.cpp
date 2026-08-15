@@ -1121,10 +1121,17 @@ void DungeonVendorBuyEnter()
 
 enum class GambleSymbol : uint8_t { Gold, Sword, Scroll, Potion, Skull, Crown };
 constexpr int NumGambleSymbols = 6;
-// Per-reel symbol weights (sum 27). Crown at 2/27 puts triple-crown -- the displayed
-// unique jackpot -- at ~1 in 2,460 pulls: a real lottery, priced like one.
-constexpr int GambleSymbolWeights[NumGambleSymbols] = { 5, 4, 4, 6, 6, 2 };
+// Per-reel symbol weights (sum 27). Retuned after playtest: the prize symbols were the
+// two rarest on the reels (sword 1 in 308, crown 1 in 2,460), so a session could run for
+// hours and only ever see the potion and skull triples -- the machine read as "expensive
+// for nothing". Sword joins the common tier and crown moves 2 -> 3, putting the jackpot
+// at ~1 in 729: still a lottery, but one a real player can expect to hit. Uniques stay
+// bounded by boss kills regardless, since a claimed jackpot only rerolls on a boss death.
+constexpr int GambleSymbolWeights[NumGambleSymbols] = { 5, 5, 4, 5, 5, 3 };
 constexpr int GambleWeightTotal = 27;
+/** Full healing potions paid by the triple-potion row. They drop at the player's feet,
+ * so this is bounded by what is reasonable to pick up rather than by inventory space. */
+constexpr int GamblePotionPrizeCount = 8;
 
 GambleSymbol GambleReels[3];
 /** The result headline shown on the spin screen (set by ResolveGamble). */
@@ -1229,13 +1236,50 @@ void ResolveGamble(bool tokenSpin = false)
 	const int matched = counts[best];
 
 	// Prize items are capped at EARNED depth, same rule as the vendor and the craft:
-	// town can never hand out more than the hero has proven they can reach.
-	const int prizeLevel = std::max<int>(1, myPlayer.pDeepestBeatenDepth);
+	// town can never hand out more than the hero has proven they can reach. `accessDepth`
+	// is the deepest run the hero may enter -- the vendor's scroll cap.
+	const int accessDepth = ClampRunDepth(myPlayer.pDeepestBeatenDepth + 1);
+	// [RUNS MOD] The item prize is levelled at 2 x accessDepth -- the tier that depth's
+	// boss vault pays -- rather than the raw depth. Triple sword is ~1 in 308 pulls, so
+	// at this stake a prize costs several hundred thousand gold on average; at the old
+	// raw-depth level its base pool (iMinMLvl <= 4 for a depth-4 hero) and affixes were
+	// beaten by a routine vault drop and by Griswold, which made the machine a worse
+	// item source than simply playing. With uper 15 on top (see RollGamblePrizeItem)
+	// this lands at the boss-unique tier for the deepest run the hero can enter: the
+	// rarest payout on the machine is worth the pulls it took.
+	//
+	// Still bounded by earned depth, so this cannot be farmed from a shallow scroll --
+	// it moves only when a boss dies.
+	const int prizeLevel = 2 * accessDepth;
+	// Scroll prizes stay on the depth scale (they ARE depths), capped at accessDepth so
+	// the machine can never hand out a run deeper than the boss ladder has unlocked --
+	// that would make it a progression bypass. Raised from pDeepestBeatenDepth, which
+	// paid a scroll strictly worse than one the vendor already sells for depth x 50.
+	const int scrollPrizeLevel = accessDepth;
 
-	// Payouts (tuned after playtest: the first pass paid ~35% EV and felt like a
-	// mugging). Pairs now return the full stake -- at ~44% of pulls that keeps the
-	// wallet alive between hits -- and every triple beats the stake. Overall EV sits
-	// around 65-70% plus the jackpot dream: still a firm gold sink, no longer a scam.
+	// Payouts, third pass. The first paid ~35% and felt like a mugging; the second claimed
+	// 65-70% but actually returned 61% in gold, with the two item prizes so rare that a
+	// long session saw nothing but potion and skull triples. This pass targets ~75%.
+	//
+	// Return to player, in stake units, over the 19683 equally likely reel combinations
+	// (weights 5/5/4/5/5/3, jackpot already claimed so crowns pay gold):
+	//
+	//   pair, non-crown   7704 x 1   pairs are 42.4% of pulls and keep the wallet alive
+	//   pair, crown        648 x 6
+	//   triple gold        125 x 15
+	//   triple crown        27 x 15
+	//   triple potion      125 x 3    + 8 full heals
+	//   triple scroll       64 x 2    + a dungeon scroll
+	//   triple skull       125 x 1    stake back -- see below
+	//   triple sword       125 x 0    the item prize IS the payout
+	//                    ---------
+	//                    14500 / 19683 = 73.7% in gold, ~74% counting the potions and
+	//                                    scroll at shop value; the sword prize (1 in 157)
+	//                                    and the jackpot ride on top of that.
+	//
+	// Triple skull returning the stake is deliberate: three matching symbols paying
+	// literally nothing is the worst outcome a slot can show, and at the old weights it
+	// was as common as the potion triple. Farnham keeps the joke, not the money.
 	if (matched == 3) {
 		switch (symbol) {
 		case GambleSymbol::Crown:
@@ -1251,8 +1295,8 @@ void ResolveGamble(bool tokenSpin = false)
 			}
 			break;
 		case GambleSymbol::Gold:
-			AwardGambleGold(stake * 12);
-			GambleResultLine = fmt::format(fmt::runtime(_("Three gold piles! {:s} gold!")), FormatInteger(stake * 12));
+			AwardGambleGold(stake * 15);
+			GambleResultLine = fmt::format(fmt::runtime(_("Three gold piles! {:s} gold!")), FormatInteger(stake * 15));
 			break;
 		case GambleSymbol::Sword: {
 			GamblePendingDrops.push_back(RollGamblePrizeItem(prizeLevel));
@@ -1262,30 +1306,32 @@ void ResolveGamble(bool tokenSpin = false)
 		}
 		case GambleSymbol::Scroll: {
 			Item scroll = {};
-			CreateDungeonScroll(scroll, prizeLevel);
+			CreateDungeonScroll(scroll, scrollPrizeLevel);
 			GamblePendingDrops.push_back(scroll);
-			AwardGambleGold(stake);
-			GambleResultLine = _("Three scrolls! A dungeon scroll, and your stake back!");
+			AwardGambleGold(stake * 2);
+			GambleResultLine = fmt::format(fmt::runtime(_("Three scrolls! A dungeon scroll, and {:s} gold!")), FormatInteger(stake * 2));
 			break;
 		}
 		case GambleSymbol::Potion:
-			for (int i = 0; i < 2; i++) {
+			// A round for the house: two potions read as a shrug for a 1-in-157 hit.
+			for (int i = 0; i < GamblePotionPrizeCount; i++) {
 				Item potion = {};
 				InitializeItem(potion, IDI_FULLHEAL);
 				GenerateNewSeed(potion);
 				GamblePendingDrops.push_back(potion);
 			}
-			AwardGambleGold(stake * 2);
-			GambleResultLine = fmt::format(fmt::runtime(_("Three potions! Drinks, and {:s} gold!")), FormatInteger(stake * 2));
+			AwardGambleGold(stake * 3);
+			GambleResultLine = fmt::format(fmt::runtime(_("Three potions! A round for the house, and {:s} gold!")), FormatInteger(stake * 3));
 			break;
 		case GambleSymbol::Skull:
-			GambleResultLine = _("Three skulls. Farnham laughs himself off his stool.");
+			AwardGambleGold(stake);
+			GambleResultLine = _("Three skulls. Farnham laughs, then slides your stake back.");
 			break;
 		}
 	} else if (matched == 2) {
 		if (symbol == GambleSymbol::Crown) {
-			AwardGambleGold(stake * 5);
-			GambleResultLine = fmt::format(fmt::runtime(_("Two crowns -- so close! {:s} gold.")), FormatInteger(stake * 5));
+			AwardGambleGold(stake * 6);
+			GambleResultLine = fmt::format(fmt::runtime(_("Two crowns -- so close! {:s} gold.")), FormatInteger(stake * 6));
 		} else {
 			AwardGambleGold(stake);
 			GambleResultLine = _("A pair. Your stake back.");
@@ -3327,6 +3373,16 @@ void SetupTownStores()
 		}
 	}
 
+	// [RUNS MOD] Drive the shop level off EARNED DEPTH -- the deepest run the hero may
+	// enter, the same gate the Dungeon Merchant's scroll shelf uses -- instead of scanning
+	// _pLvlVisited. Two reasons: the flags are no longer a record of how deep you have
+	// been (ApplyRunSeed clears the entry on every reseed, so re-rolling a portal from the
+	// hub silently drops the shelf a tier), and depth belongs on the progression clock
+	// rather than on wherever a scroll happened to take you. Also drives Adria's magic
+	// tier, which is derived from this level.
+	if (RunsModEnabled)
+		l = ClampRunDepth(myPlayer.pDeepestBeatenDepth + 1);
+
 	l = std::clamp(l + 2, 6, 16);
 	SpawnSmith(l);
 	SpawnWitch(l);
@@ -3338,7 +3394,12 @@ void SetupTownStores()
 		// [RUNS MOD] The fruit-machine jackpot rerolls with the vendor: session state,
 		// refreshed by a boss kill. The floor keeps the pool interesting for fresh
 		// characters; the cap keeps it at the edge of earned progression.
-		SpawnGamblerJackpot(std::max<int>(4, myPlayer.pDeepestBeatenDepth + 1));
+		//
+		// The cap is 2 x the deepest run the hero may enter -- the same vault scale as
+		// the item prize and every other drop in the mod. It was the raw access depth,
+		// which capped the rarest payout on the machine (triple crown, ~1 in 2,460 pulls)
+		// at the tier a routine early vault already beats.
+		SpawnGamblerJackpot(std::max<int>(4, 2 * ClampRunDepth(myPlayer.pDeepestBeatenDepth + 1)));
 		DungeonVendorRestockPending = false;
 	}
 	SpawnHealer(l);

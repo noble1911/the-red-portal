@@ -388,6 +388,11 @@ void LoadAndValidateItemData(LoadHelper &file, Item &item)
 		return;
 	}
 
+	// [RUNS MOD] _iCurs is stored per item, so a dungeon scroll saved before the mod had
+	// its own icon would keep the vanilla scroll frame forever. Re-apply on load so a
+	// stash of old scrolls matches newly dropped ones.
+	ApplyDungeonScrollIcon(item);
+
 	RemoveInvalidItem(item);
 }
 

@@ -41,6 +41,7 @@
 #include "portal.h"
 #include "qol/stash.h"
 #include "qol/visual_store.h"
+#include "runs_gems.h"
 #include "runs_mod.h"
 #include "stores.h"
 #include "towners.h"
@@ -454,7 +455,7 @@ bool AutoEquip(Player &player, const Item &item, inv_body_loc bodyLocation, bool
 		ChangeEquipment(player, bodyLocation, item, sendNetworkMessage);
 
 		if (sendNetworkMessage && *GetOptions().Audio.autoEquipSound) {
-			PlaySFX(ItemInvSnds[ItemCAnimTbl[item._iCurs]]);
+			PlaySFX(ItemInvSnds[ItemCAnim(item._iCurs)]);
 		}
 
 		CalcPlrInv(player, true);
@@ -753,7 +754,7 @@ void CheckInvPaste(Player &player, Point cursorPosition)
 	}
 
 	if (&player == MyPlayer) {
-		PlaySFX(ItemInvSnds[ItemCAnimTbl[player.HoldItem._iCurs]]);
+		PlaySFX(ItemInvSnds[ItemCAnim(player.HoldItem._iCurs)]);
 	}
 
 	// Select the parameters that go into
@@ -966,7 +967,7 @@ void CheckInvCut(Player &player, Point cursorPosition, bool automaticMove, bool 
 				attemptedMove = true;
 				automaticallyMoved = AutoPlaceItemInInventory(player, player.InvBody[invloc]);
 				if (automaticallyMoved) {
-					successSound = ItemInvSnds[ItemCAnimTbl[player.InvBody[invloc]._iCurs]];
+					successSound = ItemInvSnds[ItemCAnim(player.InvBody[invloc]._iCurs)];
 					RemoveEquipment(player, invloc, false);
 				} else {
 					failedSpeech = HeroSpeech::IHaveNoRoom;
@@ -1076,7 +1077,7 @@ void CheckInvCut(Player &player, Point cursorPosition, bool automaticMove, bool 
 					}
 					automaticallyMoved = AutoEquip(player, player.InvList[iv], true, &player == MyPlayer);
 					if (automaticallyMoved) {
-						successSound = ItemInvSnds[ItemCAnimTbl[player.InvList[iv]._iCurs]];
+						successSound = ItemInvSnds[ItemCAnim(player.InvList[iv]._iCurs)];
 						player.RemoveInvItem(iv, false);
 
 						// If we're holding an item at this point we just lifted it from a body slot to make room for the original item, so we need to put it into the inv
@@ -1869,7 +1870,7 @@ void TransferItemToStash(Player &player, int location)
 		return;
 	}
 
-	PlaySFX(ItemInvSnds[ItemCAnimTbl[item._iCurs]]);
+	PlaySFX(ItemInvSnds[ItemCAnim(item._iCurs)]);
 
 	if (location < INVITEM_INV_FIRST) {
 		RemoveEquipment(player, static_cast<inv_body_loc>(location), false);
@@ -2435,6 +2436,21 @@ bool UseInvItem(int cii)
 		return true;
 	}
 
+	if (item->_iMiscId == IMISC_GEM) {
+		// [RUNS MOD] Gems have no socket to sit in, so using one starts targeting: pick
+		// the weapon or armour to fuse it into. Like the preservation scroll, the gem is
+		// spent only on a successful fuse, so aiming badly or cancelling costs nothing.
+		if (&player == MyPlayer) {
+			BeginGemTargeting(*item, static_cast<int8_t>(cii));
+			if (SpellbookFlag)
+				SpellbookFlag = false;
+			if (!invflag)
+				invflag = true;
+			NewCursor(CURSOR_OIL);
+		}
+		return true;
+	}
+
 	if (item->_iMiscId == IMISC_PRESERVE) {
 		// [RUNS MOD] Scroll of Preservation: enter mark-targeting (identify cursor
 		// art + the PreserveTargetingActive flag). The scroll is NOT consumed here --
@@ -2471,7 +2487,7 @@ bool UseInvItem(int cii)
 		return true;
 	}
 
-	const int idata = ItemCAnimTbl[item->_iCurs];
+	const int idata = ItemCAnim(item->_iCurs);
 	if (item->_iMiscId == IMISC_BOOK)
 		PlaySFX(SfxID::ReadBook);
 	else if (&player == MyPlayer)
@@ -2528,7 +2544,7 @@ void CloseStash()
 				// to not have room for the item all 3 cases are extremely unlikely
 				app_fatal(_("No room for item"));
 			}
-			PlaySFX(ItemInvSnds[ItemCAnimTbl[myPlayer.HoldItem._iCurs]]);
+			PlaySFX(ItemInvSnds[ItemCAnim(myPlayer.HoldItem._iCurs)]);
 		}
 		myPlayer.HoldItem.clear();
 		NewCursor(CURSOR_HAND);

@@ -83,6 +83,7 @@ enum _item_indexes : int16_t { // TODO defines all indexes in AllItemsList
 	IDI_ARENAPOT,
 	IDI_DUNGEONSCROLL,  // [RUNS MOD] itemdat.tsv rows must stay in this order
 	IDI_PRESERVESCROLL, // [RUNS MOD]
+	IDI_GEM,            // [RUNS MOD] base row for all 35 gems (see runs_gems.h)
 	IDI_GAMBLETOKEN,    // [RUNS MOD] must be the LAST row of itemdat.tsv
 
 	IDI_NUM_DEFAULT_ITEMS,
@@ -492,6 +493,7 @@ enum item_misc_id : int8_t {
 	IMISC_ARENAPOT,
 	IMISC_DUNGEONSCROLL, // [RUNS MOD] opens a dungeon run at the level stored on the item
 	IMISC_PRESERVE,      // [RUNS MOD] marks one carried item to survive a single death
+	IMISC_GEM,           // [RUNS MOD] D2-style gem; type/quality live in the create-info
 	IMISC_INVALID = -1,
 };
 

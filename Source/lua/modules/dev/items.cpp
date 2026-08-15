@@ -18,6 +18,7 @@
 #include "lua/metadoc.hpp"
 #include "pack.h"
 #include "player.h"
+#include "runs_gems.h"
 #include "utils/is_of.hpp"
 #include "utils/str_case.hpp"
 #include "utils/str_cat.hpp"
@@ -222,6 +223,56 @@ std::string DebugSpawnUniqueItem(std::string itemName)
 	return StrCat("Item generated successfully - iterations: ", i);
 }
 
+// [RUNS MOD] Drops one gem at the player's feet. Gems never come out of the random
+// roller (their itemdat row has dropRate 0 and type/quality live in the create-info),
+// so testing them needs a direct spawn.
+std::string DebugSpawnGem(std::string typeName, int quality)
+{
+	if (ActiveItemCount >= MAXITEMS) return "No space to generate the item!";
+
+	AsciiStrToLower(typeName);
+	int type = -1;
+	for (int i = 0; i < NumGemTypes; i++) {
+		std::string candidate = GemName(static_cast<GemType>(i), GemQuality::Normal);
+		AsciiStrToLower(candidate);
+		if (candidate == typeName) {
+			type = i;
+			break;
+		}
+	}
+	if (type < 0) return "Unknown gem type (amethyst/topaz/sapphire/emerald/ruby/diamond/skull).";
+	if (quality < 0 || quality >= NumGemQualities) return StrCat("Quality must be 0-", NumGemQualities - 1, " (chipped..perfect).");
+
+	const int ii = AllocateItem();
+	Item &item = Items[ii];
+	CreateGem(item, static_cast<GemType>(type), static_cast<GemQuality>(quality));
+	item.setNewAnimation(MyPlayer != nullptr && MyPlayer->pLvlLoad == 0);
+	Point pos = MyPlayer->position.tile;
+	GetSuperItemSpace(pos, ii);
+	NetSendCmdPItem(false, CMD_SPAWNITEM, item.position, item);
+	return StrCat("Spawned ", GemName(static_cast<GemType>(type), static_cast<GemQuality>(quality)), ".");
+}
+
+/** [RUNS MOD] Drops one of every gem -- the quick way to eyeball all 35 icons. */
+std::string DebugSpawnAllGems()
+{
+	int spawned = 0;
+	for (int type = 0; type < NumGemTypes; type++) {
+		for (int quality = 0; quality < NumGemQualities; quality++) {
+			if (ActiveItemCount >= MAXITEMS) break;
+			const int ii = AllocateItem();
+			Item &item = Items[ii];
+			CreateGem(item, static_cast<GemType>(type), static_cast<GemQuality>(quality));
+			item.setNewAnimation(MyPlayer != nullptr && MyPlayer->pLvlLoad == 0);
+			Point pos = MyPlayer->position.tile;
+			GetSuperItemSpace(pos, ii);
+			NetSendCmdPItem(false, CMD_SPAWNITEM, item.position, item);
+			spawned++;
+		}
+	}
+	return StrCat("Spawned ", spawned, " gems.");
+}
+
 } // namespace
 
 sol::table LuaDevItemsModule(sol::state_view &lua)
@@ -231,6 +282,8 @@ sol::table LuaDevItemsModule(sol::state_view &lua)
 	LuaSetDocFn(table, "info", "()", "Show info of currently selected item.", &DebugCmdItemInfo);
 	LuaSetDocFn(table, "spawn", "(name: string)", "Attempt to generate an item.", &DebugSpawnItem);
 	LuaSetDocFn(table, "spawnUnique", "(name: string)", "Attempt to generate a unique item.", &DebugSpawnUniqueItem);
+	LuaSetDocFn(table, "gem", "(type: string, quality: number)", "[RUNS MOD] Spawn a gem (quality 0=chipped .. 4=perfect).", &DebugSpawnGem);
+	LuaSetDocFn(table, "gemsAll", "()", "[RUNS MOD] Spawn one of every gem.", &DebugSpawnAllGems);
 	return table;
 }
 

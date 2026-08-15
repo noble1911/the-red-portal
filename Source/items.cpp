@@ -73,6 +73,8 @@
 #include "portal.h"
 #include "qol/stash.h"
 #include "quests.h"
+#include "runs_gems.h"
+#include "runs_icons.h"
 #include "runs_mod.h"
 #include "scroll_mods.h"
 #include "sound_effect_enums.h"
@@ -134,6 +136,19 @@ int8_t ItemCAnimTbl[] = {
 	3, 1, 6, 6, 6, 1, 8, 6, 11, 3,
 	6, 8, 1, 6, 6, 17, 40, 0, 0
 };
+
+int8_t ItemCAnim(int curs)
+{
+	// [RUNS MOD] Gem cursors are numbered past both sprite sheets, and so past the end
+	// of this table (see runs_gems.h). They borrow the Blood Stone's class -- a small
+	// gemstone, which is exactly what they are -- for the ground animation and the drop
+	// and pick-up sounds. Going through here rather than indexing the table directly
+	// keeps the vanilla table untouched for upstream merges.
+	if (RunsModEnabled && IsGemCurs(curs))
+		curs = ICURS_BLOOD_STONE;
+	assert(curs >= 0 && static_cast<size_t>(curs) < std::size(ItemCAnimTbl));
+	return ItemCAnimTbl[curs];
+}
 
 /** Maps of drop sounds effect of placing the item in the inventory. */
 SfxID ItemInvSnds[] = {
@@ -400,6 +415,41 @@ int itemLevelAddHf[] = {
 	 3,
 	// clang-format on
 };
+
+/** [RUNS MOD] Floor under the premium shelf so a hero who has beaten nothing still sees
+ * a starter magic item or two; mirrors the fruit machine's jackpot floor. */
+constexpr int MinPremiumMagicLevel = 5;
+
+/** @brief [RUNS MOD] Base quality level for Griswold's premium shelf: EARNED DEPTH, not
+ * character level.
+ *
+ * Vanilla could put the shelf on the character-level clock because levelling only
+ * happened by descending -- depth and character level were one progression. Run mode
+ * splits them: XP comes from any kill at any depth, while depth itself is gated on boss
+ * kills, so a hero farming shallow runs out-levels the dungeon and the shelf runs away
+ * from it (level 14 at depth 5 bought affix level 17 when the depth-5 vault capped at
+ * 10, making the shop a better gear source than the boss).
+ *
+ * The ceiling is 2 x deepest beaten depth -- exactly the affix level that depth's vault
+ * pays (CreateRndItem at 2 x currlevel) -- so Griswold sells gear for floors already
+ * conquered and the dungeon keeps the one that is not. It moves only when a boss dies,
+ * so no amount of shallow-scroll farming can raise it.
+ *
+ * The base sits the largest slot delta below that ceiling so the deltas still spread the
+ * shelf (the top slot lands exactly on the ceiling) instead of flat-lining on it, and
+ * never exceeds the character level so the shop cannot outrun the hero either.
+ */
+int PremiumBaseLevel(const Player &player)
+{
+	const int charLevel = player.getCharacterLevel();
+	if (!RunsModEnabled)
+		return charLevel;
+	const int maxSlotAdd = gbIsHellfire ? itemLevelAddHf[NumSmithItemsHf - 1] : itemLevelAdd[NumSmithItems - 1];
+	const int ceiling = std::max(2 * static_cast<int>(player.pDeepestBeatenDepth), MinPremiumMagicLevel);
+	// std::max on the upper bound, not std::clamp's hi directly: a not-yet-initialised
+	// player reports level 0, and std::clamp with lo > hi is undefined behaviour.
+	return std::clamp(ceiling - maxSlotAdd, 1, std::max(1, charLevel));
+}
 
 int ItemsGetCurrlevel()
 {
@@ -1822,6 +1872,15 @@ void printItemMiscGamepad(const Item &item, bool isOil, bool isCastOnTarget)
 
 void PrintItemMisc(const Item &item)
 {
+	if (item._iMiscId == IMISC_GEM) {
+		// [RUNS MOD] A gem does something different depending on what it is fused into,
+		// so the tooltip lists all three outcomes -- that choice is the whole item.
+		std::vector<std::string> lines;
+		GetGemEffectLines(GemTypeOf(item), GemQualityOf(item), lines);
+		for (std::string &line : lines)
+			AddItemInfoBoxString(std::move(line));
+		return;
+	}
 	if (item._iMiscId == IMISC_DUNGEONSCROLL) {
 		// [RUNS MOD] Put the scroll's modifiers (full wording) in the floating hover
 		// tooltip, which auto-sizes to fit. Dungeon scrolls force that box to appear
@@ -2147,11 +2206,13 @@ void RecreateWitchItem(const Player &player, Item &item, _item_indexes idx, int 
 		SetRndSeed(iseed);
 		const _item_indexes itype = RndWitchItem(player, lvl);
 		GetItemAttrs(item, itype, lvl);
+		// [RUNS MOD] Magic tier is `lvl`, not `2 * lvl` -- must stay identical to SpawnWitch
+		// (see the rationale there) or bought staves mutate on load and across the wire.
 		int iblvl = -1;
 		if (GenerateRnd(100) <= 5)
-			iblvl = 2 * lvl;
+			iblvl = lvl;
 		if (iblvl == -1 && item._iMiscId == IMISC_STAFF)
-			iblvl = 2 * lvl;
+			iblvl = lvl;
 		if (iblvl != -1)
 			GetItemBonus(player, item, iblvl / 2, iblvl, true, true);
 	}
@@ -2247,6 +2308,10 @@ StringOrView GetTranslatedItemName(const Item &item)
 	if (item._iMiscId == IMISC_EAR) {
 		return fmt::format(fmt::runtime(_(/* TRANSLATORS: {:s} will be a Character Name */ "Ear of {:s}")), item._iIName);
 	}
+	if (item._iMiscId == IMISC_GEM) {
+		// [RUNS MOD] "Flawless Ruby" and friends, built from the create-info word.
+		return GemName(GemTypeOf(item), GemQualityOf(item));
+	}
 	if (item._iMiscId == IMISC_DUNGEONSCROLL) {
 		// [RUNS MOD] Show the level, rarity (from the modifier count) and difficulty on
 		// the scroll, e.g. "Rare Nightmare Dungeon Scroll (Level 8)".
@@ -2304,11 +2369,15 @@ std::string GetTranslatedItemNameMagical(const Item &item, bool hellfireItem, bo
 		maxlvl = lvl * 2;
 	} else if ((item._iCreateInfo & CF_WITCH) != 0) {
 		DiscardRandomValues(2); // RndVendorItem and GetItemAttrs
+		// [RUNS MOD] Magic tier is `lvl`, not `2 * lvl`. This replays the affix roll to
+		// re-derive the display name, so it is the THIRD copy of the formula that has to
+		// agree with SpawnWitch and RecreateWitchItem (see the rationale in SpawnWitch) --
+		// leaving it doubled made an item's _iIName disagree with its own getName().
 		int iblvl = -1;
 		if (GenerateRnd(100) <= 5)
-			iblvl = 2 * lvl;
+			iblvl = lvl;
 		if (iblvl == -1 && item._iMiscId == IMISC_STAFF)
-			iblvl = 2 * lvl;
+			iblvl = lvl;
 		minlvl = iblvl / 2;
 		maxlvl = iblvl;
 	} else {
@@ -3024,6 +3093,17 @@ void InitializeItem(Item &item, _item_indexes itemData)
 		item.dwBuff |= CF_HELLFIRE;
 }
 
+void ApplyDungeonScrollIcon(Item &item)
+{
+	if (!RunsModEnabled || !IsDungeonScroll(item))
+		return;
+	// Degrade to the vanilla scroll frame the item table names if the art file is
+	// missing, rather than leaving _iCurs pointing at a sprite that was never built.
+	if (!RunIconsAvailable())
+		return;
+	item._iCurs = static_cast<uint16_t>(RunIconCurs(RunIcon::DungeonScroll));
+}
+
 void CreateDungeonScroll(Item &item, int level, int difficulty)
 {
 	// [RUNS MOD] Build a dungeon scroll that opens a run at `level` and `difficulty`.
@@ -3031,6 +3111,7 @@ void CreateDungeonScroll(Item &item, int level, int difficulty)
 	// which is already saved and network-synced, so no new item fields are needed. The
 	// displayed name (level/rarity/difficulty) is generated in GetTranslatedItemName.
 	InitializeItem(item, IDI_DUNGEONSCROLL);
+	ApplyDungeonScrollIcon(item);
 	GenerateNewSeed(item); // gives the scroll a seed to derive its modifiers from
 	// [RUNS MOD] Store the level (bits 0-5), modifier count/rarity (bits 6-7) and
 	// difficulty (bits 8-9). The count is stored explicitly so crafting can add a
@@ -3151,10 +3232,14 @@ void DropPrizeItem(Item prize, Point position)
 
 Item RollGamblePrizeItem(int lvl)
 {
-	// [RUNS MOD] A good-quality equipment prize around `lvl` (the fruit machine's
+	// [RUNS MOD] A good-quality equipment prize at item level `lvl` (the fruit machine's
 	// triple-sword payout; the caller drops it via DropPrizeItem when the show ends).
-	// Mirrors a monster "onlygood" drop, but at the hero's EARNED depth rather than
-	// the current (town) level, and with a boss-grade unique chance (uper 15).
+	// Mirrors a monster "onlygood" drop, but levelled off the hero's EARNED depth rather
+	// than the current (town) level, and with a boss-grade unique chance (uper 15).
+	//
+	// The caller passes 2 x earned access depth, i.e. the vault scale every other drop in
+	// the mod uses, so `lvl` bounds the base pool directly and uper 15 lifts the affix
+	// level to lvl + 4 (GetItemBLevel) -- the boss-unique tier for that depth.
 	Item item = {};
 	const _item_indexes idx = GetItemIndexForDroppableItem(true, [lvl](const ItemData &data) {
 		if (lvl < data.iMinMLvl)
@@ -3832,9 +3917,22 @@ void RecreateItem(const Player &player, Item &item, _item_indexes idx, uint16_t 
 		// [RUNS MOD] Rebuild a dungeon scroll: the level lives in CF_LEVEL and the
 		// name is derived from it, so it survives save/load and network sync.
 		InitializeItem(item, IDI_DUNGEONSCROLL);
+		ApplyDungeonScrollIcon(item);
 		item._iSeed = iseed;
 		item._iCreateInfo = icreateinfo;
 		item._iIdentified = true;
+		gbIsHellfire = tmpIsHellfire;
+		return;
+	}
+
+	if (idx == IDI_GEM) {
+		// [RUNS MOD] Same deal for gems: type and quality are the create-info word, and
+		// the icon and price both fall out of them, so CreateGem rebuilds the item
+		// exactly. Seed is restored afterwards -- CreateGem rolls a fresh one, but a
+		// recreated item has to keep the seed it was sent with.
+		CreateGem(item, GemTypeFromCreateInfo(icreateinfo), GemQualityFromCreateInfo(icreateinfo));
+		item._iSeed = iseed;
+		item._iCreateInfo = icreateinfo;
 		gbIsHellfire = tmpIsHellfire;
 		return;
 	}
@@ -4041,7 +4139,7 @@ void SpawnTheodore(Point position, bool sendmsg)
 
 void RespawnItem(Item &item, bool flipFlag)
 {
-	const int it = ItemCAnimTbl[item._iCurs];
+	const int it = ItemCAnim(item._iCurs);
 	item.setNewAnimation(flipFlag);
 	item._iRequest = false; // Item isn't being picked up by a player
 
@@ -4101,7 +4199,7 @@ void ProcessItems()
 				item.AnimInfo.currentFrame = 10;                                                     // Beginning of elevated frames
 		} else {
 			if (item.AnimInfo.currentFrame == (item.AnimInfo.numberOfFrames - 1) / 2)
-				PlaySfxLoc(ItemDropSnds[ItemCAnimTbl[item._iCurs]], item.position);
+				PlaySfxLoc(ItemDropSnds[ItemCAnim(item._iCurs)], item.position);
 
 			if (item.AnimInfo.isLastFrame()) {
 				item.AnimInfo.currentFrame = item.AnimInfo.numberOfFrames - 1;
@@ -4122,7 +4220,7 @@ void FreeItemGFX()
 
 void GetItemFrm(Item &item)
 {
-	const int it = ItemCAnimTbl[item._iCurs];
+	const int it = ItemCAnim(item._iCurs);
 	if (itemanims[it])
 		item.AnimInfo.sprites.emplace(*itemanims[it]);
 }
@@ -4794,14 +4892,27 @@ void SpawnSmith(int lvl)
 void ReplacePremium(const Player &player, int idx)
 {
 	int plvl = gbIsHellfire ? itemLevelAddHf[idx] : itemLevelAdd[idx];
-	plvl += player.getCharacterLevel();
+	// [RUNS MOD] Earned depth, not character level -- see PremiumBaseLevel.
+	plvl += PremiumBaseLevel(player);
 	SpawnOnePremium(PremiumItems[idx], plvl, player);
 }
 
 void SpawnPremium(const Player &player)
 {
-	const int lvl = player.getCharacterLevel();
+	// [RUNS MOD] The shelf climbs with EARNED DEPTH, not character level. The final plvl
+	// is stamped into each item's create-info (SpawnOnePremium) and RecreatePremiumItem
+	// reads it back from there, so the item carries its own level -- changing how the
+	// level is chosen here cannot disturb save/load or network recreation.
+	const int lvl = PremiumBaseLevel(player);
 	const size_t maxItems = gbIsHellfire ? NumSmithItemsHf : NumSmithItems;
+
+	// [RUNS MOD] Vanilla only ever ratchets PremiumItemLevel upward, so a hero whose shelf
+	// already sits above the earned-depth ceiling -- a save made before this cap existed --
+	// would keep its inflated stock forever. Drop to the ceiling and re-roll the shelf.
+	if (PremiumItemLevel > lvl) {
+		PremiumItemLevel = lvl;
+		PremiumItems.clear();
+	}
 
 	while (PremiumItems.size() < maxItems) {
 		int plvl = PremiumItemLevel + (gbIsHellfire ? itemLevelAddHf[PremiumItems.size()] : itemLevelAdd[PremiumItems.size()]);
@@ -4877,11 +4988,24 @@ void SpawnWitch(int lvl)
 			SetRndSeed(item._iSeed);
 			const _item_indexes itemData = RndWitchItem(*MyPlayer, lvl);
 			GetItemAttrs(item, itemData, lvl);
+			// [RUNS MOD] Adria's magic tier is `lvl`, not `2 * lvl`: every staff she sells
+			// is onlygood, so at the vanilla doubling her shelf out-rolled the boss vault
+			// at the deepest run the hero could even enter (affix 14 at shop level 7, vs 10
+			// from a depth-5 vault) -- and her shelf level has a floor of 6, so a hero who
+			// had beaten nothing bought affix-12 staves. Halving puts her under the vault at
+			// every depth while still tracking progression, since SetupTownStores now
+			// derives `lvl` from earned depth.
+			//
+			// Expressed in terms of the stamped `lvl` rather than a cap read from the
+			// player: RecreateWitchItem rebuilds bought items from create-info alone, and
+			// anything keyed to mutable state (deepest depth, character level) would mutate
+			// items already in the pack -- and, in co-op, rebuild a peer's item against the
+			// local hero's progression. Keep this and RecreateWitchItem identical.
 			int maxlvl = -1;
 			if (GenerateRnd(100) <= 5)
-				maxlvl = 2 * lvl;
+				maxlvl = lvl;
 			if (maxlvl == -1 && item._iMiscId == IMISC_STAFF)
-				maxlvl = 2 * lvl;
+				maxlvl = lvl;
 			if (maxlvl != -1)
 				GetItemBonus(*MyPlayer, item, maxlvl / 2, maxlvl, true, true);
 		} while (item._iIvalue > maxValue);
@@ -5210,7 +5334,7 @@ bool Item::isUsable() const
 
 void Item::setNewAnimation(bool showAnimation)
 {
-	const int8_t it = ItemCAnimTbl[_iCurs];
+	const int8_t it = ItemCAnim(_iCurs);
 	const int8_t numberOfFrames = ItemAnimLs[it];
 	const OptionalClxSpriteList sprite = itemanims[it] ? OptionalClxSpriteList { *itemanims[static_cast<size_t>(it)] } : std::nullopt;
 	if (_iCurs != ICURS_MAGIC_ROCK)

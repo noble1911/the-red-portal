@@ -88,6 +88,10 @@ public:
 		gbIsHellfire = false;
 		PremiumItemLevel = 1;
 		CreatePlayer(*MyPlayer, HeroClass::Warrior);
+		// [RUNS MOD] Griswold's premium shelf is capped at 2 x deepest beaten depth. These
+		// tests cover the underlying character-level formula, so lift the cap clear of it;
+		// PremiumCappedByEarnedDepth / PremiumCapReRollsInflatedShelf cover the cap itself.
+		MyPlayer->pDeepestBeatenDepth = 24;
 		SetRndSeed(SEED);
 	}
 
@@ -291,6 +295,63 @@ TEST_F(VendorTest, PremiumQlvl30Plus)
 	for (size_t i = 0; i < PremiumItems.size(); i++) {
 		EXPECT_EQ(PremiumItems[i]._iCreateInfo & CF_LEVEL, QLVLS[i]) << "Index: " << i;
 		EXPECT_THAT(PremiumItems[i]._itype, AnyOf(SmithTypeMatch(i), PremiumTypeMatch(i)));
+	}
+}
+
+// [RUNS MOD] The shelf follows earned depth, not character level: a hero who out-levels
+// the dungeon by farming shallow runs must not out-shop it. The top slot lands exactly on
+// 2 x deepest beaten depth -- the affix level that depth's boss vault pays.
+TEST_F(VendorTest, PremiumCappedByEarnedDepth)
+{
+	constexpr int QLVLS[] = { 5, 5, 6, 6, 7, 8 };
+
+	// A level 25 hero who has only ever beaten the depth-4 boss.
+	MyPlayer->setCharacterLevel(25);
+	MyPlayer->pDeepestBeatenDepth = 4;
+	PremiumItems.clear();
+	SpawnPremium(*MyPlayer);
+	EXPECT_EQ(PremiumItems.size(), NumSmithItems);
+
+	for (size_t i = 0; i < PremiumItems.size(); i++) {
+		EXPECT_EQ(PremiumItems[i]._iCreateInfo & CF_LEVEL, QLVLS[i]) << "Index: " << i;
+		EXPECT_LE(PremiumItems[i]._iCreateInfo & CF_LEVEL, 2 * MyPlayer->pDeepestBeatenDepth) << "Index: " << i;
+	}
+
+	// Restocking a bought slot uses the same ceiling.
+	ReplacePremium(*MyPlayer, 0);
+	ReplacePremium(*MyPlayer, 5);
+	for (size_t i = 0; i < PremiumItems.size(); i++) {
+		EXPECT_EQ(PremiumItems[i]._iCreateInfo & CF_LEVEL, QLVLS[i]) << "Index: " << i;
+	}
+
+	// Beating a boss is what moves the shelf.
+	MyPlayer->pDeepestBeatenDepth = 6;
+	SpawnPremium(*MyPlayer);
+	for (size_t i = 0; i < PremiumItems.size(); i++) {
+		EXPECT_EQ(PremiumItems[i]._iCreateInfo & CF_LEVEL, QLVLS[i] + 4) << "Index: " << i;
+	}
+}
+
+// [RUNS MOD] PremiumItemLevel is persisted and vanilla only ratchets it upward, so a save
+// made before the cap existed carries an inflated shelf. SpawnPremium must pull it back
+// down and re-roll rather than leave the old stock standing.
+TEST_F(VendorTest, PremiumCapReRollsInflatedShelf)
+{
+	MyPlayer->setCharacterLevel(25);
+	MyPlayer->pDeepestBeatenDepth = 24;
+	PremiumItems.clear();
+	SpawnPremium(*MyPlayer);
+	EXPECT_EQ(PremiumItemLevel, 25);
+
+	// The same hero, now held to what it has actually beaten.
+	MyPlayer->pDeepestBeatenDepth = 4;
+	SpawnPremium(*MyPlayer);
+
+	constexpr int QLVLS[] = { 5, 5, 6, 6, 7, 8 };
+	EXPECT_EQ(PremiumItemLevel, 6);
+	EXPECT_EQ(PremiumItems.size(), NumSmithItems);
+	for (size_t i = 0; i < PremiumItems.size(); i++) {
+		EXPECT_EQ(PremiumItems[i]._iCreateInfo & CF_LEVEL, QLVLS[i]) << "Index: " << i;
 	}
 }
 

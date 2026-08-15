@@ -416,9 +416,12 @@ TEST(Writehero, pfile_write_hero)
 	// which creates fresh archives (no in-place block management) and may
 	// produce a different on-disk layout.  The file content is identical;
 	// only the binary representation differs.
+	// [RUNS MOD] Regenerated again when Adria's magic tier dropped from 2 x lvl to lvl:
+	// this hero carries a witch staff (PackItemStaff, iCreateInfo 0x2010 = CF_WITCH at
+	// level 16), so it recreates with different affixes and re-packs to different bytes.
 	// To regenerate: run this test, let it fail, and update the hash below.
 	EXPECT_EQ(picosha2::bytes_to_hex_string(s.begin(), s.end()),
-	    "b52885393aedc22c856c7c315975c9be89a034b64a2067e22d5387a51998a51b");
+	    "3f86d79c96df2156e7935d6d1f3fa5254b5ac84462eb73b6e77c0b33d5d8b50c");
 }
 
 } // namespace

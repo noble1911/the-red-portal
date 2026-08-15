@@ -40,6 +40,8 @@
 #include "options.h"
 #include "portal.h"
 #include "qol/itemlabels.h"
+#include "runs_gems.h"
+#include "runs_icons.h"
 #include "runs_mod.h"
 #include "qol/stash.h"
 #include "scroll_mods.h"
@@ -465,6 +467,14 @@ void FreeCursor()
 ClxSprite GetInvItemSprite(int cursId)
 {
 	assert(cursId > 0);
+	// [RUNS MOD] Gem icons are not in either sheet: they ship as RGB and are baked
+	// against the live palette (see runs_gems.cpp). `cursId` is in cursor space, while
+	// GemCursFirst is in item space, hence the shift.
+	if (RunsModEnabled && IsGemCurs(cursId - static_cast<int>(CURSOR_FIRSTITEM)))
+		return GetGemSprite(cursId - static_cast<int>(CURSOR_FIRSTITEM));
+	// [RUNS MOD] Same arrangement for the mod's own item icons (see runs_icons.cpp).
+	if (RunsModEnabled && IsRunIconCurs(cursId - static_cast<int>(CURSOR_FIRSTITEM)))
+		return GetRunIconSprite(cursId - static_cast<int>(CURSOR_FIRSTITEM));
 	const size_t numSprites = pCursCels->numSprites();
 	if (static_cast<size_t>(cursId) <= numSprites) {
 		return (*pCursCels)[cursId - 1];
@@ -494,8 +504,15 @@ void CreateHalfSizeItemSprites()
 {
 	if (HalfSizeItemSprites != nullptr)
 		return;
-	const uint32_t numInvItems = pCursCels->numSprites() - (static_cast<uint32_t>(CURSOR_FIRSTITEM) - 1)
+	uint32_t numInvItems = pCursCels->numSprites() - (static_cast<uint32_t>(CURSOR_FIRSTITEM) - 1)
 	    + (pCursCels2.has_value() ? pCursCels2->numSprites() : 0);
+	// [RUNS MOD] Gems and the mod's own icons sit past both sheets, so the arrays have to
+	// reach that far even though neither gets half-size entries (both are 1x1, which the
+	// loop below skips). Indexing is by curs id, so the bound is the highest id in use.
+	if (RunsModEnabled) {
+		numInvItems = std::max<uint32_t>(numInvItems, GemCursFirst + NumGems);
+		numInvItems = std::max<uint32_t>(numInvItems, RunIconCursFirst + NumRunIcons);
+	}
 	HalfSizeItemSprites = new OptionalOwnedClxSpriteList[numInvItems];
 	HalfSizeItemSpritesRed = new OptionalOwnedClxSpriteList[numInvItems];
 	const uint8_t *redTrn = GetInfravisionTRN();

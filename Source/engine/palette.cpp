@@ -35,6 +35,7 @@ namespace devilution {
 
 std::array<SDL_Color, 256> logical_palette;
 std::array<SDL_Color, 256> system_palette;
+unsigned PaletteGeneration = 0;
 
 namespace {
 
@@ -183,6 +184,7 @@ void LoadPalette(const char *path)
 	for (unsigned i = 0; i < palData.size(); i++) {
 		logical_palette[i] = palData[i].toSDL();
 	}
+	PaletteGeneration++; // [RUNS MOD] see the declaration in palette.h
 }
 
 void LoadPaletteAndInitBlending(const char *path)

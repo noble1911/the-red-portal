@@ -209,7 +209,11 @@ struct Item {
 	char _iIName[ItemNameLength] = {};
 	item_equip_type _iLoc = ILOC_NONE;
 	item_class _iClass = ICLASS_NONE;
-	uint8_t _iCurs = 0;
+	// [RUNS MOD] Widened from uint8_t: the mod's gem icons live in their own sprite list
+	// past objcurs/objcurs2, which together already fill 228 of the 256 slots a byte can
+	// address. Safe to widen -- the save file has always stored this as a 32-bit field,
+	// and ItemPack does not carry it at all (items are rebuilt by RecreateItem).
+	uint16_t _iCurs = 0;
 	int _ivalue = 0;
 	int _iIvalue = 0;
 	uint8_t _iMinDam = 0;
@@ -522,6 +526,21 @@ void InitializeItem(Item &item, _item_indexes itemData);
 /** @brief [RUNS MOD] Builds a dungeon scroll that opens a run at the given level. */
 void CreateDungeonScroll(Item &item, int level, int difficulty = 0);
 
+/** @brief [RUNS MOD] True if the item is a dungeon scroll. */
+inline bool IsDungeonScroll(const Item &item)
+{
+	return item.IDidx == IDI_DUNGEONSCROLL;
+}
+
+/** @brief [RUNS MOD] Gives a dungeon scroll the mod's own inventory icon.
+ *
+ * The item table can only name a vanilla objcurs frame, and every scroll in the game
+ * shares ICURS_SCROLL_OF, so the dedicated icon is applied here instead -- on creation
+ * and again after load, so scrolls sitting in an older save pick it up too. No-op when
+ * the art file is missing, leaving the vanilla frame in place.
+ */
+void ApplyDungeonScrollIcon(Item &item);
+
 /** @brief [RUNS MOD] Dungeon scroll level (create-info bits 0-5). */
 inline int DungeonScrollLevel(const Item &item)
 {
@@ -673,6 +692,12 @@ void UpdateHellfireFlag(Item &item, const char *identifiedItemName);
 extern int MaxGold;
 
 extern int8_t ItemCAnimTbl[];
+/** @brief Animation/sound class for an item cursor graphic.
+ *
+ * [RUNS MOD] Use this rather than indexing ItemCAnimTbl directly: the mod's gem cursors
+ * are numbered past the end of that table and are mapped onto a stand-in here.
+ */
+int8_t ItemCAnim(int curs);
 extern SfxID ItemInvSnds[];
 
 } // namespace devilution

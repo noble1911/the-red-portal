@@ -101,6 +101,7 @@
 #include "quick_messages.hpp"
 #include "restrict.h"
 #include "run_clock.h"
+#include "runs_gems.h"
 #include "runs_mod.h"
 #include "scroll_mods.h"
 #include "stores.h"
@@ -2942,6 +2943,20 @@ bool TryIconCurs()
 			Stash.dirty = true;
 		}
 		NewCursor(CURSOR_HAND);
+		return true;
+	}
+
+	if (pcurs == CURSOR_OIL && GemTargetingActive) {
+		// [RUNS MOD] Gems borrow the oil cursor (there is no gem cursor frame in
+		// objcurs). Nothing has been spent yet, so an invalid target keeps the cursor up
+		// for re-aiming and clicking away cancels for free -- as with the preserve mark.
+		if (pcursinvitem != -1 && !IsInspectingPlayer()) {
+			if (DoGem(myPlayer, pcursinvitem))
+				NewCursor(CURSOR_HAND);
+		} else {
+			CancelGemTargeting();
+			NewCursor(CURSOR_HAND);
+		}
 		return true;
 	}
 

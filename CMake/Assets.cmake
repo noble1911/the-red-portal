@@ -59,6 +59,8 @@ set(devilutionx_assets
   data/hintbox.clx
   data/hintboxbackground.clx
   data/hinticons.clx
+  data/inv/gems.dat
+  data/inv/runicons.dat
   data/monstertags.clx
   data/panel8buc.clx
   data/panel8bucp.clx
