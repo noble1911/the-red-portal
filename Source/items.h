@@ -180,6 +180,25 @@ enum icreateinfo_flag2 {
 	 * which clears the bit. dwBuff bits 5-31 are otherwise unused and round-trip
 	 * fully through saves, hero packs, RecreateItem and network sync. */
 	CF_PRESERVED = 1 << 5,
+	/** [RUNS MOD] This item has a gem fused into it (see runs_gems.h). The gem's identity
+	 * lives here rather than only in the _iPL* fields it granted, for two reasons: the
+	 * raw stat fields do NOT survive ItemPack (items are rebuilt from seed + create-info,
+	 * so a synced or repacked item would silently lose its gem), and an item has to be
+	 * able to say which gem it holds. dwBuff does round-trip, so the bonus is re-applied
+	 * from these bits after every rebuild. */
+	CF_GEMMED = 1 << 6,
+	CF_GEMTYPE = ((1 << 3) - 1) << 7,     // bits 7-9:  GemType
+	CF_GEMQUALITY = ((1 << 3) - 1) << 10, // bits 10-12: GemQuality
+	/** [RUNS MOD] This item IS a gem, and which one.
+	 *
+	 * Deliberately here rather than in _iCreateInfo: that word is not free storage. Its
+	 * low six bits ARE the item level (CF_LEVEL) and the rest are provenance flags the
+	 * validation code reads, so packing a type/quality pair into it made a plain Skull
+	 * claim item level 38 while a Perfect Skull claimed 6 -- inverting which gems the
+	 * game thought a hero could use, and setting CF_ONLYGOOD at random. */
+	CF_ISGEM = 1 << 13,
+	CF_GEMITEMTYPE = ((1 << 3) - 1) << 14,     // bits 14-16: GemType
+	CF_GEMITEMQUALITY = ((1 << 3) - 1) << 17,  // bits 17-19: GemQuality
 	// clang-format on
 };
 

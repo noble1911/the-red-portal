@@ -85,19 +85,36 @@ constexpr bool IsGemCurs(int curs)
 	return curs >= GemCursFirst && curs < GemCursFirst + NumGems;
 }
 
-/** @brief Gem type, from create-info bits 0-3. */
-GemType GemTypeFromCreateInfo(uint16_t createInfo);
-/** @brief Gem quality, from create-info bits 4-6. */
-GemQuality GemQualityFromCreateInfo(uint16_t createInfo);
+/** @brief Gem type, from dwBuff bits 14-16. */
+GemType GemTypeFromBuff(uint32_t dwBuff);
+/** @brief Gem quality, from dwBuff bits 17-19. */
+GemQuality GemQualityFromBuff(uint32_t dwBuff);
 /** @brief Gem type of an existing gem item. */
 GemType GemTypeOf(const Item &item);
 /** @brief Gem quality of an existing gem item. */
 GemQuality GemQualityOf(const Item &item);
-/** @brief Packs type (bits 0-3) and quality (bits 4-6) into a create-info word. */
-uint16_t MakeGemCreateInfo(GemType type, GemQuality quality);
+/** @brief Builds the dwBuff bits marking an item as this gem. */
+uint32_t MakeGemBuff(GemType type, GemQuality quality);
 
 /** @brief True if the item is a gem of any type. */
 bool IsGem(const Item &item);
+
+/** @brief Earned depth a hero must have beaten before this quality may be used.
+ *
+ * Mirrors the drop window exactly (quality q first drops at depth 5q), so the rule is
+ * simply "you may use what you could have earned". Chipped has no requirement.
+ */
+int GemRequiredDepth(GemQuality quality);
+
+/** @brief True if `player` has beaten deep enough to use this gem.
+ *
+ * Diablo has no character-level requirement on items -- CanUseItem checks strength,
+ * magic and dexterity only -- so without this a gem handed over in co-op, or left in the
+ * stash by a dead hero, could be used at any point. Gating on earned depth matches the
+ * premium shelf's cap: what you have beaten sets what you may use, and it only moves
+ * when a boss dies.
+ */
+bool CanUseGem(const Player &player, const Item &item);
 
 /** @brief Builds a gem of the given type and quality (used by drops and by RecreateItem). */
 void CreateGem(Item &item, GemType type, GemQuality quality);
@@ -135,6 +152,24 @@ std::string GemName(GemType type, GemQuality quality);
  * Returned rather than printed so the info-box plumbing stays inside items.cpp. */
 void GetGemEffectLines(GemType type, GemQuality quality, std::vector<std::string> &out);
 
+/** @brief True if a gem has been fused into this item. One gem per item. */
+bool HasGem(const Item &item);
+/** @brief The gem fused into this item. Only meaningful when HasGem(). */
+GemType FusedGemType(const Item &item);
+GemQuality FusedGemQuality(const Item &item);
+
+/** @brief Re-applies the stored gem's bonus to a freshly rebuilt item.
+ *
+ * RecreateItem rebuilds an item from its seed and create-info, which restores the base
+ * item but not the _iPL* fields a gem wrote. dwBuff survives that trip, so the gem is
+ * re-applied from it -- otherwise a gemmed item would lose its bonus the first time it
+ * crossed the wire or was repacked.
+ */
+void ReapplyFusedGem(Item &item);
+
+/** @brief Appends the "what gem is in this, and what did it give" lines for an item. */
+void GetFusedGemLines(const Item &item, std::vector<std::string> &out);
+
 
 /** @brief Builds the gem sprites for the palette that is currently loaded.
  *
@@ -144,6 +179,9 @@ void GetGemEffectLines(GemType type, GemQuality quality, std::vector<std::string
  */
 void RefreshGemSprites();
 void FreeGemSprites();
+
+/** @brief Diagnostic: dumps the live palette and the gem colour mapping to `path`. */
+std::string DumpGemPaletteMapping(const char *path);
 
 /** @brief Sprite for a gem `_iCurs`. Only valid for IsGemCurs(curs). */
 ClxSprite GetGemSprite(int curs);

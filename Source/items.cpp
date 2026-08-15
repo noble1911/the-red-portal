@@ -1879,6 +1879,10 @@ void PrintItemMisc(const Item &item)
 		GetGemEffectLines(GemTypeOf(item), GemQualityOf(item), lines);
 		for (std::string &line : lines)
 			AddItemInfoBoxString(std::move(line));
+		// Diablo shows stat requirements but has no notion of a depth one, so say it.
+		const int requiredDepth = GemRequiredDepth(GemQualityOf(item));
+		if (requiredDepth > 0)
+			AddItemInfoBoxString(fmt::format(fmt::runtime(_("Requires depth {:d} beaten")), requiredDepth));
 		return;
 	}
 	if (item._iMiscId == IMISC_DUNGEONSCROLL) {
@@ -2298,6 +2302,14 @@ StringOrView GetTranslatedItemName(const Item &item)
 {
 	const auto &baseItemData = AllItemsList[static_cast<size_t>(item.IDidx)];
 
+	// [RUNS MOD] Gems are named from their dwBuff identity, and their create-info is
+	// deliberately zero (they have no item level or provenance) -- so this has to come
+	// before the zero-create-info shortcut below, or every gem falls back to the base
+	// table name and they all read "Gem".
+	if (RunsModEnabled && item._iMiscId == IMISC_GEM) {
+		return GemName(GemTypeOf(item), GemQualityOf(item));
+	}
+
 	if (item._iCreateInfo == 0) {
 		return _(baseItemData.iName);
 	}
@@ -2307,10 +2319,6 @@ StringOrView GetTranslatedItemName(const Item &item)
 	}
 	if (item._iMiscId == IMISC_EAR) {
 		return fmt::format(fmt::runtime(_(/* TRANSLATORS: {:s} will be a Character Name */ "Ear of {:s}")), item._iIName);
-	}
-	if (item._iMiscId == IMISC_GEM) {
-		// [RUNS MOD] "Flawless Ruby" and friends, built from the create-info word.
-		return GemName(GemTypeOf(item), GemQualityOf(item));
 	}
 	if (item._iMiscId == IMISC_DUNGEONSCROLL) {
 		// [RUNS MOD] Show the level, rarity (from the modifier count) and difficulty on
@@ -3926,13 +3934,13 @@ void RecreateItem(const Player &player, Item &item, _item_indexes idx, uint16_t 
 	}
 
 	if (idx == IDI_GEM) {
-		// [RUNS MOD] Same deal for gems: type and quality are the create-info word, and
-		// the icon and price both fall out of them, so CreateGem rebuilds the item
-		// exactly. Seed is restored afterwards -- CreateGem rolls a fresh one, but a
+		// [RUNS MOD] A gem's type and quality live in dwBuff (assigned above, before this
+		// branch), so CreateGem rebuilds it exactly -- icon and price both fall out of
+		// them. The seed is restored afterwards: CreateGem rolls a fresh one, but a
 		// recreated item has to keep the seed it was sent with.
-		CreateGem(item, GemTypeFromCreateInfo(icreateinfo), GemQualityFromCreateInfo(icreateinfo));
+		CreateGem(item, GemTypeFromBuff(dwBuff), GemQualityFromBuff(dwBuff));
 		item._iSeed = iseed;
-		item._iCreateInfo = icreateinfo;
+		item.dwBuff = dwBuff;
 		gbIsHellfire = tmpIsHellfire;
 		return;
 	}
@@ -3973,6 +3981,12 @@ void RecreateItem(const Player &player, Item &item, _item_indexes idx, uint16_t 
 
 	SetupAllItems(player, item, idx, iseed, level, uper, onlygood, pregen, uidOffset, forceNotUnique);
 	SetupItem(item);
+	// [RUNS MOD] SetupAllItems rebuilds the item from its seed, which restores the base
+	// item but wipes the _iPL* fields a fused gem wrote. The gem itself rides in dwBuff
+	// (restored above), so put its bonus back -- otherwise gemmed gear would lose the
+	// gem the first time it was packed or synced.
+	if (RunsModEnabled)
+		ReapplyFusedGem(item);
 	gbIsHellfire = tmpIsHellfire;
 }
 
@@ -4623,6 +4637,14 @@ void PrintItemDetails(const Item &item)
 		AddItemInfoBoxString(_("unique item"));
 		ShowUniqueItemInfoBox = true;
 		curruitem = item;
+	}
+	// [RUNS MOD] A fused gem is not a prefix or suffix power, so the loop above cannot
+	// see it and the item would otherwise show no sign of having been gemmed at all.
+	if (RunsModEnabled && HasGem(item)) {
+		std::vector<std::string> gemLines;
+		GetFusedGemLines(item, gemLines);
+		for (std::string &line : gemLines)
+			AddItemInfoBoxString(std::move(line));
 	}
 	PrintItemInfo(item);
 }

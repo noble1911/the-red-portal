@@ -2167,8 +2167,13 @@ void InitKeymapActions()
 	    N_("Sorts the inventory."),
 	    'R',
 	    [] {
-		    ReorganizeInventory(*MyPlayer);
-	    });
+		    // [RUNS MOD] The pack can be repacked with the panel shut, so give it a sound
+		    // rather than leaving the keypress silent. Nothing when nothing moved.
+		    if (ReorganizeInventory(*MyPlayer))
+			    PlaySFX(SfxID::GrabItem);
+	    },
+	    nullptr,
+	    CanPlayerTakeAction);
 	// [RUNS MOD] Manually close the hub dungeon-scroll portal (unless someone is inside it).
 	options.Keymapper.AddAction(
 	    "CloseDungeonPortal",
@@ -2250,6 +2255,27 @@ void InitPadmapActions()
 		    []() { return CanPlayerTakeAction() && !InGameMenu(); },
 		    i + 1);
 	}
+	// [RUNS MOD] Registered up here, ahead of the gameplay actions, on purpose. Every
+	// comfortable pad button is already spoken for, so this one is gated on the inventory
+	// being open: findAction skips an action whose enable() is false and falls through to
+	// the next binding for the same button, so sharing (say) Y costs nothing during normal
+	// play and only diverts while the pack is on screen. That fall-through is why the
+	// registration has to come FIRST -- the earliest enabled match wins, and down at the
+	// bottom of the list it could never take a button off anything.
+	//
+	// The default is a free BACK combo so it works without rebinding; the gate is what
+	// makes rebinding it onto a bare button safe.
+	options.Padmapper.AddAction(
+	    "SortInv",
+	    N_("Sort Inventory"),
+	    N_("Sorts the inventory. Only while the inventory is open."),
+	    { ControllerButton_BUTTON_BACK, ControllerButton_BUTTON_Y },
+	    [] {
+		    if (ReorganizeInventory(*MyPlayer))
+			    PlaySFX(SfxID::GrabItem);
+	    },
+	    nullptr,
+	    []() { return invflag && CanPlayerTakeAction(); });
 	options.Padmapper.AddAction(
 	    "PrimaryAction",
 	    N_("Primary action"),
@@ -2688,14 +2714,6 @@ void InitPadmapActions()
 	    },
 	    nullptr,
 	    CanPlayerTakeAction);
-	options.Padmapper.AddAction(
-	    "SortInv",
-	    N_("Sort Inventory"),
-	    N_("Sorts the inventory."),
-	    ControllerButton_NONE,
-	    [] {
-		    ReorganizeInventory(*MyPlayer);
-	    });
 	options.Padmapper.AddAction(
 	    "ChatLog",
 	    N_("Chat Log"),

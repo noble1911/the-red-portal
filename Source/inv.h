@@ -205,7 +205,13 @@ bool AutoPlaceItemInBelt(Player &player, const Item &item, bool persistItem = fa
 /**
  * @brief Sort player inventory.
  */
-void ReorganizeInventory(Player &player);
+/**
+ * @brief Repacks the backpack: merges gold piles, then places every item largest-first
+ * from the top-left so the free space ends up contiguous.
+ * @return whether anything actually moved. False also covers the failure case, where the
+ * pack is left exactly as it was because not everything could be placed.
+ */
+bool ReorganizeInventory(Player &player);
 
 /**
  * @brief Calculate the maximum additional gold that may fit in the user's inventory

@@ -284,6 +284,8 @@ sol::table LuaDevItemsModule(sol::state_view &lua)
 	LuaSetDocFn(table, "spawnUnique", "(name: string)", "Attempt to generate a unique item.", &DebugSpawnUniqueItem);
 	LuaSetDocFn(table, "gem", "(type: string, quality: number)", "[RUNS MOD] Spawn a gem (quality 0=chipped .. 4=perfect).", &DebugSpawnGem);
 	LuaSetDocFn(table, "gemsAll", "()", "[RUNS MOD] Spawn one of every gem.", &DebugSpawnAllGems);
+	LuaSetDocFn(table, "gemDump", "()", "[RUNS MOD] Dump the live palette + gem colour mapping to gemdump.txt.",
+	    []() { return DumpGemPaletteMapping("gemdump.txt"); });
 	return table;
 }
 

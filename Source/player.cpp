@@ -51,6 +51,7 @@
 #include "player.h"
 #include "qol/autopickup.h"
 #include "qol/stash.h"
+#include "runs_gems.h"
 #include "runs_mod.h"
 #include "spells.h"
 #include "stores.h"
@@ -1545,6 +1546,12 @@ void Player::CalcScrolls()
 bool Player::CanUseItem(const Item &item) const
 {
 	if (!IsItemValid(*this, item))
+		return false;
+
+	// [RUNS MOD] Gems are gated on earned depth rather than stats (see CanUseGem).
+	// Routed through here so the whole existing "unusable item" path applies: the red
+	// inventory tint, the refusal when used, and the requirement line on the tooltip.
+	if (!CanUseGem(*this, item))
 		return false;
 
 	return _pStrength >= item._iMinStr

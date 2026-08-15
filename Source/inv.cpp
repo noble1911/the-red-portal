@@ -1642,70 +1642,179 @@ bool AutoPlaceItemInInventory(Player &player, const Item &item, bool sendNetwork
 	return false;
 }
 
-std::vector<int> SortItemsBySize(Player &player)
+namespace {
+
+/**
+ * @brief [RUNS MOD] Category order within a size class: weapons, armour, jewellery,
+ * consumables and other misc, gold. Only breaks ties between equally sized items, so it
+ * tidies the result without costing any cells.
+ */
+int InventoryKindRank(const Item &item)
 {
-	std::vector<std::pair<Size, int>> itemSizes; // Pair of item size and its index in InvList
-	itemSizes.reserve(player._pNumInv);          // Reserves space for the number of items in the player's inventory
-
-	for (int i = 0; i < player._pNumInv; i++) {
-		const Size size = GetInventorySize(player.InvList[i]);
-		itemSizes.emplace_back(size, i);
+	switch (item._itype) {
+	case ItemType::Sword:
+	case ItemType::Axe:
+	case ItemType::Bow:
+	case ItemType::Mace:
+	case ItemType::Staff:
+		return 0;
+	case ItemType::Shield:
+	case ItemType::Helm:
+	case ItemType::LightArmor:
+	case ItemType::MediumArmor:
+	case ItemType::HeavyArmor:
+		return 1;
+	case ItemType::Ring:
+	case ItemType::Amulet:
+		return 2;
+	case ItemType::Gold:
+		return 4;
+	default:
+		return 3;
 	}
-
-	// Sort items by height first, then by width
-	std::sort(itemSizes.begin(), itemSizes.end(), [](const auto &a, const auto &b) {
-		if (a.first.height == b.first.height) return a.first.width > b.first.width;
-		return a.first.height > b.first.height;
-	});
-
-	// Extract sorted indices
-	std::vector<int> sortedIndices;
-	sortedIndices.reserve(itemSizes.size()); // Pre-allocate the necessary capacity
-
-	for (const auto &itemSize : itemSizes) {
-		sortedIndices.push_back(itemSize.second);
-	}
-
-	return sortedIndices;
 }
 
-void ReorganizeInventory(Player &player)
+/**
+ * @brief [RUNS MOD] Packing order: biggest footprint first, so large items claim whole
+ * rows before the 1x1s fill in around them. Ties break by kind, then base item, then
+ * value, which groups identical things together and makes the result deterministic.
+ */
+bool InventoryPacksBefore(const Item &a, const Item &b)
 {
-	// Sort items by size
-	const std::vector<int> sortedIndices = SortItemsBySize(player);
+	const Size sizeA = GetInventorySize(a);
+	const Size sizeB = GetInventorySize(b);
+	const int areaA = sizeA.width * sizeA.height;
+	const int areaB = sizeB.width * sizeB.height;
+	if (areaA != areaB)
+		return areaA > areaB;
+	if (sizeA.height != sizeB.height)
+		return sizeA.height > sizeB.height;
+	if (sizeA.width != sizeB.width)
+		return sizeA.width > sizeB.width;
 
-	// Temporary storage for items and a copy of InvGrid
-	std::vector<Item> tempStorage(player._pNumInv);
-	std::array<int8_t, InventoryGridCells> originalInvGrid;                                       // Declare an array for InvGrid copy
-	std::copy(std::begin(player.InvGrid), std::end(player.InvGrid), std::begin(originalInvGrid)); // Copy InvGrid to originalInvGrid
+	const int kindA = InventoryKindRank(a);
+	const int kindB = InventoryKindRank(b);
+	if (kindA != kindB)
+		return kindA < kindB;
+	if (a._itype != b._itype)
+		return a._itype < b._itype;
+	if (a._iMiscId != b._iMiscId)
+		return a._iMiscId < b._iMiscId;
+	if (a.IDidx != b.IDidx)
+		return a.IDidx < b.IDidx;
+	return a._iIvalue > b._iIvalue;
+}
 
-	// Move items to temporary storage and clear inventory slots
-	for (int i = 0; i < player._pNumInv; ++i) {
-		tempStorage[i] = player.InvList[i];
+/**
+ * @brief [RUNS MOD] Pours partial gold piles together, up to the per-stack cap.
+ *
+ * Gold is the only thing that stacks in Diablo, and a long run routinely ends with
+ * several part-full piles each eating a cell. Emptied piles drop out of the list.
+ */
+void MergeGoldStacks(std::vector<Item> &items)
+{
+	int total = 0;
+	int stacks = 0;
+	for (const Item &item : items) {
+		if (item._itype == ItemType::Gold) {
+			total += item._ivalue;
+			stacks++;
+		}
+	}
+	if (stacks < 2)
+		return;
+
+	std::vector<Item> merged;
+	merged.reserve(items.size());
+	int remaining = total;
+	for (Item &item : items) {
+		if (item._itype != ItemType::Gold) {
+			merged.push_back(item);
+			continue;
+		}
+		if (remaining <= 0)
+			continue; // poured into an earlier pile
+		item._ivalue = std::min(remaining, MaxGold);
+		remaining -= item._ivalue;
+		SetPlrHandGoldCurs(item); // the pile graphic follows the amount
+		merged.push_back(item);
+	}
+	items = std::move(merged);
+}
+
+/**
+ * @brief [RUNS MOD] First cell, scanning top-left to bottom-right, that fits this size.
+ *
+ * Deliberately not FindSlotForItem. That one's per-size rules (1x1s to the bottom row,
+ * 2-high items from the right edge inwards) exist to keep big contiguous space free when
+ * a single new item drops into a bag already in use. Feeding a pre-sorted list through
+ * them scatters it, because the rules are busy protecting space the caller is about to
+ * fill anyway. A plain scan is what packing largest-first wants.
+ */
+std::optional<int> FindFirstFitSlot(const Player &player, Size itemSize)
+{
+	const int unlockedCells = UnlockedInventoryGridCells(player);
+	for (int slot = 0; slot < unlockedCells; slot++) {
+		if (CheckItemFitsInInventorySlot(player, slot, itemSize, -1))
+			return slot;
+	}
+	return {};
+}
+
+} // namespace
+
+bool ReorganizeInventory(Player &player)
+{
+	// [RUNS MOD] Snapshot before touching anything: a repack that cannot place every item
+	// has to leave the pack exactly as it was.
+	//
+	// The previous implementation got this wrong in a way that duplicated items. It reset
+	// _pNumInv to 0, re-added items one at a time, and on failure appended the whole
+	// backup on top of the ones already placed -- leaving _pNumInv inflated and the
+	// restored InvGrid indices pointing at the wrong InvList entries.
+	const std::vector<Item> original(player.InvList, player.InvList + player._pNumInv);
+	std::array<int8_t, InventoryGridCells> originalGrid;
+	std::copy(std::begin(player.InvGrid), std::end(player.InvGrid), originalGrid.begin());
+
+	std::vector<Item> packed = original;
+	MergeGoldStacks(packed);
+	std::stable_sort(packed.begin(), packed.end(), InventoryPacksBefore);
+
+	// The cleared grid doubles as the scratch space the fit test reads.
+	std::fill(std::begin(player.InvGrid), std::end(player.InvGrid), 0);
+	for (int i = 0; i < player._pNumInv; i++)
 		player.InvList[i] = {};
-	}
-	player._pNumInv = 0;                                                // Reset inventory count
-	std::fill(std::begin(player.InvGrid), std::end(player.InvGrid), 0); // Clear InvGrid
+	player._pNumInv = static_cast<int>(packed.size());
 
-	// Attempt to place items back, now from the temp storage
-	bool reorganizationFailed = false;
-	for (const int index : sortedIndices) {
-		const Item &item = tempStorage[index];
-		if (!AutoPlaceItemInInventory(player, item, false)) {
-			reorganizationFailed = true;
-			break;
+	for (size_t i = 0; i < packed.size(); i++) {
+		const Size itemSize = GetInventorySize(packed[i]);
+		const std::optional<int> slot = FindFirstFitSlot(player, itemSize);
+		if (!slot) {
+			std::copy(originalGrid.begin(), originalGrid.end(), std::begin(player.InvGrid));
+			for (size_t j = 0; j < original.size(); j++)
+				player.InvList[j] = original[j];
+			for (size_t j = original.size(); j < packed.size(); j++)
+				player.InvList[j] = {};
+			player._pNumInv = static_cast<int>(original.size());
+			player.CalcScrolls();
+			return false;
 		}
+		player.InvList[i] = packed[i];
+		// [RUNS MOD] Not broadcast. CMD_CHANGEINVITEMS mirrors one placement into a remote
+		// client's copy of this backpack, and remotes apply it with CheckInvSwap, which
+		// replaces whatever item sits at that cell in THEIR grid. Replaying a whole new
+		// layout onto a mirror still holding the old one shuffles item identities and
+		// orphans entries. The only thing that reads another player's InvList is the
+		// inspect-player panel, so the cost of not syncing is that it shows the pre-sort
+		// arrangement -- much cheaper than corrupting the mirror.
+		AddItemToInvGrid(player, *slot, static_cast<int>(i) + 1, itemSize, false);
 	}
 
-	// If reorganization failed, restore items and InvGrid from tempStorage and originalInvGrid
-	if (reorganizationFailed) {
-		for (const Item &item : tempStorage) {
-			if (!item.isEmpty()) {
-				player.InvList[player._pNumInv++] = item;
-			}
-		}
-		std::copy(std::begin(originalInvGrid), std::end(originalInvGrid), std::begin(player.InvGrid)); // Restore InvGrid
-	}
+	player._pGold = CalculateGold(player);
+	player.CalcScrolls();
+
+	return packed.size() != original.size()
+	    || !std::equal(originalGrid.begin(), originalGrid.end(), std::begin(player.InvGrid));
 }
 
 int RoomForGold()

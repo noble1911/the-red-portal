@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstdio>
 #include <limits>
 #include <memory>
 #include <string_view>
@@ -28,6 +29,7 @@
 #include "utils/is_of.hpp"
 #include "utils/language.h"
 #include "utils/log.hpp"
+#include "utils/str_cat.hpp"
 #include "utils/surface_to_clx.hpp"
 
 namespace devilution {
@@ -128,6 +130,14 @@ constexpr Tier DiamondAllRes { 3, 5, 7, 10, 14 };
 constexpr Tier DiamondToHit { 3, 5, 8, 11, 15 };
 
 // Skull: the vampiric gem -- steals on a weapon, thorns on a shield, both pools on armour.
+//
+// The weapon slot carries a life bonus as well as the steal flag. Diablo's life steal is
+// a pair of fixed-tier flags rather than a percentage, so a flag-only bonus had two bad
+// properties: the five qualities collapsed onto two real outcomes, and the gem did
+// nothing at all on a weapon that already stole life -- which is why a Perfect Skull
+// would apply where a plain one silently refused. The numeric part means every tier
+// always has something to give.
+constexpr Tier SkullWeaponHp { 2, 3, 4, 5, 6 };
 constexpr Tier SkullGetHit { 2, 3, 4, 5, 6 };
 constexpr Tier SkullHp { 3, 5, 7, 9, 12 };
 constexpr Tier SkullMana { 3, 5, 7, 9, 12 };
@@ -173,6 +183,7 @@ GemEffect GetGemEffect(GemType type, GemQuality quality)
 		e.armor.toHit = DiamondToHit[q];
 		break;
 	case GemType::Skull:
+		e.weapon.hp = SkullWeaponHp[q];
 		e.weapon.flags = q >= 3 ? ItemSpecialEffect::StealLife5 : ItemSpecialEffect::StealLife3;
 		e.shield.flags = ItemSpecialEffect::Thorns;
 		e.shield.getHit = SkullGetHit[q];
@@ -294,11 +305,14 @@ GemQuality PendingGemQuality = GemQuality::Chipped;
 /** Inventory/belt slot the pending gem came from, so a success spends the right one. */
 int8_t GemSourceSlot = -1;
 
-/** Renders one bonus as a tooltip line. Mirrors the wording of the item stat lines. */
-void AppendBonusLine(std::string_view slot, const GemBonus &bonus, std::vector<std::string> &out)
+/** Renders a bonus as compact text.
+ *
+ * Deliberately terse: the info box is a fixed narrow strip (see the oils, which hand-split
+ * their descriptions across two short lines), and anything much longer than about thirty
+ * characters runs past the edge and overlaps the next line.
+ */
+std::string BonusText(const GemBonus &bonus)
 {
-	if (bonus.isEmpty())
-		return;
 	std::string text;
 	const auto add = [&text](std::string_view part) {
 		if (!text.empty())
@@ -308,49 +322,55 @@ void AppendBonusLine(std::string_view slot, const GemBonus &bonus, std::vector<s
 	if (bonus.toHit != 0)
 		add(fmt::format(fmt::runtime(_("+{:d}% to hit")), bonus.toHit));
 	if (bonus.dam != 0)
-		add(fmt::format(fmt::runtime(_("+{:d}% damage")), bonus.dam));
+		add(fmt::format(fmt::runtime(_("+{:d}% dam")), bonus.dam));
 	if (bonus.damMod != 0)
-		add(fmt::format(fmt::runtime(_("+{:d} damage")), bonus.damMod));
+		add(fmt::format(fmt::runtime(_("+{:d} dam")), bonus.damMod));
 	if (bonus.fireMax != 0)
-		add(fmt::format(fmt::runtime(_("{:d}-{:d} fire damage")), bonus.fireMin, bonus.fireMax));
+		add(fmt::format(fmt::runtime(_("{:d}-{:d} fire dam")), bonus.fireMin, bonus.fireMax));
 	if (bonus.lightMax != 0)
-		add(fmt::format(fmt::runtime(_("{:d}-{:d} lightning damage")), bonus.lightMin, bonus.lightMax));
+		add(fmt::format(fmt::runtime(_("{:d}-{:d} lightning dam")), bonus.lightMin, bonus.lightMax));
 	if (bonus.ac != 0)
-		add(fmt::format(fmt::runtime(_("+{:d} armor class")), bonus.ac));
+		add(fmt::format(fmt::runtime(_("+{:d} armor")), bonus.ac));
 	if (bonus.fr != 0 && bonus.fr == bonus.lr && bonus.fr == bonus.mr) {
-		add(fmt::format(fmt::runtime(_("+{:d}% all resistances")), bonus.fr));
+		add(fmt::format(fmt::runtime(_("+{:d}% all resist")), bonus.fr));
 	} else {
 		if (bonus.fr != 0)
-			add(fmt::format(fmt::runtime(_("+{:d}% fire resistance")), bonus.fr));
+			add(fmt::format(fmt::runtime(_("+{:d}% fire resist")), bonus.fr));
 		if (bonus.lr != 0)
-			add(fmt::format(fmt::runtime(_("+{:d}% lightning resistance")), bonus.lr));
+			add(fmt::format(fmt::runtime(_("+{:d}% lightn resist")), bonus.lr));
 		if (bonus.mr != 0)
-			add(fmt::format(fmt::runtime(_("+{:d}% magic resistance")), bonus.mr));
+			add(fmt::format(fmt::runtime(_("+{:d}% magic resist")), bonus.mr));
 	}
 	if (bonus.getHit != 0)
-		add(fmt::format(fmt::runtime(_("-{:d} damage from enemies")), bonus.getHit));
+		add(fmt::format(fmt::runtime(_("-{:d} dam taken")), bonus.getHit));
 	if (bonus.str != 0)
-		add(fmt::format(fmt::runtime(_("+{:d} strength")), bonus.str));
+		add(fmt::format(fmt::runtime(_("+{:d} Str")), bonus.str));
 	if (bonus.dex != 0)
-		add(fmt::format(fmt::runtime(_("+{:d} dexterity")), bonus.dex));
+		add(fmt::format(fmt::runtime(_("+{:d} Dex")), bonus.dex));
 	if (bonus.vit != 0)
-		add(fmt::format(fmt::runtime(_("+{:d} vitality")), bonus.vit));
+		add(fmt::format(fmt::runtime(_("+{:d} Vit")), bonus.vit));
 	if (bonus.mag != 0)
-		add(fmt::format(fmt::runtime(_("+{:d} magic")), bonus.mag));
+		add(fmt::format(fmt::runtime(_("+{:d} Mag")), bonus.mag));
 	if (bonus.hp != 0)
 		add(fmt::format(fmt::runtime(_("+{:d} life")), bonus.hp));
 	if (bonus.mana != 0)
 		add(fmt::format(fmt::runtime(_("+{:d} mana")), bonus.mana));
 	if (bonus.light != 0)
-		add(fmt::format(fmt::runtime(_("+{:d} light radius")), bonus.light));
+		add(fmt::format(fmt::runtime(_("+{:d} light")), bonus.light));
 	if (HasAnyOf(bonus.flags, ItemSpecialEffect::StealLife3 | ItemSpecialEffect::StealLife5))
 		add(_("steals life"));
 	if (HasAnyOf(bonus.flags, ItemSpecialEffect::StealMana3 | ItemSpecialEffect::StealMana5))
 		add(_("steals mana"));
 	if (HasAnyOf(bonus.flags, ItemSpecialEffect::Thorns))
-		add(_("attacker takes damage"));
+		add(_("thorns"));
+	return text;
+}
 
-	out.push_back(fmt::format(fmt::runtime(_(/* TRANSLATORS: {:s} is a slot name, then its bonuses */ "{:s}: {:s}")), slot, text));
+void AppendBonusLine(std::string_view slot, const GemBonus &bonus, std::vector<std::string> &out)
+{
+	if (bonus.isEmpty())
+		return;
+	out.push_back(fmt::format(fmt::runtime(_(/* TRANSLATORS: {:s} is a slot name, then its bonuses */ "{:s}: {:s}")), slot, BonusText(bonus)));
 }
 
 // --- Icons --------------------------------------------------------------------------
@@ -365,10 +385,15 @@ constexpr char GemAssetPath[] = "data\\inv\\gems.dat";
 /** Palette indices below this are animated (see palette_update_caves) or reserved. */
 constexpr int FirstStablePaletteIndex = 32;
 
+/** Format version this build understands (see the converter in scripts/). */
+constexpr uint8_t GemAssetVersion = 2;
+
 struct GemArt {
 	uint8_t width = 0;
 	uint8_t height = 0;
-	std::unique_ptr<uint8_t[]> pixels; // 0 = transparent, else colour table index + 1
+	// 0 = transparent, else colour table index + 1. 16-bit because the 35 gems together
+	// use ~974 distinct colours -- a byte index cannot address them.
+	std::unique_ptr<uint16_t[]> pixels;
 };
 
 std::array<GemArt, NumGems> GemArtwork;
@@ -394,8 +419,13 @@ void LoadGemArt()
 		return;
 	}
 
+	if (data[4] != GemAssetVersion) {
+		LogError("Gem art {} is version {}, expected {}", GemAssetPath, data[4], GemAssetVersion);
+		GemArtMissing = true;
+		return;
+	}
 	const int spriteCount = data[5];
-	const int colorCount = data[6];
+	const int colorCount = static_cast<int>(data[6]) | (static_cast<int>(data[7]) << 8);
 	size_t offset = 8;
 	if (spriteCount != NumGems || offset + static_cast<size_t>(colorCount) * 3 > size) {
 		LogError("Gem art {} has {} sprites, expected {}", GemAssetPath, spriteCount, NumGems);
@@ -417,31 +447,42 @@ void LoadGemArt()
 		const uint8_t w = data[offset++];
 		const uint8_t h = data[offset++];
 		const size_t pixelCount = static_cast<size_t>(w) * h;
-		if (offset + pixelCount > size) {
+		if (offset + pixelCount * 2 > size) {
 			GemArtMissing = true;
 			return;
 		}
 		GemArtwork[i].width = w;
 		GemArtwork[i].height = h;
-		GemArtwork[i].pixels = std::make_unique<uint8_t[]>(pixelCount);
-		std::copy_n(&data[offset], pixelCount, GemArtwork[i].pixels.get());
-		offset += pixelCount;
+		GemArtwork[i].pixels = std::make_unique<uint16_t[]>(pixelCount);
+		for (size_t p = 0; p < pixelCount; p++) {
+			GemArtwork[i].pixels[p] = static_cast<uint16_t>(
+			    static_cast<int>(data[offset + p * 2]) | (static_cast<int>(data[offset + p * 2 + 1]) << 8));
+		}
+		offset += pixelCount * 2;
 	}
 	GemArtLoaded = true;
 }
 
-/** Nearest palette entry to `color`, skipping the animated low indices. */
+/** Nearest palette entry to `color`, skipping the animated low indices.
+ *
+ * Uses the "redmean" approximation rather than a luminance-weighted distance. Weighting
+ * green heavily (as the eye does) is right for photographs and wrong for this: it lets a
+ * colour match on brightness while its hue drifts, so saturated gem colours all collapsed
+ * onto whichever ramp happened to sit at the same luminance. Redmean keeps hue.
+ */
 uint8_t NearestPaletteIndex(SDL_Color color)
 {
 	int best = FirstStablePaletteIndex;
-	int bestDistance = std::numeric_limits<int>::max();
+	int64_t bestDistance = std::numeric_limits<int64_t>::max();
 	for (int i = FirstStablePaletteIndex; i < 256; i++) {
 		const SDL_Color &candidate = logical_palette[i];
+		const int rmean = (static_cast<int>(color.r) + candidate.r) / 2;
 		const int dr = static_cast<int>(color.r) - candidate.r;
 		const int dg = static_cast<int>(color.g) - candidate.g;
 		const int db = static_cast<int>(color.b) - candidate.b;
-		// Weighted to favour green, which the eye resolves best.
-		const int distance = dr * dr * 2 + dg * dg * 4 + db * db;
+		const int64_t distance = ((512 + rmean) * dr * dr) / 256
+		    + 4LL * dg * dg
+		    + ((767 - rmean) * db * db) / 256;
 		if (distance < bestDistance) {
 			bestDistance = distance;
 			best = i;
@@ -468,7 +509,7 @@ void BuildGemSprites()
 		OwnedSurface surface { art.width, art.height };
 		for (int y = 0; y < art.height; y++) {
 			for (int x = 0; x < art.width; x++) {
-				const uint8_t value = art.pixels[static_cast<size_t>(y) * art.width + x];
+				const uint16_t value = art.pixels[static_cast<size_t>(y) * art.width + x];
 				*surface.at(x, y) = value == 0 ? 0 : colorMap[value - 1];
 			}
 		}
@@ -488,34 +529,50 @@ void EnsureGemSprites()
 
 } // namespace
 
-GemType GemTypeFromCreateInfo(uint16_t createInfo)
+GemType GemTypeFromBuff(uint32_t dwBuff)
 {
-	return static_cast<GemType>(std::clamp(createInfo & 0x0F, 0, NumGemTypes - 1));
+	return static_cast<GemType>(std::clamp<int>((dwBuff & CF_GEMITEMTYPE) >> 14, 0, NumGemTypes - 1));
 }
 
-GemQuality GemQualityFromCreateInfo(uint16_t createInfo)
+GemQuality GemQualityFromBuff(uint32_t dwBuff)
 {
-	return static_cast<GemQuality>(std::clamp((createInfo >> 4) & 0x07, 0, NumGemQualities - 1));
+	return static_cast<GemQuality>(std::clamp<int>((dwBuff & CF_GEMITEMQUALITY) >> 17, 0, NumGemQualities - 1));
 }
 
 GemType GemTypeOf(const Item &item)
 {
-	return GemTypeFromCreateInfo(item._iCreateInfo);
+	return GemTypeFromBuff(item.dwBuff);
 }
 
 GemQuality GemQualityOf(const Item &item)
 {
-	return GemQualityFromCreateInfo(item._iCreateInfo);
+	return GemQualityFromBuff(item.dwBuff);
 }
 
-uint16_t MakeGemCreateInfo(GemType type, GemQuality quality)
+uint32_t MakeGemBuff(GemType type, GemQuality quality)
 {
-	return static_cast<uint16_t>((static_cast<int>(type) & 0x0F) | ((static_cast<int>(quality) & 0x07) << 4));
+	return CF_ISGEM
+	    | (static_cast<uint32_t>(type) << 14)
+	    | (static_cast<uint32_t>(quality) << 17);
 }
 
 bool IsGem(const Item &item)
 {
 	return item._iMiscId == IMISC_GEM;
+}
+
+int GemRequiredDepth(GemQuality quality)
+{
+	// Quality q first becomes droppable at depth 5q (see DropRandomGem), so the use
+	// requirement is the same number: you may use what you could have earned.
+	return 5 * static_cast<int>(quality);
+}
+
+bool CanUseGem(const Player &player, const Item &item)
+{
+	if (!RunsModEnabled || !IsGem(item))
+		return true;
+	return static_cast<int>(player.pDeepestBeatenDepth) >= GemRequiredDepth(GemQualityOf(item));
 }
 
 std::string GemName(GemType type, GemQuality quality)
@@ -551,11 +608,22 @@ void CreateGem(Item &item, GemType type, GemQuality quality)
 	// scrolls use for their level. RecreateItem rebuilds the icon and price from it.
 	InitializeItem(item, IDI_GEM);
 	GenerateNewSeed(item);
-	item._iCreateInfo = MakeGemCreateInfo(type, quality);
+	// Identity goes in dwBuff, and the create-info is left at zero: a gem has no item
+	// level, no affix roll and no vendor provenance, and every one of those is what
+	// _iCreateInfo actually means. InitializeItem may have set CF_HELLFIRE, so OR in
+	// rather than assign.
+	item._iCreateInfo = 0;
+	item.dwBuff |= MakeGemBuff(type, quality);
 	item._iCurs = static_cast<uint16_t>(GemCurs(type, quality));
 	item._iIdentified = true;
 	item._ivalue = GemValues[static_cast<size_t>(quality)];
 	item._iIvalue = item._ivalue;
+	// Without this the item stays at the zero-initialised _iStatFlag = false, and
+	// DrawItem renders anything "unusable" through the infravision TRN -- which maps the
+	// whole sprite onto a single red ramp, so every gem came out as a flat red blob.
+	// Rolled items get this from SetupItem; gems are built directly, so do it here.
+	if (MyPlayer != nullptr)
+		item.updateRequiredStatsCacheForPlayer(*MyPlayer);
 }
 
 bool ShouldDropGem(int depth)
@@ -592,6 +660,59 @@ void DropRandomGem(int depth, Point position, bool sendmsg)
 		NetSendCmdPItem(false, CMD_DROPITEM, item.position, item);
 }
 
+bool HasGem(const Item &item)
+{
+	return RunsModEnabled && (item.dwBuff & CF_GEMMED) != 0;
+}
+
+GemType FusedGemType(const Item &item)
+{
+	return static_cast<GemType>(std::clamp<int>((item.dwBuff & CF_GEMTYPE) >> 7, 0, NumGemTypes - 1));
+}
+
+GemQuality FusedGemQuality(const Item &item)
+{
+	return static_cast<GemQuality>(std::clamp<int>((item.dwBuff & CF_GEMQUALITY) >> 10, 0, NumGemQualities - 1));
+}
+
+/** Records which gem this item holds, without applying anything. */
+void StoreGemOnItem(Item &item, GemType type, GemQuality quality)
+{
+	item.dwBuff &= ~(CF_GEMTYPE | CF_GEMQUALITY);
+	item.dwBuff |= CF_GEMMED
+	    | (static_cast<uint32_t>(type) << 7)
+	    | (static_cast<uint32_t>(quality) << 10);
+}
+
+/** The bonus a stored gem grants this item, chosen by the item's class. */
+const GemBonus &BonusForItem(const GemEffect &effect, const Item &item)
+{
+	if (item._iClass == ICLASS_WEAPON)
+		return effect.weapon;
+	return item._itype == ItemType::Shield ? effect.shield : effect.armor;
+}
+
+void ReapplyFusedGem(Item &item)
+{
+	if (!HasGem(item))
+		return;
+	const GemEffect effect = GetGemEffect(FusedGemType(item), FusedGemQuality(item));
+	ApplyBonus(item, BonusForItem(effect, item));
+}
+
+void GetFusedGemLines(const Item &item, std::vector<std::string> &out)
+{
+	if (!HasGem(item))
+		return;
+	const GemType type = FusedGemType(item);
+	const GemQuality quality = FusedGemQuality(item);
+	out.push_back(fmt::format(fmt::runtime(_(/* TRANSLATORS: {:s} is a gem name */ "{:s} fused")), GemName(type, quality)));
+	const GemEffect effect = GetGemEffect(type, quality);
+	const std::string text = BonusText(BonusForItem(effect, item));
+	if (!text.empty())
+		out.push_back(text);
+}
+
 bool GemTargetingActive = false;
 
 void BeginGemTargeting(const Item &gem, int8_t sourceSlot)
@@ -625,26 +746,38 @@ bool DoGem(Player &player, int cii)
 	// Gems fuse into gear, not into consumables, gold or quest items -- the same
 	// classes the oils refuse.
 	if (target->_iClass != ICLASS_WEAPON && target->_iClass != ICLASS_ARMOR) {
-		InitDiabloMsg(_("Only weapons and armor can take a gem."));
+		InitDiabloMsg(_("Only weapons and armor can hold a gem."));
+		return false;
+	}
+	// One gem per item: a socket, not a stack. Without this the caps were the only
+	// brake, so an item could quietly absorb a dozen gems and the description could
+	// only ever name the last one.
+	if (HasGem(*target)) {
+		InitDiabloMsg(fmt::format(fmt::runtime(_(/* TRANSLATORS: {:s} is a gem name */ "This item already holds a {:s}.")),
+		    GemName(FusedGemType(*target), FusedGemQuality(*target))));
 		return false;
 	}
 
 	const GemEffect effect = GetGemEffect(PendingGemType, PendingGemQuality);
-	const GemBonus &bonus = target->_iClass == ICLASS_WEAPON
-	    ? effect.weapon
-	    : (target->_itype == ItemType::Shield ? effect.shield : effect.armor);
+	const GemBonus &bonus = BonusForItem(effect, *target);
 
-	if (bonus.isEmpty() || !ApplyBonus(*target, bonus)) {
-		InitDiabloMsg(_("That gem has nothing to give this item."));
+	if (bonus.isEmpty()) {
+		InitDiabloMsg(_("That gem does nothing in this kind of item."));
 		return false;
 	}
+	if (!ApplyBonus(*target, bonus)) {
+		InitDiabloMsg(_("This item is already at its limit for that."));
+		return false;
+	}
+	StoreGemOnItem(*target, PendingGemType, PendingGemQuality);
 
 	target->_iIdentified = true;
 	target->updateRequiredStatsCacheForPlayer(player);
 
 	// Spend the gem that opened this targeting; if its slot went stale (the inventory
 	// moved under us), fall back to any matching gem, mirroring DoPreserve.
-	const uint16_t createInfo = MakeGemCreateInfo(PendingGemType, PendingGemQuality);
+	const GemType spendType = PendingGemType;
+	const GemQuality spendQuality = PendingGemQuality;
 	bool spent = false;
 	if (GemSourceSlot >= INVITEM_BELT_FIRST && GemSourceSlot <= INVITEM_BELT_LAST) {
 		const int idx = GemSourceSlot - INVITEM_BELT_FIRST;
@@ -660,8 +793,8 @@ bool DoGem(Player &player, int cii)
 		}
 	}
 	if (!spent) {
-		RemoveInventoryOrBeltItem(player, [createInfo](const Item &item) {
-			return IsGem(item) && item._iCreateInfo == createInfo;
+		RemoveInventoryOrBeltItem(player, [spendType, spendQuality](const Item &item) {
+			return IsGem(item) && GemTypeOf(item) == spendType && GemQualityOf(item) == spendQuality;
 		});
 	}
 
@@ -673,6 +806,39 @@ bool DoGem(Player &player, int cii)
 void RefreshGemSprites()
 {
 	BuildGemSprites();
+}
+
+std::string DumpGemPaletteMapping(const char *path)
+{
+	// [RUNS MOD] Diagnostic: writes the live palette and the source-colour -> palette
+	// index mapping so the quantiser's actual behaviour can be inspected offline. The
+	// palette Diablo uses in game is not in the repo (it lives in the MPQs and changes
+	// per dungeon type), so this is the only way to see what the matcher is really given.
+	LoadGemArt();
+	if (!GemArtLoaded)
+		return "gem art not loaded";
+
+	std::string out;
+	out.append(StrCat("palette_generation ", PaletteGeneration, "\n"));
+	out.append("# index r g b\n");
+	for (int i = 0; i < 256; i++) {
+		out.append(StrCat("PAL ", i, " ", logical_palette[i].r, " ",
+		    logical_palette[i].g, " ", logical_palette[i].b, "\n"));
+	}
+	out.append("# srcR srcG srcB -> index palR palG palB\n");
+	for (size_t i = 0; i < GemArtColors.size(); i++) {
+		const SDL_Color c = GemArtColors[i];
+		const uint8_t idx = NearestPaletteIndex(c);
+		out.append(StrCat("MAP ", c.r, " ", c.g, " ", c.b, " -> ", idx, " ",
+		    logical_palette[idx].r, " ", logical_palette[idx].g, " ", logical_palette[idx].b, "\n"));
+	}
+
+	FILE *f = std::fopen(path, "wb");
+	if (f == nullptr)
+		return StrCat("could not open ", path);
+	std::fwrite(out.data(), 1, out.size(), f);
+	std::fclose(f);
+	return StrCat("wrote ", out.size(), " bytes to ", path);
 }
 
 void FreeGemSprites()
