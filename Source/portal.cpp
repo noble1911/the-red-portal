@@ -167,6 +167,20 @@ void SyncDungeonPortal()
 		AddMissile(DungeonPortalPos, DungeonPortalPos, Direction::South, MissileID::RedPortal, TARGET_MONSTERS, *MyPlayer, 0, 0);
 }
 
+bool CanEnterTownPortal(size_t portalIndex)
+{
+	// [RUNS MOD] Town portals cast inside a run stand in the hub long after the run they
+	// point at is over, and they are not gated by the hub portal's state -- so without this
+	// they are a second entrance that survives the collapse, letting a player walk back in
+	// for the corpse loot the seal is supposed to cost them. Walking *out* through one is
+	// always fine (sealed never means trapped); only the trip back in is refused, and only
+	// for the run level of a portal that is no longer open.
+	if (!RunsModEnabled)
+		return true;
+	const Portal &portal = Portals[portalIndex];
+	return DungeonPortalOpen && !portal.setlvl && portal.level == DungeonPortalLevel;
+}
+
 void DeactivatePortal(const Player &player)
 {
 	Portals[player.getId()].open = false;

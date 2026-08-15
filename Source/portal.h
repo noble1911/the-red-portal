@@ -59,6 +59,11 @@ void CloseDungeonPortal();
 void SetDungeonPortalRemote(int level, uint32_t scrollSeed, int modCount, int difficulty);
 /** @brief [RUNS MOD] Re-spawn the dungeon-portal visual on hub load if it is open. */
 void SyncDungeonPortal();
+/** @brief [RUNS MOD] True if stepping into player `portalIndex`'s town portal from the hub
+ * may still lead into the dungeon. A town portal is a way *out* of a run, never a second
+ * door back into one that has sealed (collapse or manual close) -- the hub portal is the
+ * only entrance. Always true with the mod off. */
+bool CanEnterTownPortal(size_t portalIndex);
 bool PortalOnLevel(const Player &player);
 void RemovePortalMissile(const Player &player);
 void SetCurrentPortal(size_t p);

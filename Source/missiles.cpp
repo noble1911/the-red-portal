@@ -26,6 +26,7 @@
 #include "cursor.h"
 #include "dead.h"
 #include "diablo.h"
+#include "diablo_msg.hpp"
 #include "effects.h"
 #include "engine/clx_sprite.hpp"
 #include "engine/direction.hpp"
@@ -44,6 +45,7 @@
 #include "multi.h"
 #include "objects.h"
 #include "player.h"
+#include "portal.h"
 #include "sound_effect_enums.h"
 #include "tables/itemdat.h"
 #include "tables/misdat.h"
@@ -51,6 +53,7 @@
 #include "tables/playerdat.hpp"
 #include "tables/spelldat.h"
 #include "utils/enum_traits.h"
+#include "utils/language.h"
 #ifdef _DEBUG
 #include "debug.h"
 #endif
@@ -3402,6 +3405,13 @@ void ProcessTownPortal(Missile &missile)
 		if (player.plractive && player.isOnActiveLevel() && !player._pLvlChanging && player._pmode == PM_STAND && player.position.tile == missile.position.tile) {
 			ClrPlrPath(player);
 			if (&player == MyPlayer) {
+				// [RUNS MOD] A town portal left over from a sealed run leads nowhere: the hub
+				// portal is the only way in. Each client judges this from its own (mirrored)
+				// portal state, exactly like the seal itself.
+				if (leveltype == DTYPE_TOWN && !CanEnterTownPortal(missile._misource)) {
+					InitDiabloMsg(_("The dungeon has sealed itself!"));
+					continue;
+				}
 				NetSendCmdParam1(true, CMD_WARP, missile._misource);
 				player._pmode = PM_NEWLVL;
 			}
