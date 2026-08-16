@@ -199,6 +199,7 @@ std::string_view CmdIdString(_cmd_id cmd)
 	case CMD_RUNSEED: return "CMD_RUNSEED";
 	case CMD_OPENDUNGEONPORTAL: return "CMD_OPENDUNGEONPORTAL";
 	case CMD_CLOSEDUNGEONPORTAL: return "CMD_CLOSEDUNGEONPORTAL";
+	case CMD_ARMRUNCOLLAPSE: return "CMD_ARMRUNCOLLAPSE";
 	case FAKE_CMD_SETID: return "FAKE_CMD_SETID";
 	case FAKE_CMD_DROPID: return "FAKE_CMD_DROPID";
 	case CMD_INVALID: return "CMD_INVALID";
@@ -2064,6 +2065,31 @@ size_t OnCloseDungeonPortal(const TCmd &cmd, Player &player)
 	return sizeof(cmd);
 }
 
+size_t OnArmRunCollapse(const TCmd &cmd, Player &player)
+{
+	// [RUNS MOD] The run boss died on another client, so start the collapse countdown
+	// here too.
+	//
+	// This has to travel. MonsterDeath arms locally on every client that runs it, but
+	// OnMonstDeath only calls M_SyncStartKill when the SENDER is on the receiver's active
+	// level -- so a player standing in the hub while their partner killed the boss never
+	// armed, never counted down and never sealed. Their DungeonPortalOpen stayed true,
+	// which left them able to walk a town portal back into a run the killer could no
+	// longer enter: the seal held for one player and not the other.
+	//
+	// Only the arm is broadcast. Each client still runs its own countdown and seals
+	// itself, so the warnings appear everywhere and a few ticks of drift stay harmless.
+	// ArmRunCollapse is idempotent, so the killer's own copy and this crossing over do
+	// not stack.
+	if (gbBufferMsgs == 1) {
+		BufferMessage(player, &cmd, sizeof(cmd));
+	} else if (&player != MyPlayer) {
+		ArmRunCollapse();
+	}
+
+	return sizeof(cmd);
+}
+
 size_t OnWarp(const TCmdParam1 &message, Player &player)
 {
 	const uint16_t portalIdx = Swap16LE(message.wParam1);
@@ -3569,6 +3595,8 @@ size_t ParseCmd(uint8_t pnum, const TCmd *pCmd, size_t maxCmdSize)
 		return HandleCmd(OnOpenDungeonPortal, player, pCmd, maxCmdSize);
 	case CMD_CLOSEDUNGEONPORTAL:
 		return OnCloseDungeonPortal(*pCmd, player);
+	case CMD_ARMRUNCOLLAPSE:
+		return OnArmRunCollapse(*pCmd, player);
 	default:
 		break;
 	}

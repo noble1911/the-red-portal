@@ -4242,7 +4242,16 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 		RunBossDefeated = true;
 		// [RUNS MOD] The boss's death starts the collapse countdown (push-your-luck:
 		// finish looting and get out before the run seals).
+		//
+		// Broadcast as well as armed locally, and the broadcast is the load-bearing half.
+		// This block runs wherever MonsterDeath runs, but OnMonstDeath only reaches
+		// MonsterDeath when the sender is on the receiver's active level -- so a partner
+		// waiting in the hub never armed, never sealed, and kept a live town portal into a
+		// run the killer had already been shut out of. Sent from the killer alone
+		// (`sendmsg`); ArmRunCollapse is idempotent, so the two paths do not stack.
 		ArmRunCollapse();
+		if (sendmsg && gbIsMultiplayer)
+			NetSendCmd(true, CMD_ARMRUNCOLLAPSE);
 		// [RUNS MOD] Completing a dungeon restocks the Dungeon Merchant on the next
 		// hub visit.
 		DungeonVendorRestockPending = true;

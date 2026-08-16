@@ -132,9 +132,11 @@ void ProcessRunClock()
 
 	// Collapse countdown runs in real ticks once armed, everywhere (also while players
 	// shop in the hub -- the countdown is the window for looting and corpse runs).
-	// Each client seals locally when its own countdown expires: the portal state is
-	// already mirrored on every client, so no broadcast is needed and a few ticks of
-	// cross-client drift in the arm time is harmless.
+	// Each client seals locally when its own countdown expires, and a few ticks of
+	// cross-client drift in the arm time is harmless. The ARM itself does have to be
+	// broadcast (CMD_ARMRUNCOLLAPSE): MonsterDeath only reaches a client that was on the
+	// run level when the boss died, so a partner in the hub would otherwise never start
+	// counting and never seal.
 	if (RunCollapseArmed && RunCollapseTicksLeft > 0) {
 		RunCollapseTicksLeft--;
 		const int tps = TicksPerSecond();

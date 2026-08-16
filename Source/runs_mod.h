@@ -37,8 +37,13 @@ constexpr int HubPortalX = 30;
 constexpr int HubPortalY = 31;
 
 // Where the dungeon-scroll portal appears in the hub (run mode). Its own spot so it
-// never collides with a town portal. Tunable.
-constexpr int HubDungeonPortalX = 33;
+// never collides with a town portal -- nor with the tile a player LANDS on stepping out
+// of one, which is the portal tile + (1,1) (GetPortalLvlPos). At the old x=33 that
+// arrival tile was the dungeon portal itself for player 1, who therefore left a run and
+// walked straight back into it. HubPortalSpotsAreClear() in portal.cpp keeps the two
+// sets apart. Tunable, but stay on the plaza: y=32 is walkable at least from the spawn
+// (x=25) out to the town-portal arrivals (x=37).
+constexpr int HubDungeonPortalX = 27;
 constexpr int HubDungeonPortalY = 32;
 
 constexpr bool IsInsideHub(int x, int y)

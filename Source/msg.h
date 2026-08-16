@@ -432,6 +432,11 @@ enum _cmd_id : uint8_t {
 	//
 	// body (TCmd)
 	CMD_CLOSEDUNGEONPORTAL,
+	// [RUNS MOD] Broadcast that the run boss died and the collapse countdown is running.
+	// Each client then counts down and seals on its own, so this carries no deadline.
+	//
+	// body (TCmd)
+	CMD_ARMRUNCOLLAPSE,
 	// Fake command; set current player for succeeding mega pkt buffer messages.
 	//
 	// body (TFakeCmdPlr)
