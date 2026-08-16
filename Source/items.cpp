@@ -3135,7 +3135,6 @@ void DropDungeonScroll(int level, Point position, int difficulty, bool sendmsg)
 {
 	// [RUNS MOD] Drop a dungeon scroll of `level`/`difficulty` on the ground near
 	// `position` (used for run-boss / monster scroll drops that feed the next run).
-	// Placement and network sync mirror a normal monster item drop.
 	if (ActiveItemCount >= MAXITEMS)
 		return;
 	const int ii = AllocateItem();
@@ -3143,8 +3142,10 @@ void DropDungeonScroll(int level, Point position, int difficulty, bool sendmsg)
 	CreateDungeonScroll(item, level, difficulty);
 	GetSuperItemSpace(position, static_cast<int8_t>(ii));
 	item.setNewAnimation(MyPlayer != nullptr && MyPlayer->pLvlLoad == 0);
+	// CMD_SPAWNITEM, not CMD_DROPITEM. See the note on DropRandomGem: this drop is
+	// rolled on one client only, and CMD_DROPITEM would only reach the others' delta.
 	if (sendmsg)
-		NetSendCmdPItem(false, CMD_DROPITEM, item.position, item);
+		NetSendCmdPItem(false, CMD_SPAWNITEM, item.position, item);
 }
 
 void DropGambleToken(Point position, bool sendmsg)
@@ -3161,7 +3162,7 @@ void DropGambleToken(Point position, bool sendmsg)
 	GetSuperItemSpace(position, static_cast<int8_t>(ii));
 	item.setNewAnimation(MyPlayer != nullptr && MyPlayer->pLvlLoad == 0);
 	if (sendmsg)
-		NetSendCmdPItem(false, CMD_DROPITEM, item.position, item);
+		NetSendCmdPItem(false, CMD_SPAWNITEM, item.position, item);
 }
 
 // [RUNS MOD] The classic quest uniques are unobtainable in run mode: their quests are
@@ -3226,8 +3227,9 @@ void TryDropRunRelic(int depth, Point position)
 void DropPrizeItem(Item prize, Point position)
 {
 	// [RUNS MOD] Drop an already-built item on the ground near `position`, synced like
-	// a monster drop. Used for fruit-machine payouts: the machine spits prizes at the
-	// player's feet instead of opening bag-room dialogs.
+	// a monster drop. Used for fruit-machine payouts and boss-vault relics: the item is
+	// built on one client, so it has to be spawned on the others rather than merely
+	// recorded in their delta (see DropRandomGem).
 	if (prize.isEmpty() || ActiveItemCount >= MAXITEMS)
 		return;
 	const int ii = AllocateItem();
@@ -3235,7 +3237,7 @@ void DropPrizeItem(Item prize, Point position)
 	item = prize;
 	GetSuperItemSpace(position, static_cast<int8_t>(ii));
 	item.setNewAnimation(MyPlayer != nullptr && MyPlayer->pLvlLoad == 0);
-	NetSendCmdPItem(false, CMD_DROPITEM, item.position, item);
+	NetSendCmdPItem(false, CMD_SPAWNITEM, item.position, item);
 }
 
 Item RollGamblePrizeItem(int lvl)
@@ -3870,11 +3872,14 @@ void SpawnItem(Monster &monster, Point position, bool sendmsg, bool spawn /*= fa
 		NetSendCmdPItem(false, CMD_SPAWNITEM, item.position, item);
 }
 
-void CreateRndItem(Point position, bool onlygood, bool sendmsg, bool delta)
+void CreateRndItem(Point position, bool onlygood, bool sendmsg, bool delta, bool spawn)
 {
 	const _item_indexes idx = onlygood ? RndUItem(nullptr) : RndAllItems();
 
-	SetupBaseItem(position, idx, onlygood, sendmsg, delta);
+	// [RUNS MOD] `spawn` forwarded so a caller that rolls the item on ONE client (the
+	// mod's boss vault) can have it placed on the others, rather than only recorded in
+	// their delta the way vanilla's every-client drops need. See DropRandomGem.
+	SetupBaseItem(position, idx, onlygood, sendmsg, delta, spawn);
 }
 
 void CreateRndUseful(Point position, bool sendmsg)

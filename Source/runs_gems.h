@@ -119,11 +119,16 @@ bool CanUseGem(const Player &player, const Item &item);
 /** @brief Builds a gem of the given type and quality (used by drops and by RecreateItem). */
 void CreateGem(Item &item, GemType type, GemQuality quality);
 
-/** @brief Rolls a gem appropriate to `depth` and drops it near `position`. */
+/** @brief Rolls a gem appropriate to `depth` and drops it near `position`.
+ *
+ * [RUNS MOD] The run boss is the ONLY source of gems: ordinary kills used to roll for one
+ * too, but a floor is ~150 kills (numplacemonsters is walkable tiles / 30, half again in
+ * multiplayer) so even a low per-kill rate buried the pack, and it made a permanent
+ * upgrade to a piece of gear more common than a dungeon scroll -- a consumable. Coming
+ * only from the vault also makes the quality roll mean something: it is taken at the run's
+ * depth, so moving up the gem tiers needs the same thing moving up depth needs.
+ */
 void DropRandomGem(int depth, Point position, bool sendmsg);
-
-/** @brief Rolls how many gems, if any, a kill at `depth` should drop. */
-bool ShouldDropGem(int depth);
 
 /** @brief True while the "pick an item to fuse this gem into" cursor is up.
  *

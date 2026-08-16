@@ -626,15 +626,6 @@ void CreateGem(Item &item, GemType type, GemQuality quality)
 		item.updateRequiredStatsCacheForPlayer(*MyPlayer);
 }
 
-bool ShouldDropGem(int depth)
-{
-	// [RUNS MOD] Roughly one gem every twenty kills at depth 1, climbing with depth so
-	// deeper runs feel like the place to farm them. Uses the shared game RNG, so it is
-	// already level-owner gated wherever monster loot is rolled.
-	const int chance = std::min(2 + depth / 2, 12);
-	return GenerateRnd(100) < chance;
-}
-
 void DropRandomGem(int depth, Point position, bool sendmsg)
 {
 	if (ActiveItemCount >= MAXITEMS)
@@ -656,8 +647,24 @@ void DropRandomGem(int depth, Point position, bool sendmsg)
 	CreateGem(item, type, quality);
 	GetSuperItemSpace(position, static_cast<int8_t>(ii));
 	item.setNewAnimation(MyPlayer != nullptr && MyPlayer->pLvlLoad == 0);
+	// [RUNS MOD] CMD_SPAWNITEM, not CMD_DROPITEM, and the difference is load-bearing.
+	//
+	// OnDropItem does nothing but DeltaPutItem: it records the item so it comes back on
+	// level re-entry, and never places it in the receiving client's world. Vanilla can
+	// use it for monster loot because SpawnLoot runs on EVERY client, seeded from
+	// monster.rndItemSeed, so each one materialises the identical item locally and only
+	// needs the delta entry. The mod's drops are not like that -- they are rolled inside
+	// MonsterDeath's `sendmsg` block, which is the killer's client alone. Announced with
+	// CMD_DROPITEM they existed on exactly one floor, so peers could not see them, and a
+	// pickup by anyone else stalled in OnRequestGetItem (the level owner has no such
+	// item, so it retries until NetSendCmdReq2's 5s expiry) after the requesting client
+	// had already removed the item locally -- loot that vanished on being touched.
+	//
+	// OnSpawnItem is a superset: SyncDropItem on peers, plus PutItemRecord and
+	// DeltaPutItem. So this replaces the drop message rather than joining it; sending
+	// both would write the delta twice for one item.
 	if (sendmsg)
-		NetSendCmdPItem(false, CMD_DROPITEM, item.position, item);
+		NetSendCmdPItem(false, CMD_SPAWNITEM, item.position, item);
 }
 
 bool HasGem(const Item &item)

@@ -4292,19 +4292,28 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 			// is the jackpot. Gold piles inherit the Avaricious gold scaling via the
 			// GetItemAttrs hook.
 			//
-			// sendmsg WITHOUT delta, like every vanilla monster/object drop. `delta` is
-			// forwarded to SetupAllItems as `pregen`, which stamps CF_PREGEN: remote
-			// clients reject a broadcast pregen item outright (IsCreationFlagComboValid),
-			// and the local DeltaAddItem races the loopback of our own CMD_DROPITEM,
-			// tripping DeltaPutItem's floor-item duplication guard -- which drops a
-			// player as a "timeout". The pile still survives exit/re-entry: OnDropItem
-			// delta-persists on every client, the sender included.
+			// SPAWN, not sendmsg, and never delta.
+			//
+			// `delta` is forwarded to SetupAllItems as `pregen`, which stamps CF_PREGEN:
+			// remote clients reject a broadcast pregen item outright
+			// (IsCreationFlagComboValid), and the local DeltaAddItem races the loopback of
+			// our own message, tripping DeltaPutItem's floor-item duplication guard --
+			// which drops a player as a "timeout".
+			//
+			// `sendmsg` sends CMD_DROPITEM, which is delta-only: OnDropItem records the
+			// item so it returns on level re-entry and never places it in the receiving
+			// client's world. Vanilla's drops can live with that because SpawnLoot runs on
+			// every client off monster.rndItemSeed, so all of them build the same item
+			// locally. This whole block is inside `sendmsg`, i.e. the killer's client
+			// ALONE, so nothing else would ever build these. `spawn` sends CMD_SPAWNITEM,
+			// which places the item on peers and still does the delta write and the item
+			// record -- a superset, so it replaces sendmsg rather than joining it.
 			const int vaultItems = 2 + static_cast<int>(currlevel) / 5;
 			const int goldPiles = 2 + static_cast<int>(currlevel) / 10;
 			for (int i = 0; i < vaultItems; i++)
-				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/true, /*delta=*/false);
+				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/false, /*delta=*/false, /*spawn=*/true);
 			for (int i = 0; i < goldPiles; i++)
-				CreateTypeItem(monster.position.tile, /*onlygood=*/false, ItemType::Gold, IMISC_NONE, /*sendmsg=*/true, /*delta=*/false);
+				CreateTypeItem(monster.position.tile, /*onlygood=*/false, ItemType::Gold, IMISC_NONE, /*sendmsg=*/false, /*delta=*/false, /*spawn=*/true);
 			// [RUNS MOD] A fistful of chips for Farnham: beating the boss buys a real
 			// session at the fruit machine rather than the single stray token that trash
 			// drops. The count is flat because a token's WORTH already scales -- each is
@@ -4318,21 +4327,17 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 			TryDropRunRelic(static_cast<int>(currlevel), monster.position.tile);
 			// [RUNS MOD] The vault always pays a gem, and its quality is rolled at this
 			// depth -- the boss is the reliable way to move up the gem tiers, the same
-			// way it is the only way to move up depth. sendmsg without delta, as above.
+			// way it is the only way to move up depth. Spawned on peers, as above.
 			DropRandomGem(static_cast<int>(currlevel), monster.position.tile, /*sendmsg=*/true);
 		} else {
 			// [RUNS MOD] Tyrannical champions always pay out: one good item at the
 			// corpse (the pick is re-derived, so no champion state is stored).
-			// sendmsg without delta -- see the vault drop above.
+			// Spawned, not sendmsg, and never delta -- see the vault drop above.
 			if (IsRunChampion(static_cast<unsigned>(monster.getId())))
-				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/true, /*delta=*/false);
+				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/false, /*delta=*/false, /*spawn=*/true);
 			if (GenerateRnd(100) < 3)
 				DropDungeonScroll(ClampRunDepth(static_cast<int>(currlevel)), monster.position.tile, dropDiff, true);
-			// [RUNS MOD] Gems trickle out of ordinary kills, more often the deeper the
-			// run -- the floor is where you farm the low tiers, the boss is where the
-			// good ones come from. sendmsg without delta, as above.
-			if (ShouldDropGem(static_cast<int>(currlevel)))
-				DropRandomGem(static_cast<int>(currlevel), monster.position.tile, /*sendmsg=*/true);
+			// [RUNS MOD] No gem here: the vault is the only source (see DropRandomGem).
 			// [RUNS MOD] Gambler's Tokens: one free pull each. Rarer than scrolls --
 			// they don't stack, so the pack should never drown in chips.
 			//

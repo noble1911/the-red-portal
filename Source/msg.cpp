@@ -1312,7 +1312,11 @@ bool IsPItemValid(const TCmdPItem &message, const Player &player)
 
 	if (idx != IDI_EAR) {
 		const uint16_t creationFlags = Swap16LE(message.item.wCI);
-		const uint32_t dwBuff = Swap16LE(message.item.dwBuff);
+		// [RUNS MOD] Swap32LE: dwBuff is a 32-bit field and Swap16LE silently truncated it
+		// to its low half. Harmless while CF_HELLFIRE (bit 0) was all the validators read,
+		// but the mod's gem identity lives in bits 13-19 and a fused gem's in bits 6-12,
+		// so the truncated copy is not the value it claims to be.
+		const uint32_t dwBuff = Swap32LE(message.item.dwBuff);
 
 		if (idx != IDI_GOLD)
 			ValidateField(creationFlags, IsCreationFlagComboValid(creationFlags));
