@@ -199,7 +199,7 @@ std::string_view CmdIdString(_cmd_id cmd)
 	case CMD_RUNSEED: return "CMD_RUNSEED";
 	case CMD_OPENDUNGEONPORTAL: return "CMD_OPENDUNGEONPORTAL";
 	case CMD_CLOSEDUNGEONPORTAL: return "CMD_CLOSEDUNGEONPORTAL";
-	case CMD_ARMRUNCOLLAPSE: return "CMD_ARMRUNCOLLAPSE";
+	case CMD_RUNBOSSDIED: return "CMD_RUNBOSSDIED";
 	case FAKE_CMD_SETID: return "FAKE_CMD_SETID";
 	case FAKE_CMD_DROPID: return "FAKE_CMD_DROPID";
 	case CMD_INVALID: return "CMD_INVALID";
@@ -2065,29 +2065,27 @@ size_t OnCloseDungeonPortal(const TCmd &cmd, Player &player)
 	return sizeof(cmd);
 }
 
-size_t OnArmRunCollapse(const TCmd &cmd, Player &player)
+size_t OnRunBossDied(const TCmdParam1 &message, Player &player)
 {
-	// [RUNS MOD] The run boss died on another client, so start the collapse countdown
-	// here too.
+	// [RUNS MOD] Another client killed the run boss. Apply the run's completion here too:
+	// seal countdown, vendor restock, and -- if this hero was actually in the run --
+	// its progression.
 	//
-	// This has to travel. MonsterDeath arms locally on every client that runs it, but
-	// OnMonstDeath only calls M_SyncStartKill when the SENDER is on the receiver's active
-	// level -- so a player standing in the hub while their partner killed the boss never
-	// armed, never counted down and never sealed. Their DungeonPortalOpen stayed true,
-	// which left them able to walk a town portal back into a run the killer could no
-	// longer enter: the seal held for one player and not the other.
+	// This has to travel. MonsterDeath does all of that locally, but OnMonstDeath only
+	// calls M_SyncStartKill when the SENDER is on the receiver's active level, so a player
+	// in the hub while their partner killed the boss ran none of it: they never sealed
+	// (leaving them a town portal into a run the killer was shut out of) and were never
+	// paid for a run they may well have fought and died in.
 	//
-	// Only the arm is broadcast. Each client still runs its own countdown and seals
-	// itself, so the warnings appear everywhere and a few ticks of drift stay harmless.
-	// ArmRunCollapse is idempotent, so the killer's own copy and this crossing over do
-	// not stack.
+	// The depth rides along because the receiver may be in town, where currlevel is 0.
+	// ClampRunDepth keeps a malformed value off the progression maths.
 	if (gbBufferMsgs == 1) {
-		BufferMessage(player, &cmd, sizeof(cmd));
+		BufferMessage(player, &message, sizeof(message));
 	} else if (&player != MyPlayer) {
-		ArmRunCollapse();
+		ApplyRunBossKill(ClampRunDepth(Swap16LE(message.wParam1)));
 	}
 
-	return sizeof(cmd);
+	return sizeof(message);
 }
 
 size_t OnWarp(const TCmdParam1 &message, Player &player)
@@ -3595,8 +3593,8 @@ size_t ParseCmd(uint8_t pnum, const TCmd *pCmd, size_t maxCmdSize)
 		return HandleCmd(OnOpenDungeonPortal, player, pCmd, maxCmdSize);
 	case CMD_CLOSEDUNGEONPORTAL:
 		return OnCloseDungeonPortal(*pCmd, player);
-	case CMD_ARMRUNCOLLAPSE:
-		return OnArmRunCollapse(*pCmd, player);
+	case CMD_RUNBOSSDIED:
+		return HandleCmd(OnRunBossDied, player, pCmd, maxCmdSize);
 	default:
 		break;
 	}

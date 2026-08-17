@@ -4235,52 +4235,25 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 	// beaten; only then does returning to the hub advance to a deeper run.
 	const bool isRunBoss = RunsModEnabled && monster.isUnique() && monster.uniqueType == RunBossType;
 	if (isRunBoss) {
-		// [RUNS MOD] With the Twinned affix BOTH bosses come through here: each pays its
-		// own vault below, and a twin's death re-arms the collapse window, but per-run
-		// progression (the inventory row) fires only on the first kill.
-		const bool firstRunBossKill = !RunBossDefeated;
-		RunBossDefeated = true;
-		// [RUNS MOD] The boss's death starts the collapse countdown (push-your-luck:
-		// finish looting and get out before the run seals).
-		//
-		// Broadcast as well as armed locally, and the broadcast is the load-bearing half.
-		// This block runs wherever MonsterDeath runs, but OnMonstDeath only reaches
-		// MonsterDeath when the sender is on the receiver's active level -- so a partner
-		// waiting in the hub never armed, never sealed, and kept a live town portal into a
-		// run the killer had already been shut out of. Sent from the killer alone
-		// (`sendmsg`); ArmRunCollapse is idempotent, so the two paths do not stack.
-		ArmRunCollapse();
-		if (sendmsg && gbIsMultiplayer)
-			NetSendCmd(true, CMD_ARMRUNCOLLAPSE);
-		// [RUNS MOD] Completing a dungeon restocks the Dungeon Merchant on the next
-		// hub visit.
-		DungeonVendorRestockPending = true;
-		// [RUNS MOD] Deep-enough clears grow the extended inventory (each client its own).
-		if (firstRunBossKill)
-			TryUnlockInventoryRowForDepth(currlevel);
-		// [RUNS MOD] Record the hero's deepest beaten depth (each client its own); the
-		// Dungeon Merchant only stocks scrolls up to this + 1, so the boss is the sole
-		// gate to new depth on the buy path.
-		if (currlevel > MyPlayer->pDeepestBeatenDepth)
-			MyPlayer->pDeepestBeatenDepth = static_cast<uint8_t>(std::min<int>(currlevel, GetMaxRunDepth()));
-		// [RUNS MOD] Clearing the boss at the unlock depth opens the next difficulty tier
-		// (Normal -> Nightmare -> Hell), tracked per character in pDiabloKillLevel (stored
-		// as clearedDifficulty + 1, matching vanilla's Diablo-kill difficulty gate).
-		//
-		// Deliberately DifficultyUnlockDepth (15) rather than the Hellfire cap (24): the
-		// tier pacing was tuned against a 15-level ladder, and tying it to the cap would
-		// silently make Nightmare nine levels harder to reach. The Nest and Crypt are extra
-		// depth within a tier instead. Move this to GetMaxRunDepth() to change that.
-		if (currlevel >= DifficultyUnlockDepth) {
-			Player &mp = *MyPlayer;
-			const auto cleared = static_cast<uint8_t>(sgGameInitInfo.nDifficulty + 1);
-			if (mp.pDiabloKillLevel < cleared) {
-				mp.pDiabloKillLevel = cleared;
-				// Reward the unlock with a fresh level-1 scroll of the newly unlocked
-				// difficulty so the harder tier can be started right away.
-				if (sendmsg && sgGameInitInfo.nDifficulty < DIFF_HELL)
-					DropDungeonScroll(1, monster.position.tile, sgGameInitInfo.nDifficulty + 1, true);
-			}
+		// [RUNS MOD] Everything the kill means -- collapse armed, vendor restocked, and
+		// (for a hero who was actually in this run) the pack row, deepest depth and
+		// difficulty tier -- lives in ApplyRunBossKill so the broadcast below applies the
+		// identical thing. With the Twinned affix both bosses come through here; it is
+		// idempotent where that matters.
+		const bool unlockedNewTier = ApplyRunBossKill(static_cast<int>(currlevel));
+		if (sendmsg) {
+			// The broadcast is the load-bearing half. This block only runs where
+			// MonsterDeath does, and OnMonstDeath only reaches MonsterDeath when the
+			// sender is on the receiver's active level -- so a partner waiting in the hub,
+			// or one who died to the boss and respawned there, saw none of it: no seal, no
+			// restock, no credit for a run they fought.
+			if (gbIsMultiplayer)
+				NetSendCmdParam1(true, CMD_RUNBOSSDIED, static_cast<uint16_t>(currlevel));
+			// Reward a newly opened tier with a fresh level-1 scroll of it so the harder
+			// difficulty can be started right away. Dropped once, by the killer, because
+			// it is loot and needs a position -- anyone standing there can take it.
+			if (unlockedNewTier && sgGameInitInfo.nDifficulty < DIFF_HELL)
+				DropDungeonScroll(1, monster.position.tile, sgGameInitInfo.nDifficulty + 1, true);
 		}
 	}
 

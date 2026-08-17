@@ -95,10 +95,31 @@ int NextRunDepth(int depth);
 // The dungeon level of the current run. Defined in diablo.cpp.
 extern int RunDepth;
 
-// True once the current run's boss has been killed. Progression to a deeper run
-// is gated on this: you only advance if you actually beat the run. Reset when a
-// new run starts. Defined in diablo.cpp.
+// True once the current run's boss has been killed. Reset when a new run starts.
+// Defined in diablo.cpp.
+//
+// Depth progression is NOT gated on this (it used to be, hence the old comment): a run is
+// opened by a scroll, and how deep a scroll may go is gated on pDeepestBeatenDepth. What
+// this still governs is the abandoned-boss heal on re-entry, and the once-per-run
+// inventory row under the Twinned affix.
 extern bool RunBossDefeated;
+
+// True once the local hero has stood on the current run's level. Cleared with the run
+// seed, set on entering the run level. This is what earns run-completion credit, so
+// dying to the boss still pays while never leaving the hub does not. Defined in diablo.cpp.
+extern bool RunParticipated;
+
+/** @brief [RUNS MOD] Apply everything that follows from the run boss dying at `depth`.
+ *
+ * Called directly on the killer and via CMD_RUNBOSSDIED everywhere else -- it cannot rely
+ * on MonsterDeath, which only runs on clients that were standing on the run level. Run
+ * facts (the collapse arm, the vendor restock) land on every client; hero progression
+ * (pack row, deepest depth, difficulty tier) lands only where RunParticipated is set.
+ *
+ * @return true if this opened a new difficulty tier for the local hero, which the caller
+ * uses to decide whether to drop the celebratory scroll.
+ */
+bool ApplyRunBossKill(int depth);
 
 // [RUNS MOD] Set when a dungeon is completed (run boss killed); consumed on the next
 // hub load to restock the Dungeon Merchant. Starts true so the vendor stocks on the

@@ -3206,6 +3206,7 @@ void SetRndSeedForDungeonLevel()
 
 int RunDepth = 1;
 bool RunBossDefeated = false;
+bool RunParticipated = false;
 bool DungeonVendorRestockPending = true;
 bool RunForfeitPending = false;
 
@@ -3216,8 +3217,65 @@ void ResetRunSession()
 	CloseDungeonPortal();
 	RunDepth = 1;
 	RunBossDefeated = false;
+	RunParticipated = false;
 	RunForfeitPending = false;
 	ResetRunClock();
+}
+
+bool ApplyRunBossKill(int depth)
+{
+	// [RUNS MOD] Everything that follows from the run boss dying, applied identically on
+	// every client -- the killer calls this directly, the rest reach it through
+	// CMD_RUNBOSSDIED.
+	//
+	// It has to travel, because MonsterDeath does not. OnMonstDeath only calls
+	// M_SyncStartKill when the sender is on the RECEIVER's active level, so a hero
+	// standing in the hub -- or one who died to the boss and respawned there, which is
+	// the common case -- never ran this at all. The run ended for them (the seal is
+	// broadcast) while none of the credit was.
+	//
+	// Returns true if this call opened a new difficulty tier for the local hero, which
+	// the caller uses to decide whether to drop the celebratory scroll.
+	const bool firstKill = !RunBossDefeated;
+	RunBossDefeated = true;
+
+	// Facts about the RUN, true wherever a client happens to be standing.
+	ArmRunCollapse();
+	DungeonVendorRestockPending = true;
+
+	// Progression is earned rather than awarded: a hero who never set foot in this run
+	// collects nothing, so a weaker character cannot park in the hub and ride a partner's
+	// deep clears for the depth that gates gems, scroll purchases and the vendor tier.
+	// Entering at any point in the run is enough -- dying to the boss still pays.
+	if (!RunParticipated)
+		return false;
+
+	// Deep-enough clears grow the extended inventory; only on the first kill, so the
+	// Twinned affix's second boss does not pay a second row.
+	if (firstKill)
+		TryUnlockInventoryRowForDepth(depth);
+
+	// The hero's deepest beaten depth: the Dungeon Merchant only stocks scrolls up to
+	// this + 1, so the boss is the sole gate to new depth on the buy path.
+	if (depth > MyPlayer->pDeepestBeatenDepth)
+		MyPlayer->pDeepestBeatenDepth = static_cast<uint8_t>(std::min<int>(depth, GetMaxRunDepth()));
+
+	// Clearing the boss at the unlock depth opens the next difficulty tier (Normal ->
+	// Nightmare -> Hell), tracked per character in pDiabloKillLevel (stored as
+	// clearedDifficulty + 1, matching vanilla's Diablo-kill difficulty gate).
+	//
+	// Deliberately DifficultyUnlockDepth (15) rather than the Hellfire cap (24): the tier
+	// pacing was tuned against a 15-level ladder, and tying it to the cap would silently
+	// make Nightmare nine levels harder to reach. The Nest and Crypt are extra depth
+	// within a tier instead. Move this to GetMaxRunDepth() to change that.
+	if (depth < DifficultyUnlockDepth)
+		return false;
+	Player &mp = *MyPlayer;
+	const auto cleared = static_cast<uint8_t>(sgGameInitInfo.nDifficulty + 1);
+	if (mp.pDiabloKillLevel >= cleared)
+		return false;
+	mp.pDiabloKillLevel = cleared;
+	return true;
 }
 
 int GetMaxRunDepth()
@@ -3253,6 +3311,10 @@ void ApplyRunSeed(int depth, uint32_t seed)
 	// a malformed or out-of-range value would index DungeonSeeds/_pLvlVisited out of bounds.
 	depth = ClampRunDepth(depth);
 	RunDepth = depth;
+	// [RUNS MOD] A new layout is a new run, so this hero has not been in it yet. Cleared
+	// here rather than in PrimeScrollRun/StartNewRun because this is the one point both
+	// the initiator and the peers receiving CMD_RUNSEED pass through.
+	RunParticipated = false;
 	DungeonSeeds[depth] = seed;
 	LevelSeeds[depth] = std::nullopt;
 	MyPlayer->_pLvlVisited[depth] = false;
@@ -3699,6 +3761,12 @@ tl::expected<void, std::string> LoadGameLevel(bool firstflag, lvl_entry lvldir)
 
 	SyncPortals();
 	SyncDungeonPortal(); // [RUNS MOD] re-spawn the dungeon-portal visual in the hub
+
+	// [RUNS MOD] Setting foot in the run is what earns its completion credit (see
+	// ApplyRunBossKill) -- including for a hero who dies to the boss and reads the news
+	// from the hub.
+	if (RunsModEnabled && leveltype != DTYPE_TOWN && currlevel == RunDepth)
+		RunParticipated = true;
 
 	// [RUNS MOD] An abandoned boss recovers: re-entering the run level heals the run
 	// boss back to full unless another player held the level the whole time. This
