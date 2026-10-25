@@ -2522,7 +2522,10 @@ void InitPlayer(Player &player, bool firstTime)
 
 		player._pdir = Direction::South;
 
-		if (&player == MyPlayer && (!firstTime || leveltype != DTYPE_TOWN)) {
+		// [RUNS MOD] Also on a game's first town entry: vanilla keeps the per-player
+		// Tristram spot SetupLocalPositions assigned, which is outside the hub crop, so
+		// use the hub spawn CreateTown chose for this player.
+		if (&player == MyPlayer && (!firstTime || leveltype != DTYPE_TOWN || RunsModEnabled)) {
 			player.position.tile = ViewPosition;
 		}
 

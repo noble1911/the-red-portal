@@ -357,6 +357,18 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
 - `RunDungeonRules` is a runtime flag set in StartGame, so the golden-layout dungeon tests
   keep exercising vanilla generation.
 
+**Hub layout as data + per-player spawns** (2026-10-25)
+- Every hub position (7 NPCs, dungeon portal, town-portal spot, spawn1-4) lives in
+  `assets/txtdata/runs/hub_layout.tsv` (runs_hub.h), with built-in fallbacks. Each player
+  arrives on their own spawn (MyPlayerId) -- one shared tile stacked co-op parties because
+  every client places its hero before it knows where the others stand. The old static
+  assert (no town-portal arrival on the dungeon portal) is now HubLayoutProblem, checked
+  on load and on every edit.
+- Debug builds rearrange the hub in game: `dev.hub.place(name)` at your feet,
+  `dev.hub.list()`, `dev.hub.reset(name)`, `dev.hub.reload()`. Edits save to
+  <pref path>/txtdata/runs/hub_layout.tsv (overrides the shipped copy); copy it into
+  assets/ and delete the pref copy to ship it.
+
 **Gambler's Tokens** ✅ shipped 2026-07-21
 - New base item `IDI_GAMBLETOKEN` (itemdat.tsv last row + enum; BLOOD_STONE icon,
   dropRate 0, value 150): each token is ONE free pull at Farnham's at full payouts,

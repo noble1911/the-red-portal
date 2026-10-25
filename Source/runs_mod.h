@@ -27,24 +27,8 @@ constexpr int HubMaxX = 47;
 constexpr int HubMinY = 10;
 constexpr int HubMaxY = 47;
 
-// Where the player spawns when starting a new game in the compact hub.
-constexpr int HubSpawnX = 25;
-constexpr int HubSpawnY = 32;
-
-// Where town portals land in the hub (near the vendors) in run mode -- the vanilla
-// Tristram portal spot is outside the cropped plaza. Players are offset along x.
-constexpr int HubPortalX = 30;
-constexpr int HubPortalY = 31;
-
-// Where the dungeon-scroll portal appears in the hub (run mode). Its own spot so it
-// never collides with a town portal -- nor with the tile a player LANDS on stepping out
-// of one, which is the portal tile + (1,1) (GetPortalLvlPos). At the old x=33 that
-// arrival tile was the dungeon portal itself for player 1, who therefore left a run and
-// walked straight back into it. HubPortalSpotsAreClear() in portal.cpp keeps the two
-// sets apart. Tunable, but stay on the plaza: y=32 is walkable at least from the spawn
-// (x=25) out to the town-portal arrivals (x=37).
-constexpr int HubDungeonPortalX = 27;
-constexpr int HubDungeonPortalY = 32;
+// Positions inside the hub (vendors, portals, spawn points) live in
+// txtdata\runs\hub_layout.tsv -- see runs_hub.h.
 
 constexpr bool IsInsideHub(int x, int y)
 {

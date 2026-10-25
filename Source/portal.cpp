@@ -10,6 +10,7 @@
 #include "msg.h"
 #include "multi.h"
 #include "player.h"
+#include "runs_hub.h"
 #include "runs_mod.h"
 #include "tables/misdat.h"
 
@@ -36,33 +37,9 @@ Point PortalTownPosition[MAXPORTAL] = {
 Point GetPortalTownPos(size_t index)
 {
 	if (RunsModEnabled)
-		return Point { HubPortalX + static_cast<int>(index) * 2, HubPortalY };
+		return HubPosition(HubSpot::TownPortal) + Displacement { static_cast<int>(index) * 2, 0 };
 	return PortalTownPosition[index];
 }
-
-/** [RUNS MOD] True if no hub town portal, and no tile a player arrives on stepping out of
- * one, sits on the dungeon portal.
- *
- * The arrival tile is the portal tile + (1,1) (see GetPortalLvlPos), and that is the half
- * that was missed: the two coordinate sets were checked against each other directly, found
- * not to overlap, and player 1's portal at (32,31) still put its arrival on (33,32) --
- * exactly the dungeon portal. Leaving a run dropped that player onto the way back in, so
- * they bounced straight back down. Asserted rather than commented so moving either spot
- * cannot quietly recreate it. */
-constexpr bool HubPortalSpotsAreClear()
-{
-	for (int i = 0; i < MAXPORTAL; i++) {
-		const int x = HubPortalX + (i * 2);
-		if (x == HubDungeonPortalX && HubPortalY == HubDungeonPortalY)
-			return false;
-		if (x + 1 == HubDungeonPortalX && HubPortalY + 1 == HubDungeonPortalY)
-			return false;
-	}
-	return true;
-}
-
-static_assert(HubPortalSpotsAreClear(),
-    "a hub town portal, or the tile a player lands on leaving one, sits on the dungeon portal");
 
 } // namespace
 
@@ -164,7 +141,7 @@ void SetDungeonPortalRemote(int level, uint32_t scrollSeed, int modCount, int di
 	DungeonPortalSeed = scrollSeed;
 	DungeonPortalModCount = modCount;
 	DungeonPortalDifficulty = difficulty;
-	DungeonPortalPos = { HubDungeonPortalX, HubDungeonPortalY };
+	DungeonPortalPos = HubPosition(HubSpot::DungeonPortal);
 	if (leveltype == DTYPE_TOWN)
 		AddMissile(DungeonPortalPos, DungeonPortalPos, Direction::South, MissileID::RedPortal, TARGET_MONSTERS, *MyPlayer, 0, 0);
 }

@@ -11,6 +11,7 @@
 #include "multi.h"
 #include "player.h"
 #include "quests.h"
+#include "runs_hub.h"
 #include "runs_mod.h"
 #include "utils/endian_swap.hpp"
 
@@ -397,9 +398,11 @@ void CreateTown(lvl_entry entry)
 	}
 
 	if (RunsModEnabled) {
-		// [RUNS MOD] The only town is the compact hub, so always arrive at the hub
-		// spawn -- whether starting a new game or returning from a run (TWARPUP).
-		ViewPosition = { HubSpawnX, HubSpawnY };
+		// [RUNS MOD] The only town is the compact hub, so always arrive at a hub
+		// spawn -- whether starting a new game or returning from a run (TWARPUP). Each
+		// player gets their own: every client places its hero here before it knows
+		// where the others stand, so one shared tile stacked co-op parties.
+		ViewPosition = HubSpawnPosition(MyPlayerId);
 	}
 
 	DrlgTPass3();

@@ -31,6 +31,7 @@ set(libdevilutionx_SRCS
   restrict.cpp
   run_clock.cpp
   runs_gems.cpp
+  runs_hub.cpp
   runs_icons.cpp
   scroll_mods.cpp
   sync.cpp
@@ -102,6 +103,7 @@ set(libdevilutionx_SRCS
   lua/modules/hellfire.cpp
   lua/modules/dev.cpp
   lua/modules/dev/display.cpp
+  lua/modules/dev/hub.cpp
   lua/modules/dev/items.cpp
   lua/modules/dev/level.cpp
   lua/modules/dev/level/map.cpp

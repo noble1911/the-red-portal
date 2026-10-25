@@ -230,6 +230,7 @@ set(devilutionx_assets
   txtdata/monsters/unique_monstdat.tsv
   txtdata/objects/objdat.tsv
   txtdata/quests/questdat.tsv
+  txtdata/runs/hub_layout.tsv
   txtdata/sound/effects.tsv
   txtdata/spells/spelldat.tsv
   txtdata/text/textdat.tsv

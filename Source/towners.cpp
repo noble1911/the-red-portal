@@ -16,6 +16,7 @@
 #include "inv.h"
 #include "minitext.h"
 #include "qol/stash.h"
+#include "runs_hub.h"
 #include "runs_mod.h"
 #include "stores.h"
 #include "tables/textdat.h"
@@ -881,10 +882,11 @@ void InitTowners()
 		if (RunsModEnabled) {
 			relocated = entry;
 			switch (entry.type) {
-			case TOWN_SMITH:  relocated.position = { 22, 34 }; break; // Griswold - gear
-			case TOWN_HEALER: relocated.position = { 28, 34 }; break; // Pepin - potions/healing
-			case TOWN_WITCH:  relocated.position = { 20, 37 }; break; // Adria - scrolls/staves
-			case TOWN_STORY:  relocated.position = { 30, 37 }; break; // Cain - identify
+			// Positions come from the hub layout (runs_hub.h).
+			case TOWN_SMITH:  relocated.position = HubPosition(HubSpot::Griswold); break; // gear
+			case TOWN_HEALER: relocated.position = HubPosition(HubSpot::Pepin); break;    // potions/healing
+			case TOWN_WITCH:  relocated.position = HubPosition(HubSpot::Adria); break;    // scrolls/staves
+			case TOWN_STORY:  relocated.position = HubPosition(HubSpot::Cain); break;     // identify
 			case TOWN_BMAID: {
 				// Replace Gillian with a chest that opens the shared stash.
 				auto chestBehavior = TownerBehaviors.find(TOWN_STASHCHEST);
@@ -893,7 +895,7 @@ void InitTowners()
 				behaviorIt = chestBehavior;
 				// (Name comes from TownerLongNames -- see InitTowners -- because a name
 				// set on this LOCAL copy would be viewed, then freed: use-after-free.)
-				relocated.position = { 25, 37 };
+				relocated.position = HubPosition(HubSpot::StashChest);
 			} break;
 			case TOWN_DRUNK: {
 				// Farnham returns as the gambler: same drunk sprite/anims (default init
@@ -906,7 +908,7 @@ void InitTowners()
 				if (gamblerBehavior == TownerBehaviors.end() || gamblerBehavior->second == nullptr)
 					continue;
 				behaviorIt = gamblerBehavior;
-				relocated.position = { 20, 32 };
+				relocated.position = HubPosition(HubSpot::Farnham);
 			} break;
 			case TOWN_PEGBOY: {
 				// Wirt is unused in run mode; repurpose his sprite as the dedicated
@@ -919,7 +921,7 @@ void InitTowners()
 				// Moved straight "north" (up on screen) from {33,36}: on the isometric
 				// grid that means lowering x and y together (keeping x-y constant so he
 				// does not drift sideways).
-				relocated.position = { 30, 33 };
+				relocated.position = HubPosition(HubSpot::DungeonMerchant);
 			} break;
 			default: continue;
 			}
