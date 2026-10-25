@@ -146,6 +146,9 @@ int8_t ItemCAnim(int curs)
 	// keeps the vanilla table untouched for upstream merges.
 	if (RunsModEnabled && IsGemCurs(curs))
 		curs = ICURS_BLOOD_STONE;
+	// [RUNS MOD] Likewise the mod's own icons borrow a vanilla item's class.
+	if (RunsModEnabled && (IsRunIconCurs(curs) || IsRunItemCurs(curs)))
+		curs = RunIconStandInCurs(curs);
 	assert(curs >= 0 && static_cast<size_t>(curs) < std::size(ItemCAnimTbl));
 	return ItemCAnimTbl[curs];
 }

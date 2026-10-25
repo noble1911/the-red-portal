@@ -171,3 +171,23 @@ IDI_DUNGEONSCROLL	0	Misc	Unequippable	SCROLL_OF	Misc	NONE	Dungeon Scroll		1	0	0	
 IDI_PRESERVESCROLL	0	Misc	Unequippable	SCROLL_OF	Misc	NONE	Scroll of Preservation		1	0	0	0	0	0	0	0	0		PRESERVE	Null	true	50000
 IDI_GEM	0	Misc	Unequippable	BLOOD_STONE	Misc	NONE	Gem		1	0	0	0	0	0	0	0	0		GEM	Null	true	250
 IDI_GAMBLETOKEN	0	Misc	Unequippable	BLOOD_STONE	Misc	NONE	Gambler's Token		1	0	0	0	0	0	0	0	0		NONE	Null	false	150
+	1	Armor	Helm	400	Helm	NONE	Sallet	Helm	10	35	0	0	5	8	30	0	0		NONE	Null	false	90
+	1	Armor	Helm	401	Helm	NONE	Corinthian Helm	Helm	14	40	0	0	8	11	40	0	0		NONE	Null	false	200
+	1	Armor	Helm	402	Helm	NONE	Horned Helm	Helm	18	50	0	0	11	14	50	0	0		NONE	Null	false	350
+	1	Armor	Helm	403	Helm	NONE	Crested Helm	Helm	24	65	0	0	14	18	60	0	0		NONE	Null	false	600
+	1	Armor	Helm	404	Helm	NONE	Dread Helm	Helm	28	75	0	0	17	22	75	0	0		NONE	Null	false	900
+	1	Armor	Armor	405	MediumArmor	NONE	Brigandine	Mail	10	50	0	0	19	23	35	0	0		NONE	Null	false	1000
+	1	Armor	Armor	406	MediumArmor	NONE	Lamellar Armor	Mail	15	60	0	0	26	32	50	0	0		NONE	Null	false	2600
+	1	Armor	Armor	407	HeavyArmor	NONE	Dread Plate	Plate	30	110	0	0	75	90	115	0	0		NONE	Null	false	11000
+	1	Armor	Armor	408	HeavyArmor	NONE	Ornate Plate	Plate	27	100	0	0	65	80	100	0	0		NONE	Null	false	9000
+	1	Weapon	One-handed	409	Sword	NONE	Messer	Sword	10	45	5	11	0	0	45	0	0		NONE	Null	false	800
+	1	Weapon	Two-handed	410	Sword	NONE	Zweihander	Sword	14	75	8	20	0	0	75	0	0		NONE	Null	false	2200
+	1	Weapon	Two-handed	411	Sword	NONE	Headsman's Sword	Sword	26	100	14	28	0	0	120	0	0		NONE	Null	false	6000
+	1	Weapon	Two-handed	412	Axe	NONE	Bearded Axe	Axe	16	65	10	26	0	0	70	0	0		NONE	Null	false	2200
+	1	Weapon	Two-handed	413	Axe	NONE	Headsman's Axe	Axe	26	85	16	38	0	0	110	0	0		NONE	Null	false	6000
+	1	Weapon	One-handed	414	Mace	NONE	Flanged Mace	Mace	15	55	6	14	0	0	60	0	0		NONE	Null	false	1500
+	1	Weapon	Two-handed	415	Mace	NONE	Great Hammer	Hammer	24	75	12	30	0	0	110	0	0		NONE	Null	false	5000
+	1	Weapon	Two-handed	416	Bow	NONE	Recurve Bow	Bow	12	50	2	10	0	0	35	0	45		NONE	Null	false	1200
+	1	Weapon	Two-handed	417	Bow	NONE	Elder Bow	Bow	26	70	3	17	0	0	60	0	90		NONE	Null	false	5000
+	1	Armor	One-handed	418	Shield	NONE	Heater Shield	Shield	13	40	0	0	10	14	50	0	0		NONE	Null	false	500
+	1	Armor	One-handed	419	Shield	NONE	Pavise	Shield	27	70	0	0	18	26	100	0	0		NONE	Null	false	3500

@@ -84,7 +84,7 @@ enum _item_indexes : int16_t { // TODO defines all indexes in AllItemsList
 	IDI_DUNGEONSCROLL,  // [RUNS MOD] itemdat.tsv rows must stay in this order
 	IDI_PRESERVESCROLL, // [RUNS MOD]
 	IDI_GEM,            // [RUNS MOD] base row for all 35 gems (see runs_gems.h)
-	IDI_GAMBLETOKEN,    // [RUNS MOD] must be the LAST row of itemdat.tsv
+	IDI_GAMBLETOKEN,    // [RUNS MOD] last NAMED row; the mod's base items follow it unnamed
 
 	IDI_NUM_DEFAULT_ITEMS,
 	IDI_NONE = -1,
@@ -113,7 +113,9 @@ enum item_equip_type : int8_t {
 };
 
 /// Item graphic IDs; frame_num-11 of objcurs.cel.
-enum item_cursor_graphic : uint8_t {
+// [RUNS MOD] 16-bit: the mod numbers its own icons past both sprite sheets (gems from
+// 256, base items from 400; see runs_icons.h), beyond what a byte can name.
+enum item_cursor_graphic : uint16_t {
 	// clang-format off
 	ICURS_POTION_OF_FULL_MANA         = 0,
 	ICURS_SCROLL_OF                   = 1,

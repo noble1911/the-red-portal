@@ -243,7 +243,10 @@ set(devilutionx_assets
 
 if(NOT UNPACKED_MPQS)
   list(APPEND devilutionx_assets
-    data/inv/objcurs-widths.txt)
+    data/inv/objcurs-widths.txt
+    # [RUNS MOD] Base-item icon sheet; a CEL, read only by the MPQ-backed loader.
+    data/inv/runitems-widths.txt
+    data/inv/runitems.cel)
 endif()
 
 if(NOT USE_SDL1 AND NOT VITA)

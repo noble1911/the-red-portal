@@ -69,6 +69,8 @@ namespace {
 /** Cursor images CEL */
 OptionalOwnedClxSpriteList pCursCels;
 OptionalOwnedClxSpriteList pCursCels2;
+/** [RUNS MOD] The mod's base-item icons (see runs_icons.h). */
+OptionalOwnedClxSpriteList pRunItemCels;
 
 OptionalOwnedClxSpriteList *HalfSizeItemSprites;
 OptionalOwnedClxSpriteList *HalfSizeItemSpritesRed;
@@ -453,6 +455,11 @@ void InitCursor()
 	if (ref.ok()) {
 		pCursCels2 = LoadOptionalCel("data\\inv\\objcurs2", ReadWidths(std::move(ref)).data());
 	}
+	if (RunsModEnabled) {
+		AssetRef runItemsRef = FindAsset("data\\inv\\runitems-widths.txt");
+		if (runItemsRef.ok())
+			pRunItemCels = LoadOptionalCel("data\\inv\\runitems", ReadWidths(std::move(runItemsRef)).data());
+	}
 #endif
 	ClearCursor();
 }
@@ -461,6 +468,7 @@ void FreeCursor()
 {
 	pCursCels = std::nullopt;
 	pCursCels2 = std::nullopt;
+	pRunItemCels = std::nullopt;
 	ClearCursor();
 }
 
@@ -475,6 +483,14 @@ ClxSprite GetInvItemSprite(int cursId)
 	// [RUNS MOD] Same arrangement for the mod's own item icons (see runs_icons.cpp).
 	if (RunsModEnabled && IsRunIconCurs(cursId - static_cast<int>(CURSOR_FIRSTITEM)))
 		return GetRunIconSprite(cursId - static_cast<int>(CURSOR_FIRSTITEM));
+	// [RUNS MOD] The mod's base items: their own sheet, or the vanilla picture they stand
+	// in for if it failed to load (e.g. an UNPACKED_MPQS build, which has no .clx of it).
+	if (RunsModEnabled && IsRunItemCurs(cursId - static_cast<int>(CURSOR_FIRSTITEM))) {
+		const int frame = cursId - static_cast<int>(CURSOR_FIRSTITEM) - RunItemCursFirst;
+		if (pRunItemCels && static_cast<size_t>(frame) < pRunItemCels->numSprites())
+			return (*pRunItemCels)[frame];
+		cursId = RunIconStandInCurs(cursId - static_cast<int>(CURSOR_FIRSTITEM)) + static_cast<int>(CURSOR_FIRSTITEM);
+	}
 	const size_t numSprites = pCursCels->numSprites();
 	if (static_cast<size_t>(cursId) <= numSprites) {
 		return (*pCursCels)[cursId - 1];
@@ -512,6 +528,7 @@ void CreateHalfSizeItemSprites()
 	if (RunsModEnabled) {
 		numInvItems = std::max<uint32_t>(numInvItems, GemCursFirst + NumGems);
 		numInvItems = std::max<uint32_t>(numInvItems, RunIconCursFirst + NumRunIcons);
+		numInvItems = std::max<uint32_t>(numInvItems, RunItemCursFirst + NumRunItemIcons);
 	}
 	HalfSizeItemSprites = new OptionalOwnedClxSpriteList[numInvItems];
 	HalfSizeItemSpritesRed = new OptionalOwnedClxSpriteList[numInvItems];
@@ -553,6 +570,13 @@ void CreateHalfSizeItemSprites()
 	if (pCursCels2.has_value()) {
 		for (size_t i = 0, n = pCursCels2->numSprites(); i < n; ++i, ++outputIndex) {
 			createHalfSize((*pCursCels2)[i], outputIndex);
+		}
+	}
+	// [RUNS MOD] Store and stash previews draw items larger than 1x1 at half size.
+	if (RunsModEnabled) {
+		for (int i = 0; i < NumRunItemIcons; ++i) {
+			const int curs = RunItemCursFirst + i;
+			createHalfSize(GetInvItemSprite(curs + static_cast<int>(CURSOR_FIRSTITEM)), curs);
 		}
 	}
 }

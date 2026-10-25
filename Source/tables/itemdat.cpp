@@ -252,7 +252,7 @@ tl::expected<item_cursor_graphic, std::string> ParseItemCursorGraphic(std::strin
 	if (value == "") return ICURS_DEFAULT;
 
 	// also support providing the item cursor icon frame number directly
-	return ParseInt<uint8_t>(value)
+	return ParseInt<uint16_t>(value)
 	    .map([](auto numericalValue) { return static_cast<item_cursor_graphic>(numericalValue); })
 	    .map_error([](auto) { return std::string("Unknown enum value"); });
 }

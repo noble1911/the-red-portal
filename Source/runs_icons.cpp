@@ -15,6 +15,7 @@
 #include "engine/load_file.hpp"
 #include "engine/palette.h"
 #include "engine/surface.hpp"
+#include "tables/itemdat.h"
 #include "utils/log.hpp"
 #include "utils/surface_to_clx.hpp"
 
@@ -178,6 +179,39 @@ void FreeRunIconSprites()
 	for (auto &sprite : IconSprites)
 		sprite = std::nullopt;
 	IconSpritesBuilt = false;
+}
+
+int RunIconStandInCurs(int curs)
+{
+	if (IsRunIconCurs(curs))
+		return ICURS_SCROLL_OF; // The dungeon scroll is a scroll.
+
+	// One per runitems.cel frame, in order (see itemdat.tsv's rows using 400..419).
+	static constexpr item_cursor_graphic RunItemStandIns[NumRunItemIcons] = {
+		ICURS_FULL_HELM,       // Sallet
+		ICURS_FULL_HELM,       // Corinthian Helm
+		ICURS_GREAT_HELM,      // Horned Helm
+		ICURS_GREAT_HELM,      // Crested Helm
+		ICURS_GREAT_HELM,      // Dread Helm
+		ICURS_RING_MAIL,       // Brigandine
+		ICURS_SCALE_MAIL,      // Lamellar Armor
+		ICURS_FULL_PLATE_MAIL, // Dread Plate
+		ICURS_FULL_PLATE_MAIL, // Ornate Plate
+		ICURS_FALCHION,        // Messer
+		ICURS_GREAT_SWORD,     // Zweihander
+		ICURS_GREAT_SWORD,     // Headsman's Sword
+		ICURS_BATTLE_AXE,      // Bearded Axe
+		ICURS_GREAT_AXE,       // Headsman's Axe
+		ICURS_MORNING_STAR,    // Flanged Mace
+		ICURS_MAUL,            // Great Hammer
+		ICURS_COMPOSITE_BOW,   // Recurve Bow
+		ICURS_LONG_WAR_BOW,    // Elder Bow
+		ICURS_KITE_SHIELD,     // Heater Shield
+		ICURS_TOWER_SHIELD,    // Pavise
+	};
+	if (IsRunItemCurs(curs))
+		return RunItemStandIns[curs - RunItemCursFirst];
+	return curs;
 }
 
 ClxSprite GetRunIconSprite(int curs)

@@ -70,4 +70,30 @@ void FreeRunIconSprites();
  */
 bool RunIconsAvailable();
 
+/**
+ * @brief [RUNS MOD] Icons for the mod's own base items (Sallet, Dread Plate, ...).
+ *
+ * Unlike the RGB icons above these are frames lifted from The Hell 4's inventory sheet,
+ * already drawn in Diablo's item palette range, so they ship as an ordinary CEL sheet
+ * (data\inv\runitems.cel + runitems-widths.txt) that loads beside objcurs and draws
+ * under any level palette with no quantising.
+ *
+ * Items name these in itemdat.tsv's cursorGraphic column by number (RunItemCursFirst +
+ * frame), so the constant below is part of the data format: keep the two in step.
+ */
+constexpr int RunItemCursFirst = 400;
+constexpr int NumRunItemIcons = 20;
+
+constexpr bool IsRunItemCurs(int curs)
+{
+	return curs >= RunItemCursFirst && curs < RunItemCursFirst + NumRunItemIcons;
+}
+
+/**
+ * @brief The vanilla `_iCurs` a mod icon stands in for: the item class it borrows its
+ * ground animation and drop/pick-up sounds from (ItemCAnimTbl only covers vanilla ids),
+ * and the picture to fall back to if the mod's sheet is missing.
+ */
+int RunIconStandInCurs(int curs);
+
 } // namespace devilution
