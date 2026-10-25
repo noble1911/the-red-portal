@@ -192,7 +192,35 @@ extern THEME_LOC themeLoc[MAXTHEMES];
 std::optional<WorldTileSize> GetSizeForThemeRoom();
 #endif
 
+/**
+ * @brief [RUNS MOD] Whether dungeon levels follow run rules: each run level rolls its
+ * tileset from its (network-synced) dungeon seed instead of taking it from its depth,
+ * and its generator places only the exit staircase.
+ *
+ * Runtime rather than keyed off the compile-time RunsModEnabled so that code which
+ * generates vanilla levels -- the golden-layout dungeon tests -- still gets them. Set
+ * when a run-mode game starts.
+ */
+extern bool RunDungeonRules;
+
 dungeon_type GetLevelType(int level);
+
+/**
+ * @brief [RUNS MOD] The depth `leveltype`'s content natively belongs to.
+ *
+ * Tileset-bound object art (cathedral sarcophagi, catacomb torches, nest pods, ...) is
+ * keyed to depth ranges in objdat, which assume the vanilla depth->tileset mapping.
+ * Under run rules a tileset can appear at any depth, so those checks use the current
+ * depth clamped into the tileset's own range instead. Returns currlevel otherwise.
+ */
+int TilesetContentLevel();
+
+/**
+ * @brief [RUNS MOD] The palette the current run level uses, picked from its synced seed
+ * among vanilla's four and the mod's TH4 recolours; empty when vanilla's random pick
+ * (LoadRndLvlPal) applies -- off run rules, and for the Nest and Crypt.
+ */
+std::string RunLevelPalettePath();
 void CreateDungeon(uint32_t rseed, lvl_entry entry);
 
 DVL_ALWAYS_INLINE constexpr bool InDungeonBounds(Point position)

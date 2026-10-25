@@ -277,7 +277,7 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
 - With quests retired, the classic quest uniques (Harlequin Crest, Ring of Truth,
   Empyrean Band, Optic Amulet, The Undead Crown, Griswold's Edge, Arkaine's Valor,
   Veil of Steel, + Bovine Plate on Hellfire) were dead data: their base items have
-  dropRate 0 and nothing referenced them. They now drop as **relics** — an 8% roll
+  dropRate 0 and nothing referenced them. They now drop as **relics** — a 25% roll (was 8%; see the loot pass)
   per boss vault (`TryDropRunRelic`, items.cpp), uniform over the relics whose
   depth gate (2/3/4/5/6/6/8/10/12, ordered by power) the run has reached, announced
   with "A relic of the old world!". Duplicates allowed: relics are loot, not
@@ -322,9 +322,40 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   stats matter, how the class plays, one run-specific tip each.
 
 **Feature ideas (next slices)**
-- [ ] Loot tuning pass via TSV (M4 remainder).
+- [x] Loot tuning pass (2026-10-25) — see below.
 - [ ] Fruit machine polish (remaining): Farnham win/lose voice barks, odds/EV tuning
       after playtest.
+
+**Loot tuning pass** ✅ 2026-10-25 (built, NOT yet playtested)
+- Audit: item level is already on the vanilla curve at every depth — trash drops at the
+  monster's base level (vanilla), chests/barrels/floor items at 2x depth (vanilla), and
+  the boss + vault at 2x depth (= a vanilla chest at that depth). Monster pools/levels are
+  vanilla per depth. So item LEVEL was not the problem; VOLUME was: vanilla's guaranteed
+  quest uniques (depths 5-13) are gone, extraction death wipes gear, and the vault was
+  shared by the whole party.
+- Vault: (3 + depth/4) items PER PLAYER in the game (was 2 + depth/5 shared), each
+  boss-grade via RollGamblePrizeItem (uper 15: 16% unique chance, affix tier 2x depth + 4,
+  same as the boss's own drop). Gold piles/tokens/gem unchanged.
+- Relic chance 8% -> 25% per vault (relics are the quest uniques' only source).
+- Trash drops and item levels deliberately unchanged (vanilla parity).
+**Dungeon rules: one exit, any tileset** (2026-10-25, built + drlg tests green, NOT yet playtested)
+- One staircase per run level, and it is the exit: generators skip the down stairs, the
+  town-shortcut stairs (5/9/13) and the hell gate under `RunDungeonRules`. Players arrive on
+  open floor in the farthest quarter of the level by walking distance from that exit
+  (`PlaceRunArrival`, trigs.cpp; seed-picked so co-op peers arrive together; kept clear of
+  objects and of monster spawns like stairs are). The portal remains the quick way back.
+- Tileset variety without losing progression (user: fully random tilesets 'lose the sense
+  of progression'): each run level uses its depth's own tileset 3 times in 4, otherwise the
+  band just above or below (Nest/Crypt only on Hellfire), rolled from the synced dungeon
+  seed (`RunTileset`, gendung.cpp). Palette is seed-picked too (`RunLevelPalettePath`): the
+  four vanilla palettes or four TH4 recolours shipped as `assets/levels/l<n>data/l<n>_rp<k>.pal`
+  (Cathedral/Catacombs/Caves/Hell; Caves get the strongest: Glacial, Lava Pits, Mossy
+  Grotto, Milk Rivers). Monster pools, item levels and trap strength follow DEPTH
+  (ItemsGetCurrlevel/AddTrap rebase the Hellfire bands by depth); the boss pool follows the
+  tileset. Tileset-bound object art loads via `TilesetContentLevel`; Crypt books / Na-Krul
+  gate only on real Crypt tiles; the automap names the run depth.
+- `RunDungeonRules` is a runtime flag set in StartGame, so the golden-layout dungeon tests
+  keep exercising vanilla generation.
 
 **Gambler's Tokens** ✅ shipped 2026-07-21
 - New base item `IDI_GAMBLETOKEN` (itemdat.tsv last row + enum; BLOOD_STONE icon,

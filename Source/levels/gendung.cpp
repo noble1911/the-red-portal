@@ -1,5 +1,6 @@
 #include "levels/gendung.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -12,6 +13,7 @@
 #include <expected.hpp>
 #include <magic_enum/magic_enum.hpp>
 
+#include "diablo.h"
 #include "engine/clx_sprite.hpp"
 #include "engine/load_file.hpp"
 #include "engine/random.hpp"
@@ -33,6 +35,7 @@
 #include "utils/is_of.hpp"
 #include "utils/log.hpp"
 #include "utils/status_macros.hpp"
+#include "utils/str_cat.hpp"
 
 namespace devilution {
 
@@ -390,7 +393,12 @@ std::optional<WorldTileSize> GetSizeForThemeRoom()
 }
 #endif
 
-dungeon_type GetLevelType(int level)
+bool RunDungeonRules = false;
+
+namespace {
+
+/** @brief Vanilla's depth -> tileset mapping. */
+dungeon_type VanillaLevelType(int level)
 {
 	if (level == 0)
 		return DTYPE_TOWN;
@@ -408,6 +416,94 @@ dungeon_type GetLevelType(int level)
 		return DTYPE_CRYPT;
 
 	return DTYPE_NONE;
+}
+
+/** @brief [RUNS MOD] A hash of a level's dungeon seed. DungeonSeeds are synced
+ * (CMD_RUNSEED) before any client generates the level, so every co-op peer gets the
+ * same value; `salt` keeps independent rolls (tileset, palette, ...) uncorrelated with
+ * each other and with PickRunBoss. */
+uint32_t RunSeedHash(int level, uint32_t salt)
+{
+	uint32_t h = DungeonSeeds[level] ^ salt;
+	h ^= h >> 16;
+	h *= 0x85EBCA6Bu;
+	h ^= h >> 13;
+	h *= 0xC2B2AE35u;
+	h ^= h >> 16;
+	return h;
+}
+
+/** @brief [RUNS MOD] The tileset a run level is built from: its depth's own tileset
+ * three times in four, otherwise the tileset of the band just above or below -- runs
+ * vary, but depth still reads as progress (Hell never turns up shallow). */
+dungeon_type RunTileset(int level)
+{
+	static constexpr dungeon_type Bands[] = { DTYPE_CATHEDRAL, DTYPE_CATACOMBS, DTYPE_CAVES, DTYPE_HELL, DTYPE_NEST, DTYPE_CRYPT };
+	const dungeon_type native = VanillaLevelType(level);
+	const uint32_t h = RunSeedHash(level, 0x9E3779B9u);
+	if (h % 4 != 0)
+		return native;
+
+	// The Nest and Crypt ship in the Hellfire MPQs.
+	const int count = gbIsHellfire ? 6 : 4;
+	int band = 0;
+	while (band < count - 1 && Bands[band] != native)
+		band++;
+	dungeon_type neighbours[2];
+	int numNeighbours = 0;
+	if (band > 0)
+		neighbours[numNeighbours++] = Bands[band - 1];
+	if (band + 1 < count)
+		neighbours[numNeighbours++] = Bands[band + 1];
+	return neighbours[(h >> 8) % numNeighbours];
+}
+
+} // namespace
+
+dungeon_type GetLevelType(int level)
+{
+	// [RUNS MOD] Run levels may borrow a neighbouring band's tileset; the arena keeps
+	// its vanilla handling.
+	if (RunDungeonRules && level >= 1 && level <= 24 && level != 16)
+		return RunTileset(level);
+
+	return VanillaLevelType(level);
+}
+
+std::string RunLevelPalettePath()
+{
+	if (!RunDungeonRules || !IsAnyOf(leveltype, DTYPE_CATHEDRAL, DTYPE_CATACOMBS, DTYPE_CAVES, DTYPE_HELL))
+		return {};
+	// Vanilla's four palettes plus the four TH4 recolours (`l<n>_rp<k>.pal`) shipped with
+	// the mod, picked from the seed rather than the game RNG so co-op peers match.
+	const int n = static_cast<int>(leveltype);
+	const int pick = static_cast<int>(RunSeedHash(currlevel, 0x5BD1E995u) % 8);
+	if (pick < 4)
+		return StrCat("levels\\l", n, "data\\l", n, "_", pick + 1, ".pal");
+	return StrCat("levels\\l", n, "data\\l", n, "_rp", pick - 3, ".pal");
+}
+
+int TilesetContentLevel()
+{
+	if (!RunDungeonRules)
+		return currlevel;
+	switch (leveltype) {
+	case DTYPE_CATHEDRAL:
+		return std::clamp<int>(currlevel, 1, 4);
+	case DTYPE_CATACOMBS:
+		return std::clamp<int>(currlevel, 5, 8);
+	case DTYPE_CAVES:
+		return std::clamp<int>(currlevel, 9, 12);
+	case DTYPE_HELL:
+		return std::clamp<int>(currlevel, 13, 15);
+	case DTYPE_NEST:
+		return std::clamp<int>(currlevel, 17, 20);
+	case DTYPE_CRYPT:
+		// 24 is Na-Krul's level, whose objects are quest machinery.
+		return std::clamp<int>(currlevel, 21, 23);
+	default:
+		return currlevel;
+	}
 }
 
 void CreateDungeon(uint32_t rseed, lvl_entry entry)

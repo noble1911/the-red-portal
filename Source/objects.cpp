@@ -1228,9 +1228,10 @@ void AddFlameLever(Object &flameLever)
 void AddTrap(Object &trap)
 {
 	int effectiveLevel = currlevel;
-	if (leveltype == DTYPE_NEST)
+	// [RUNS MOD] Rebase by depth band, not tileset: a shallow run Crypt would go negative.
+	if (RunDungeonRules ? (currlevel >= 17 && currlevel <= 20) : leveltype == DTYPE_NEST)
 		effectiveLevel -= 4;
-	else if (leveltype == DTYPE_CRYPT)
+	else if (RunDungeonRules ? currlevel >= 21 : leveltype == DTYPE_CRYPT)
 		effectiveLevel -= 8;
 
 	const int missileType = GenerateRnd((effectiveLevel / 3) + 1);
@@ -3720,9 +3721,12 @@ tl::expected<void, std::string> InitObjectGFX()
 		}
 	}
 
+	// [RUNS MOD] TilesetContentLevel, not currlevel: objdat's depth ranges stand in for
+	// "this tileset", which run levels decouple from depth.
+	const int contentLevel = TilesetContentLevel();
 	for (size_t id = 0, n = AllObjects.size(); id < n; ++id) {
 		const ObjectData &objectData = AllObjects[id];
-		if (objectData.minlvl != 0 && currlevel >= objectData.minlvl && currlevel <= objectData.maxlvl) {
+		if (objectData.minlvl != 0 && contentLevel >= objectData.minlvl && contentLevel <= objectData.maxlvl) {
 			if (IsAnyOf(static_cast<_object_id>(id), OBJ_TRAPL, OBJ_TRAPR) && leveltype == DTYPE_HELL) {
 				continue;
 			}
@@ -3828,16 +3832,19 @@ void InitObjects()
 
 		if (currlevel == 4 || currlevel == 8 || currlevel == 12)
 			AddStoryBooks();
-		if (currlevel == 21) {
+		// [RUNS MOD] The Crypt story books and Na-Krul's gate are built against crypt
+		// tiles; a run level at these depths may be any tileset.
+		const bool isCrypt = leveltype == DTYPE_CRYPT;
+		if (currlevel == 21 && isCrypt) {
 			AddCryptStoryBook(1);
-		} else if (currlevel == 22) {
+		} else if (currlevel == 22 && isCrypt) {
 			AddCryptStoryBook(2);
 			AddCryptStoryBook(3);
-		} else if (currlevel == 23) {
+		} else if (currlevel == 23 && isCrypt) {
 			AddCryptStoryBook(4);
 			AddCryptStoryBook(5);
 		}
-		if (currlevel == 24) {
+		if (currlevel == 24 && isCrypt) {
 			AddNakrulGate();
 		}
 		if (leveltype == DTYPE_CATHEDRAL) {

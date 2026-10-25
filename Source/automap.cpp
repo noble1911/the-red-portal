@@ -1465,7 +1465,9 @@ void DrawAutomapText(const Surface &out)
 		drawStringAndAdvanceLine(_(QuestLevelNames[setlvlnum]));
 	} else {
 		std::string description;
-		switch (leveltype) {
+		// [RUNS MOD] Run levels name their depth: any tileset can appear at any depth, so
+		// the Nest/Crypt numbering (depth - 16 / - 20) would read nonsense, even negative.
+		switch (RunDungeonRules && leveltype != DTYPE_TOWN ? DTYPE_NONE : leveltype) {
 		case DTYPE_NEST:
 			description = fmt::format(fmt::runtime(_("Level: Nest {:d}")), currlevel - 16);
 			break;

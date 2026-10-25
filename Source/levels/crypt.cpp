@@ -737,7 +737,8 @@ bool PlaceCryptStairs(lvl_entry entry)
 	}
 
 	// Place stairs down
-	if (currlevel != 24) {
+	// [RUNS MOD] A run's only staircase is the exit: no way down. See RunDungeonRules.
+	if (currlevel != 24 && !RunDungeonRules) {
 		position = PlaceMiniSet(L5STAIRSDOWN, DMAXX * DMAXY, true);
 		if (!position)
 			success = false;

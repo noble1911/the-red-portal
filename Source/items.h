@@ -681,6 +681,9 @@ void SpawnGamblerJackpot(int qlvlCap);
 void DropPrizeItem(Item prize, Point position);
 /** @brief [RUNS MOD] Builds (does not drop) a good-quality equipment prize around `lvl`. */
 Item RollGamblePrizeItem(int lvl);
+
+/** @brief [RUNS MOD] Rolls and drops one boss-vault item at `position` (synced like a monster drop). */
+void DropBossGradeItem(Point position);
 void SpawnBoy(int lvl);
 void SpawnHealer(int lvl);
 void MakeGoldStack(Item &goldItem, int value);

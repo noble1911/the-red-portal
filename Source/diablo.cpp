@@ -185,6 +185,8 @@ bool was_ui_init = false;
 
 void StartGame(interface_mode uMsg)
 {
+	// [RUNS MOD] Before anything can generate or type a level -- loading a save does both.
+	RunDungeonRules = RunsModEnabled;
 	CalcViewportGeometry();
 	cineflag = false;
 	InitCursor();
@@ -1497,11 +1499,17 @@ void CreateLevel(lvl_entry entry)
 	default:
 		app_fatal("CreateLevel");
 	}
+	// [RUNS MOD] Needs the exit trigger set up above.
+	PlaceRunArrival(entry);
 
 	if (leveltype != DTYPE_TOWN) {
 		Freeupstairs();
 	}
-	LoadRndLvlPal(leveltype);
+	// [RUNS MOD] Run levels pick their palette from the synced seed, TH4 recolours included.
+	if (const std::string runPalette = RunLevelPalettePath(); !runPalette.empty() && !HeadlessMode)
+		LoadPaletteAndInitBlending(runPalette.c_str());
+	else
+		LoadRndLvlPal(leveltype);
 }
 
 void UnstuckChargers()

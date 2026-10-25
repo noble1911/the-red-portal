@@ -5,8 +5,11 @@
  */
 #include "levels/trigs.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <optional>
+#include <vector>
 
 #include <fmt/format.h>
 
@@ -14,8 +17,10 @@
 #include "controls/control_mode.hpp"
 #include "controls/plrctrls.h"
 #include "cursor.h"
+#include "diablo.h"
 #include "diablo_msg.hpp"
 #include "game_mode.hpp"
+#include "levels/tile_properties.hpp"
 #include "multi.h"
 #include "portal.h"
 #include "runs_mod.h"
@@ -744,6 +749,73 @@ void Freeupstairs()
 			}
 		}
 	}
+}
+
+std::optional<Point> RunArrivalPosition;
+
+void PlaceRunArrival(lvl_entry entry)
+{
+	RunArrivalPosition = std::nullopt;
+	if (!RunDungeonRules || leveltype == DTYPE_TOWN || setlevel || numtrigs == 0)
+		return;
+
+	// Walking distance from the exit over open floor, so a spot just behind a wall
+	// doesn't count as far. The exit's own tile may be solid (it is the staircase), so
+	// it seeds the search without having to be walkable itself.
+	constexpr int Unreached = -1;
+	std::vector<int> distance(MAXDUNX * MAXDUNY, Unreached);
+	std::vector<Point> frontier;
+	const Point exit = trigs[0].position;
+	distance[exit.x * MAXDUNY + exit.y] = 0;
+	frontier.push_back(exit);
+	int farthest = 0;
+	for (size_t next = 0; next < frontier.size(); next++) {
+		const Point tile = frontier[next];
+		const int d = distance[tile.x * MAXDUNY + tile.y];
+		for (const Displacement step : { Displacement { 1, 0 }, Displacement { -1, 0 }, Displacement { 0, 1 }, Displacement { 0, -1 } }) {
+			const Point neighbour = tile + step;
+			if (!InDungeonBounds(neighbour) || distance[neighbour.x * MAXDUNY + neighbour.y] != Unreached || IsTileSolid(neighbour))
+				continue;
+			distance[neighbour.x * MAXDUNY + neighbour.y] = d + 1;
+			farthest = std::max(farthest, d + 1);
+			frontier.push_back(neighbour);
+		}
+	}
+
+	// Candidates: the farthest quarter of the reachable level, on tiles with open floor
+	// all round so a co-op party has room to spawn together.
+	const auto isOpen = [](Point tile) {
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dy = -1; dy <= 1; dy++) {
+				const Point around = tile + Displacement { dx, dy };
+				if (!InDungeonBounds(around) || IsTileSolid(around))
+					return false;
+			}
+		}
+		return true;
+	};
+	std::vector<Point> candidates;
+	for (const Point tile : frontier) {
+		if (distance[tile.x * MAXDUNY + tile.y] * 4 >= farthest * 3 && isOpen(tile))
+			candidates.push_back(tile);
+	}
+	if (candidates.empty())
+		return; // A level too cramped to have a far side keeps the vanilla arrival.
+
+	// The frontier order is fully determined by the level, so indexing it with the synced
+	// seed puts every client on the same tile without touching the game RNG.
+	uint32_t h = DungeonSeeds[currlevel] ^ 0x7F4A7C15u;
+	h ^= h >> 15;
+	h *= 0x2C1B3C6Du;
+	h ^= h >> 12;
+	RunArrivalPosition = candidates[h % candidates.size()];
+	// Keep objects off the arrival, as Freeupstairs does for stairs.
+	for (int dy = -2; dy <= 2; dy++) {
+		for (int dx = -2; dx <= 2; dx++)
+			dFlags[RunArrivalPosition->x + dx][RunArrivalPosition->y + dy] |= DungeonFlag::Populated;
+	}
+	if (entry == ENTRY_MAIN)
+		ViewPosition = *RunArrivalPosition;
 }
 
 bool ForceSKingTrig()

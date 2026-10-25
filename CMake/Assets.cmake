@@ -157,8 +157,24 @@ set(devilutionx_assets
   gendata/cutstartw.clx
   gendata/cutttw.clx
   gendata/pause.trn
+  levels/l1data/l1_rp1.pal
+  levels/l1data/l1_rp2.pal
+  levels/l1data/l1_rp3.pal
+  levels/l1data/l1_rp4.pal
   levels/l1data/sklkngt.dun
   levels/l2data/bonechat.dun
+  levels/l2data/l2_rp1.pal
+  levels/l2data/l2_rp2.pal
+  levels/l2data/l2_rp3.pal
+  levels/l2data/l2_rp4.pal
+  levels/l3data/l3_rp1.pal
+  levels/l3data/l3_rp2.pal
+  levels/l3data/l3_rp3.pal
+  levels/l3data/l3_rp4.pal
+  levels/l4data/l4_rp1.pal
+  levels/l4data/l4_rp2.pal
+  levels/l4data/l4_rp3.pal
+  levels/l4data/l4_rp4.pal
   levels/towndata/automap.dun
   levels/towndata/automap.amp
   lua_internal/get_lua_function_signature.lua

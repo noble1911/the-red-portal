@@ -1933,6 +1933,11 @@ bool PlaceCaveStairs(lvl_entry entry)
 	if (entry == ENTRY_MAIN)
 		ViewPosition = position->megaToWorld() + Displacement { 1, 3 };
 
+	// [RUNS MOD] A run's only staircase is the exit: no way down, no town shortcut.
+	// See RunDungeonRules.
+	if (RunDungeonRules)
+		return true;
+
 	// Place stairs down
 	position = PlaceMiniSet(L3DOWN);
 	if (!position)
@@ -1964,7 +1969,8 @@ bool PlaceNestStairs(lvl_entry entry)
 		ViewPosition = position->megaToWorld() + Displacement { 1, 3 };
 
 	// Place stairs down
-	if (currlevel != 20) {
+	// [RUNS MOD] A run's only staircase is the exit: no way down. See RunDungeonRules.
+	if (currlevel != 20 && !RunDungeonRules) {
 		position = PlaceMiniSet(L6DOWN);
 		if (!position)
 			return false;

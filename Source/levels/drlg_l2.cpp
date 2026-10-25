@@ -2652,6 +2652,11 @@ bool PlaceStairs(lvl_entry entry)
 	if (entry == ENTRY_MAIN)
 		ViewPosition = position->megaToWorld() + Displacement { 5, 4 };
 
+	// [RUNS MOD] A run's only staircase is the exit: no way down, no town shortcut.
+	// See RunDungeonRules.
+	if (RunDungeonRules)
+		return true;
+
 	// Place stairs down
 	position = PlaceMiniSet(DSTAIRS);
 	if (!position)

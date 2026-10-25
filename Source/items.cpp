@@ -468,10 +468,15 @@ int ItemsGetCurrlevel()
 		}
 	}
 
-	if (leveltype == DTYPE_NEST)
+	// [RUNS MOD] Vanilla rebases the Hellfire levels by tileset (Nest 17 counts as 9).
+	// Under run rules the tileset says nothing about depth, so rebase by depth band.
+	const bool nestBand = RunDungeonRules ? (currlevel >= 17 && currlevel <= 20) : leveltype == DTYPE_NEST;
+	const bool cryptBand = RunDungeonRules ? currlevel >= 21 : leveltype == DTYPE_CRYPT;
+
+	if (nestBand)
 		return currlevel - 8;
 
-	if (leveltype == DTYPE_CRYPT)
+	if (cryptBand)
 		return currlevel - 7;
 
 	return currlevel;
@@ -3189,8 +3194,10 @@ constexpr RunRelic RunRelics[] = {
 	{ UITEM_STEELVEIL, 12, false }, // Veil of Steel
 };
 
-/** Chance (percent) that a boss vault also holds a relic. */
-constexpr int RunRelicChancePct = 8;
+/** Chance (percent) that a boss vault also holds a relic. 25%, not the original 8%:
+ * vanilla hands out roughly five of these as guaranteed quest rewards across depths
+ * 5-13, and relics are now their only source. */
+constexpr int RunRelicChancePct = 25;
 
 void TryDropRunRelic(int depth, Point position)
 {
@@ -3238,6 +3245,13 @@ void DropPrizeItem(Item prize, Point position)
 	GetSuperItemSpace(position, static_cast<int8_t>(ii));
 	item.setNewAnimation(MyPlayer != nullptr && MyPlayer->pLvlLoad == 0);
 	NetSendCmdPItem(false, CMD_SPAWNITEM, item.position, item);
+}
+
+void DropBossGradeItem(Point position)
+{
+	// [RUNS MOD] One boss-vault item: a chest's level at this depth (2 x ItemsGetCurrlevel,
+	// which also rebases the Hellfire depths) rolled at boss grade, see RollGamblePrizeItem.
+	DropPrizeItem(RollGamblePrizeItem(std::clamp(ItemsGetCurrlevel() * 2, 1, 63)), position);
 }
 
 Item RollGamblePrizeItem(int lvl)

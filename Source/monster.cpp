@@ -3854,6 +3854,9 @@ tl::expected<void, std::string> InitMonsters()
 				DoVision(trigs[i].position + Displacement { s, t }, 15, MAP_EXP_NONE, false);
 		}
 	}
+	// [RUNS MOD] Same courtesy for the run arrival point, which is not a staircase.
+	if (RunArrivalPosition)
+		DoVision(*RunArrivalPosition, 15, MAP_EXP_NONE, false);
 	if (!gbIsSpawn)
 		RETURN_IF_ERROR(PlaceQuestMonsters());
 	if (!setlevel) {
@@ -3904,6 +3907,8 @@ tl::expected<void, std::string> InitMonsters()
 				DoUnVision(trigs[i].position + Displacement { s, t }, 15);
 		}
 	}
+	if (RunArrivalPosition)
+		DoUnVision(*RunArrivalPosition, 15);
 
 	return InitAllMonsterGFX();
 }
@@ -4290,10 +4295,21 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 			// ALONE, so nothing else would ever build these. `spawn` sends CMD_SPAWNITEM,
 			// which places the item on peers and still does the delta write and the item
 			// record -- a superset, so it replaces sendmsg rather than joining it.
-			const int vaultItems = 2 + static_cast<int>(currlevel) / 5;
+			//
+			// Item level stays on the vanilla curve (a chest's level at this depth); the
+			// vault pays in QUANTITY and unique odds instead. One vault is
+			// shared by the whole party, so its size is per player in the game -- at a
+			// flat size co-op split it. Each item is boss-grade (uper 15: the boss drop's
+			// 16% unique chance and +4 affix tier); see DropBossGradeItem.
+			int partySize = 0;
+			for (const Player &player : Players) {
+				if (player.plractive)
+					partySize++;
+			}
+			const int vaultItems = (3 + static_cast<int>(currlevel) / 4) * std::max(partySize, 1);
 			const int goldPiles = 2 + static_cast<int>(currlevel) / 10;
 			for (int i = 0; i < vaultItems; i++)
-				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/false, /*delta=*/false, /*spawn=*/true);
+				DropBossGradeItem(monster.position.tile);
 			for (int i = 0; i < goldPiles; i++)
 				CreateTypeItem(monster.position.tile, /*onlygood=*/false, ItemType::Gold, IMISC_NONE, /*sendmsg=*/false, /*delta=*/false, /*spawn=*/true);
 			// [RUNS MOD] A fistful of chips for Farnham: beating the boss buys a real

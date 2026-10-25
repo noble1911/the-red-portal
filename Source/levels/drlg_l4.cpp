@@ -1102,6 +1102,11 @@ bool PlaceStairs(lvl_entry entry)
 	if (entry == ENTRY_MAIN)
 		ViewPosition = position->megaToWorld() + Displacement { 6, 6 };
 
+	// [RUNS MOD] A run's only staircase is the exit: no way down, no town shortcut,
+	// no hell gate. See RunDungeonRules.
+	if (RunDungeonRules)
+		return true;
+
 	if (currlevel != 15) {
 		// Place stairs down
 		if (currlevel != 16) {

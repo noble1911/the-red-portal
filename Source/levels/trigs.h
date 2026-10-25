@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include <optional>
+
 #include "engine/point.hpp"
 #include "interfac.h"
 #include "levels/gendung.h"
@@ -38,6 +40,20 @@ void InitSChambTriggers();
 void InitPWaterTriggers();
 void InitVPTriggers();
 void Freeupstairs();
+
+/** @brief [RUNS MOD] Where players arrive on the current run level; empty off run rules. */
+extern std::optional<Point> RunArrivalPosition;
+
+/**
+ * @brief [RUNS MOD] Picks the run level's arrival point, far from its exit staircase.
+ *
+ * Under RunDungeonRules the only staircase is the exit, so arriving at it (vanilla's
+ * ENTRY_MAIN spot) would let a run be abandoned in one step. Players instead arrive on
+ * open floor in the farthest stretch of the level by walking distance, picked from the
+ * level's synced seed so co-op peers arrive together. Call after the level's triggers
+ * exist; sets ViewPosition for ENTRY_MAIN.
+ */
+void PlaceRunArrival(lvl_entry entry);
 void CheckTrigForce();
 void CheckTriggers();
 

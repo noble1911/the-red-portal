@@ -1136,7 +1136,9 @@ bool PlaceCathedralStairs(lvl_entry entry)
 	}
 
 	// Place stairs down
-	if (Quests[Q_LTBANNER].IsAvailable()) {
+	if (RunDungeonRules) {
+		// [RUNS MOD] A run's only staircase is the exit: no way down. See RunDungeonRules.
+	} else if (Quests[Q_LTBANNER].IsAvailable()) {
 		if (entry == ENTRY_PREV)
 			ViewPosition = SetPiece.position.megaToWorld() + Displacement { 3, 11 };
 	} else {
