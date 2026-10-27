@@ -4021,12 +4021,14 @@ void SpawnRunWaveMonster(Point target, uint32_t rngValue)
 {
 	// [RUNS MOD] Template selection must be deterministic across clients (the caller
 	// provides the rng value), and only types already in LevelMonsterTypes can spawn.
-	// Collect living, ordinary monsters and pick one as the template.
+	// Collect living, ordinary monsters and pick one as the template. Golems are never
+	// templates: the reserved golem slots sit active and alive in the holding cell
+	// without MFLAG_GOLEM, and echoing one spawns a friendly golem for player 0.
 	size_t candidates[MaxMonsters];
 	size_t candidateCount = 0;
 	for (size_t i = 0; i < ActiveMonsterCount; i++) {
 		const Monster &monster = Monsters[ActiveMonsters[i]];
-		if (monster.hitPoints <= 0 || monster.isPlayerMinion() || monster.isUnique())
+		if (monster.hitPoints <= 0 || monster.isPlayerMinion() || monster.isUnique() || monster.type().type == MT_GOLEM)
 			continue;
 		candidates[candidateCount++] = ActiveMonsters[i];
 	}
