@@ -3356,13 +3356,26 @@ Item RollGamblePrizeItem(int lvl)
 void SpawnGamblerJackpot(int qlvlCap)
 {
 	// [RUNS MOD] Roll tonight's displayed fruit-machine jackpot: a random unique whose
-	// base item is actually droppable (excludes quest bases) and whose level fits the
-	// cap -- the jackpot sits at the edge of earned progression, never past it. The
-	// item is display state only until triple crowns claim it (see ResolveGamble).
+	// base item is actually droppable (excludes quest bases) from the top of what the
+	// cap allows -- the jackpot sits at the edge of earned progression, never past it.
+	// The item is display state only until triple crowns claim it (see ResolveGamble).
+	//
+	// Only the top JackpotLevelBand levels under the cap qualify. Drawing from every
+	// unique up to the cap made the typical jackpot a level 5-8 item at any depth, since
+	// most uniques are low level -- a ~1-in-729 pull paying out worse than a routine
+	// vault drop. Past the highest unique level the band sits on the top uniques.
 	GamblerJackpot.clear();
 	if (!RunsModEnabled)
 		return;
-	std::vector<std::pair<size_t, _item_indexes>> pool;
+	constexpr int JackpotLevelBand = 8;
+	/** The band widens downward until it holds at least this many uniques. */
+	constexpr size_t JackpotMinPool = 4;
+	struct Candidate {
+		size_t uid;
+		_item_indexes baseIdx;
+		int level;
+	};
+	std::vector<Candidate> eligible;
 	for (size_t uid = 0; uid < UniqueItems.size(); uid++) {
 		const UniqueItem &unique = UniqueItems[uid];
 		if (unique.UIMinLvl > qlvlCap)
@@ -3373,13 +3386,20 @@ void SpawnGamblerJackpot(int qlvlCap)
 				continue;
 			if (base.dropRate == 0 || !IsItemAvailable(static_cast<int>(idx)))
 				break; // quest-only or unavailable base: this unique can't be a prize
-			pool.emplace_back(uid, static_cast<_item_indexes>(idx));
+			eligible.push_back({ uid, static_cast<_item_indexes>(idx), unique.UIMinLvl });
 			break;
 		}
 	}
-	if (pool.empty())
+	if (eligible.empty())
 		return;
-	const auto &[uid, baseIdx] = pool[static_cast<size_t>(GenerateRnd(static_cast<int>(pool.size())))];
+	std::stable_sort(eligible.begin(), eligible.end(), [](const Candidate &a, const Candidate &b) { return a.level > b.level; });
+	const int floorLevel = eligible.front().level - JackpotLevelBand;
+	size_t poolSize = 0;
+	while (poolSize < eligible.size() && (eligible[poolSize].level >= floorLevel || poolSize < JackpotMinPool))
+		poolSize++;
+	const Candidate &pick = eligible[static_cast<size_t>(GenerateRnd(static_cast<int>(poolSize)))];
+	const size_t uid = pick.uid;
+	const _item_indexes baseIdx = pick.baseIdx;
 	Item &item = GamblerJackpot;
 	GetItemAttrs(item, baseIdx, std::max<int>(1, UniqueItems[uid].UIMinLvl));
 	GetUniqueItem(*MyPlayer, item, static_cast<_unique_items>(uid));

@@ -254,6 +254,14 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   max(4, deepest+1)) shown by name and inspectable; triple crowns (~1 in 2,460)
   claim it. Session state, rerolled with the vendor restock on boss kill; once
   claimed it stays gone until the next boss.
+  - (2026-10-27) The cap in code is max(4, 2 x access depth) and triple crowns are
+    1 in 729 at today's weights (the line above predates both). The pick now comes from the
+    top 8 unique levels under it (widened to at least 4 uniques), not every unique
+    up to it: most uniques are level 1-8, so a uniform draw made the typical jackpot a
+    level 5-8 item at any depth. Past the highest unique level (27, reached at access
+    depth 14) the band sits on the top uniques. The inspect screen now lists the
+    unique's powers (it showed only damage/durability/requirements, because
+    PrintStoreItem reads prefix/suffix slots and uniques keep their powers elsewhere).
 
 **Restored cut content** ✅ shipped 2026-07-21 (data-only; zero shipped assets)
 - Diablo 1 shipped monster rows that never spawn (`availability=Never`); we verified
