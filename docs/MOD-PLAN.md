@@ -288,9 +288,16 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   Veil of Steel, + Bovine Plate on Hellfire) were dead data: their base items have
   dropRate 0 and nothing referenced them. They now drop as **relics** — a 25% roll (was 8%; see the loot pass)
   per boss vault (`TryDropRunRelic`, items.cpp), uniform over the relics whose
-  depth gate (2/3/4/5/6/6/8/10/12, ordered by power) the run has reached, announced
+  depth gate the run has reached, announced
   with "A relic of the old world!". Duplicates allowed: relics are loot, not
   achievements. Twinned runs roll per twin vault.
+- **Relic window** (2026-10-27): a vault rolls only relics gated within 3 levels of its
+  depth (runs deeper than the top gate count as that gate, so 13-24 keep rolling the top
+  three). Gates: Ring of Truth 2, Empyrean Band 3, Optic Amulet 4, Bovine Plate 6
+  (Hellfire), Harlequin Crest 8, Griswold's Edge 9, Arkaine's Valor 10, Veil of Steel 12.
+  Harlequin moved from 2: playtest found a 200-gold depth-4 scroll farmed an endgame
+  helm after a death. Shallow vaults now pay the weak relics only, and deep vaults
+  are no longer diluted by them.
 - Origin: a survey of permissively-licensed DevilutionX mods (wkdmod SUL, Middle
   Earth Mod Unlicense) for portable content. Verdict recorded for the future:
   wkdmod's original items all depend on their custom engine powers (IPL_EMPOWER,

@@ -3176,8 +3176,10 @@ void DropGambleToken(Point position, bool sendmsg)
 // [RUNS MOD] The classic quest uniques are unobtainable in run mode: their quests are
 // retired and their base items never drop (dropRate 0), which left the most iconic
 // items in the game as dead data. They return as RELICS -- a small chance in every
-// boss vault, gated by depth roughly in order of power. Duplicates are allowed;
-// relics are loot, not achievements.
+// boss vault, gated by depth roughly in order of power. A vault only rolls relics
+// gated within RunRelicWindow levels of its depth, so the strong ones can't be
+// farmed from cheap shallow runs and deep runs aren't diluted by the weak ones.
+// Duplicates are allowed; relics are loot, not achievements.
 struct RunRelic {
 	_unique_items uid;
 	int minDepth;
@@ -3185,17 +3187,22 @@ struct RunRelic {
 };
 
 constexpr RunRelic RunRelics[] = {
-	{ UITEM_HARCREST, 2, false },   // Harlequin Crest
-	{ UITEM_TRING, 3, false },      // Ring of Truth
-	{ UITEM_INFRARING, 4, false },  // Empyrean Band
-	{ UITEM_OPTAMULET, 5, false },  // Optic Amulet
+	{ UITEM_TRING, 2, false },      // Ring of Truth
+	{ UITEM_INFRARING, 3, false },  // Empyrean Band
+	{ UITEM_OPTAMULET, 4, false },  // Optic Amulet
 	// The Undead Crown is deliberately absent: the Skeleton King's base type carries
 	// Uniq(SKCROWN) treasure, so he already drops it whenever he is the run boss.
 	{ UITEM_BOVINE, 6, true },      // Bovine Plate
-	{ UITEM_GRISWOLD, 8, false },   // Griswold's Edge
+	// Harlequin Crest was gated at 2, which made a 200-gold depth-4 scroll a farm for
+	// an endgame helm.
+	{ UITEM_HARCREST, 8, false },   // Harlequin Crest
+	{ UITEM_GRISWOLD, 9, false },   // Griswold's Edge
 	{ UITEM_ARMOFVAL, 10, false },  // Arkaine's Valor
 	{ UITEM_STEELVEIL, 12, false }, // Veil of Steel
 };
+
+/** A vault rolls only relics gated at most this many levels below its depth. */
+constexpr int RunRelicWindow = 3;
 
 /** Chance (percent) that a boss vault also holds a relic. 25%, not the original 8%:
  * vanilla hands out roughly five of these as guaranteed quest rewards across depths
@@ -3206,10 +3213,17 @@ void TryDropRunRelic(int depth, Point position)
 {
 	if (GenerateRnd(100) >= RunRelicChancePct)
 		return;
+	// Past the deepest gate the window stays on the top relics instead of emptying.
+	int deepestGate = 0;
+	for (const RunRelic &relic : RunRelics) {
+		if (!relic.hellfireOnly || gbIsHellfire)
+			deepestGate = std::max(deepestGate, relic.minDepth);
+	}
+	depth = std::min(depth, deepestGate);
 	_unique_items pool[std::size(RunRelics)];
 	size_t count = 0;
 	for (const RunRelic &relic : RunRelics) {
-		if (depth < relic.minDepth)
+		if (depth < relic.minDepth || relic.minDepth < depth - RunRelicWindow)
 			continue;
 		if (relic.hellfireOnly && !gbIsHellfire)
 			continue;
