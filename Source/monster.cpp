@@ -3393,6 +3393,25 @@ void EnsureMonsterIndexIsActive(size_t monsterId)
 	}
 }
 
+/** @brief [RUNS MOD] Toughens a run wave monster by its overtime tier: +20% hit points,
+ * +10% damage and +2 armour per tier. Tier 0 (every non-wave spawn) changes nothing. */
+void ApplyRunWaveTier(Monster &monster, int tier)
+{
+	tier = std::clamp<int>(tier, 0, MaxRunWaveTier);
+	if (tier == 0)
+		return;
+	const auto scaleDamage = [tier](uint8_t damage) {
+		return static_cast<uint8_t>(std::min(damage * (10 + tier) / 10, 255));
+	};
+	monster.maxHitPoints = monster.maxHitPoints * (5 + tier) / 5;
+	monster.hitPoints = monster.maxHitPoints;
+	monster.minDamage = scaleDamage(monster.minDamage);
+	monster.maxDamage = scaleDamage(monster.maxDamage);
+	monster.minDamageSpecial = scaleDamage(monster.minDamageSpecial);
+	monster.maxDamageSpecial = scaleDamage(monster.maxDamageSpecial);
+	monster.armorClass = static_cast<uint8_t>(std::min(monster.armorClass + 2 * tier, 255));
+}
+
 void InitGolem(devilution::Monster &monster, uint8_t golemOwnerPlayerId, int16_t golemSpellLevel)
 {
 	monster.flags |= MFLAG_GOLEM;
@@ -3954,7 +3973,7 @@ Monster *AddMonster(Point position, Direction dir, size_t typeIndex, bool inMap)
 	return nullptr;
 }
 
-void SpawnMonster(Point position, Direction dir, size_t typeIndex)
+void SpawnMonster(Point position, Direction dir, size_t typeIndex, uint8_t runWaveTier)
 {
 	if (ActiveMonsterCount >= MaxMonsters)
 		return;
@@ -3967,8 +3986,10 @@ void SpawnMonster(Point position, Direction dir, size_t typeIndex)
 	ActiveMonsterCount += 1;
 	const uint32_t seed = GetLCGEngineState();
 	// Update local state immediately to increase ActiveMonsterCount instantly (this allows multiple monsters to be spawned in one game tick)
-	InitializeSpawnedMonster(position, dir, typeIndex, monsterIndex, seed, 0, 0);
-	NetSendCmdSpawnMonster(position, dir, static_cast<uint16_t>(typeIndex), static_cast<uint16_t>(monsterIndex), seed, 0, 0);
+	// [RUNS MOD] A non-golem spawn borrows the golem spell level field for its run wave
+	// tier (see ApplyRunWaveTier).
+	InitializeSpawnedMonster(position, dir, typeIndex, monsterIndex, seed, 0, runWaveTier);
+	NetSendCmdSpawnMonster(position, dir, static_cast<uint16_t>(typeIndex), static_cast<uint16_t>(monsterIndex), seed, 0, runWaveTier);
 }
 
 void LoadDeltaSpawnedMonster(size_t typeIndex, size_t monsterId, uint32_t seed, uint8_t golemOwnerPlayerId, int16_t golemSpellLevel)
@@ -3981,6 +4002,8 @@ void LoadDeltaSpawnedMonster(size_t typeIndex, size_t monsterId, uint32_t seed, 
 	InitMonster(monster, Direction::South, typeIndex, position);
 	if (monster.type().type == MT_GOLEM) {
 		InitGolem(monster, golemOwnerPlayerId, golemSpellLevel);
+	} else {
+		ApplyRunWaveTier(monster, golemSpellLevel);
 	}
 }
 
@@ -4007,6 +4030,9 @@ void InitializeSpawnedMonster(Point position, Direction dir, size_t typeIndex, s
 	monster.occupyTile(position, false);
 	InitMonster(monster, dir, typeIndex, position);
 
+	if (monster.type().type != MT_GOLEM)
+		ApplyRunWaveTier(monster, golemSpellLevel);
+
 	if (monster.type().type == MT_GOLEM) {
 		InitGolem(monster, golemOwnerPlayerId, golemSpellLevel);
 		StartSpecialStand(monster, dir);
@@ -4017,7 +4043,7 @@ void InitializeSpawnedMonster(Point position, Direction dir, size_t typeIndex, s
 	}
 }
 
-void SpawnRunWaveMonster(Point target, uint32_t rngValue)
+void SpawnRunWaveMonster(Point target, uint32_t rngValue, uint8_t tier)
 {
 	// [RUNS MOD] Template selection must be deterministic across clients (the caller
 	// provides the rng value), and only types already in LevelMonsterTypes can spawn.
@@ -4049,7 +4075,7 @@ void SpawnRunWaveMonster(Point target, uint32_t rngValue)
 		return {};
 	}).value_or(target + Displacement { 1, 1 });
 
-	SpawnMonster(spawnAt, tmpl.direction, typeIndex);
+	SpawnMonster(spawnAt, tmpl.direction, typeIndex, tier);
 }
 
 void HealAbandonedRunBoss()

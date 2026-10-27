@@ -129,6 +129,13 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   (HUD timer; runs in real ticks even from town — it is the looting/corpse-run
   window). At zero the portal seals itself (no re-entry, corpse loot gone) and waves
   go overtime (every 10 s, max size) while anyone lingers — the stairs still work.
+  Overtime escalates: one tier per 20 s lingered (cap 15), each tier +20% HP, +10%
+  damage, +2 AC on the wave monsters (`ApplyRunWaveTier`; the tier rides the spawn
+  message's golem-spell-level field so co-op clients agree). Every other overtime
+  wave rises from the exit stairs, so camping them is no free escape. Drops stay
+  normal: lingering is risk vs reward, and the risk now climbs until it wins.
+  Wave templates never include golems (the reserved golem slots used to be echoed
+  as friendly golems).
 - **Volatile** affix (new): +40-80% item drops, but the whole clock runs 30-60%
   faster.
 - Impl: `Source/run_clock.h/.cpp` (deterministic GameLogic-tick driven; session-only

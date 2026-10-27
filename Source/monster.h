@@ -519,7 +519,7 @@ Monster *AddMonster(Point position, Direction dir, size_t typeIndex, bool inMap)
  * The command is only executed for the level owner, to prevent desyncs in multiplayer.
  * The level owner sends a CMD_SPAWNMONSTER-message to the other players.
  */
-void SpawnMonster(Point position, Direction dir, size_t typeIndex);
+void SpawnMonster(Point position, Direction dir, size_t typeIndex, uint8_t runWaveTier = 0);
 /**
  * @brief Loads data for a dynamically spawned monster when entering a level in multiplayer.
  */
@@ -586,8 +586,12 @@ void SpawnGolem(const Player &player, Point position, uint8_t spellLevel);
 /** @brief [RUNS MOD] Spawns one escalation-wave monster near `target` for the run
  * clock: picks a living non-boss monster on the level as the template (only types
  * already registered on the level can spawn) using the caller's deterministic
- * `rngValue`, and routes through SpawnMonster (level-owner gated + broadcast). */
-void SpawnRunWaveMonster(Point target, uint32_t rngValue);
+ * `rngValue`, and routes through SpawnMonster (level-owner gated + broadcast).
+ * `tier` is the overtime escalation: each tier adds 20% hit points, 10% damage and
+ * 2 armour, and travels in the spawn message so every client builds the same monster. */
+void SpawnRunWaveMonster(Point target, uint32_t rngValue, uint8_t tier = 0);
+/** @brief [RUNS MOD] Highest overtime escalation tier a wave monster can carry. */
+constexpr uint8_t MaxRunWaveTier = 15;
 /** @brief [RUNS MOD] Heals any wounded, living run boss to full. Called when the run
  * level is re-entered after being abandoned (no player held it), so the boss cannot
  * be whittled down across potion trips to town. */

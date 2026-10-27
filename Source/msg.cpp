@@ -2706,7 +2706,11 @@ size_t OnSpawnMonster(const TCmdSpawnMonster &message, const Player &player)
 	if (golemOwnerPlayerId >= Players.size()) {
 		return sizeof(message);
 	}
-	const uint8_t golemSpellLevel = std::min(message.golemSpellLevel, static_cast<uint8_t>(MaxSpellLevel + Players[golemOwnerPlayerId]._pISplLvlAdd));
+	// Type index 0 is always the golem. Any other spawn carries a run wave tier in this
+	// field instead, which must not be capped by the (unrelated) owner's spell levels.
+	const uint8_t golemSpellLevel = typeIndex == 0
+	    ? std::min(message.golemSpellLevel, static_cast<uint8_t>(MaxSpellLevel + Players[golemOwnerPlayerId]._pISplLvlAdd))
+	    : std::min(message.golemSpellLevel, MaxRunWaveTier);
 
 	DLevel &deltaLevel = GetDeltaLevel(player);
 

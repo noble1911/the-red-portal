@@ -45,12 +45,19 @@ constexpr int WaveSizeCap = 4;
 constexpr int CollapseSeconds = 180;
 /** Overtime wave interval once the run has sealed with players still inside. */
 constexpr int OvertimeWaveSeconds = 10;
+/** Overtime waves toughen one tier per this many seconds lingered (see ApplyRunWaveTier):
+ * staying pays at first, then the odds turn and the player has to judge when to leave. */
+constexpr int OvertimeTierSeconds = 20;
 
 /** Ticks accrued by the run (drives grace + wave pacing). Runs while anyone is on
  * the run level OR while the portal stands open (fester), so leaving to restock
  * never pauses the dungeon's escalation. */
 int RunClockTicks = 0;
 int WavesSpawned = 0;
+/** Overtime waves spawned so far; odd ones come up from the exit stairs. */
+int OvertimeWaves = 0;
+/** Ticks spent in overtime on the run level (drives the overtime tier). */
+int OvertimeTicks = 0;
 bool Warned30 = false;
 bool Warned10 = false;
 
@@ -85,7 +92,9 @@ uint32_t WaveRngNext(uint32_t &state)
 	return state >> 8;
 }
 
-void SpawnWave(int size)
+/** Spawns `size` wave monsters around a player on the run level -- or, with
+ * `atExit`, around the exit staircase, so camping the stairs is no free escape. */
+void SpawnWave(int size, uint8_t tier = 0, bool atExit = false)
 {
 	// Deterministic selection: same picks on every client that is on the level; the
 	// actual spawn is level-owner gated inside SpawnMonster and broadcast from there.
@@ -104,8 +113,10 @@ void SpawnWave(int size)
 	if (target == nullptr)
 		return;
 
+	// Under RunDungeonRules the level's only staircase is trigs[0] (see PlaceRunArrival).
+	const Point around = atExit && RunDungeonRules && numtrigs > 0 ? trigs[0].position : target->position.tile;
 	for (int i = 0; i < size; i++)
-		SpawnRunWaveMonster(target->position.tile, WaveRngNext(rng));
+		SpawnRunWaveMonster(around, WaveRngNext(rng), tier);
 }
 
 } // namespace
@@ -167,10 +178,17 @@ void ProcessRunClock()
 
 	const bool overtime = RunCollapseArmed && RunCollapseTicksLeft == 0;
 	if (overtime) {
-		// Post-seal: relentless max-size waves until everyone leaves. RunClockTicks
+		// Post-seal: relentless max-size waves until everyone leaves, each tougher than
+		// the last, and every other one rising from the exit stairs. RunClockTicks
 		// advances exactly once per tick, so the modulo fires once per interval.
-		if (onRunLevel && RunClockTicks % ScaledTicks(OvertimeWaveSeconds) == 0)
-			SpawnWave(WaveSizeCap);
+		if (!onRunLevel)
+			return;
+		OvertimeTicks++;
+		if (RunClockTicks % ScaledTicks(OvertimeWaveSeconds) == 0) {
+			const int tier = std::min<int>(OvertimeTicks / ScaledTicks(OvertimeTierSeconds), MaxRunWaveTier);
+			SpawnWave(WaveSizeCap, static_cast<uint8_t>(tier), OvertimeWaves % 2 == 1);
+			OvertimeWaves++;
+		}
 		return;
 	}
 
@@ -221,6 +239,8 @@ void ResetRunClock()
 {
 	RunClockTicks = 0;
 	WavesSpawned = 0;
+	OvertimeWaves = 0;
+	OvertimeTicks = 0;
 	RunCollapseArmed = false;
 	RunCollapseTicksLeft = 0;
 	Warned30 = false;

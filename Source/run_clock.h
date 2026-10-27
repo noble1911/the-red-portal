@@ -8,7 +8,9 @@
  *    (without spawning), so town trips return to a hotter dungeon.
  *  - Collapse: killing the run boss arms a countdown; at zero the hub portal seals
  *    for good (no re-entry, corpse loot lost) and waves shift into overtime pace
- *    while anyone lingers. The up-stairs always work -- sealed never means trapped.
+ *    while anyone lingers, toughening the longer they stay, with every other wave
+ *    rising from the exit stairs. The stairs always work -- sealed never means
+ *    trapped, but leaving late can mean fighting through to them.
  * The Volatile scroll affix accelerates the whole clock.
  *
  * All state is session-only (like the dungeon-portal state itself) and all timing is
