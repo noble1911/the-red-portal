@@ -307,6 +307,7 @@ void InitMonster(Monster &monster, Direction rd, size_t typeIndex, Point positio
 	monster.pathCount = 0;
 	monster.enemy = 0;
 	monster.isInvalid = false;
+	monster.runWaveTier = 0;
 	monster.uniqueType = UniqueMonsterType::None;
 	monster.activeForTicks = 0;
 	monster.lightId = NO_LIGHT;
@@ -3394,10 +3395,12 @@ void EnsureMonsterIndexIsActive(size_t monsterId)
 }
 
 /** @brief [RUNS MOD] Toughens a run wave monster by its overtime tier: +20% hit points,
- * +10% damage and +2 armour per tier. Tier 0 (every non-wave spawn) changes nothing. */
+ * +10% damage and +2 armour per tier, and MonsterDeath scales its XP with the hit
+ * points. Tier 0 (every non-wave spawn) changes nothing. */
 void ApplyRunWaveTier(Monster &monster, int tier)
 {
 	tier = std::clamp<int>(tier, 0, MaxRunWaveTier);
+	monster.runWaveTier = static_cast<uint8_t>(tier);
 	if (tier == 0)
 		return;
 	const auto scaleDamage = [tier](uint8_t damage) {
@@ -4256,6 +4259,10 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 				exper = 4 * (exper + 1000);
 			exper *= 2;
 		}
+		// [RUNS MOD] Overtime wave monsters pay XP in step with their extra hit points
+		// (see ApplyRunWaveTier), so XP per minute holds while the danger climbs.
+		if (monster.runWaveTier > 0)
+			exper = exper * (5 + monster.runWaveTier) / 5;
 		// [RUNS MOD] Scroll "experience" modifier boosts XP from kills on the run level.
 		if (ActiveRunMods.xpPct != 0)
 			exper = static_cast<unsigned>(ApplyPct(static_cast<int>(exper), ActiveRunMods.xpPct));

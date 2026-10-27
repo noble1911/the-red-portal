@@ -132,8 +132,10 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   Overtime escalates: one tier per 20 s lingered (cap 15), each tier +20% HP, +10%
   damage, +2 AC on the wave monsters (`ApplyRunWaveTier`; the tier rides the spawn
   message's golem-spell-level field so co-op clients agree). Every other overtime
-  wave rises from the exit stairs, so camping them is no free escape. Drops stay
-  normal: lingering is risk vs reward, and the risk now climbs until it wins.
+  wave rises from the exit stairs, so camping them is no free escape. XP scales with
+  the HP (+20% per tier), so XP per minute holds while the danger climbs; drops stay
+  normal (the vault is the loot jackpot). Lingering is risk vs reward, and the risk
+  climbs until it wins.
   Wave templates never include golems (the reserved golem slots used to be echoed
   as friendly golems).
 - **Volatile** affix (new): +40-80% item drops, but the whole clock runs 30-60%

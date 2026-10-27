@@ -287,6 +287,8 @@ struct Monster { // note: missing field _mAFNum
 	uint8_t leader;
 	LeaderRelation leaderRelation;
 	uint8_t packSize;
+	/** [RUNS MOD] Overtime escalation tier of a run wave monster; 0 for everything else. */
+	uint8_t runWaveTier;
 	int8_t lightId;
 
 	static constexpr uint8_t NoLeader = -1;
