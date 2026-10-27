@@ -71,7 +71,8 @@ void FreeRunIconSprites();
 bool RunIconsAvailable();
 
 /**
- * @brief [RUNS MOD] Icons for the mod's own base items (Sallet, Dread Plate, ...).
+ * @brief [RUNS MOD] Icons for the mod's own base items (Sallet, Dread Plate, ...) and
+ * relics (Thornstring, Archmage's Mantle, ...).
  *
  * Unlike the RGB icons above these are frames lifted from The Hell 4's inventory sheet,
  * already drawn in Diablo's item palette range, so they ship as an ordinary CEL sheet
@@ -82,7 +83,7 @@ bool RunIconsAvailable();
  * frame), so the constant below is part of the data format: keep the two in step.
  */
 constexpr int RunItemCursFirst = 400;
-constexpr int NumRunItemIcons = 20;
+constexpr int NumRunItemIcons = 33;
 
 constexpr bool IsRunItemCurs(int curs)
 {

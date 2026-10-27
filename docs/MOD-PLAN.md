@@ -292,12 +292,26 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   with "A relic of the old world!". Duplicates allowed: relics are loot, not
   achievements. Twinned runs roll per twin vault.
 - **Relic window** (2026-10-27): a vault rolls only relics gated within 3 levels of its
-  depth (runs deeper than the top gate count as that gate, so 13-24 keep rolling the top
-  three). Gates: Ring of Truth 2, Empyrean Band 3, Optic Amulet 4, Bovine Plate 6
-  (Hellfire), Harlequin Crest 8, Griswold's Edge 9, Arkaine's Valor 10, Veil of Steel 12.
-  Harlequin moved from 2: playtest found a 200-gold depth-4 scroll farmed an endgame
-  helm after a death. Shallow vaults now pay the weak relics only, and deep vaults
-  are no longer diluted by them.
+  depth (runs deeper than the top gate count as that gate). Harlequin Crest moved from
+  2 to 8: playtest found a 200-gold depth-4 scroll farmed an endgame helm after a death.
+  Shallow vaults pay the weak relics only, and deep vaults are no longer diluted by them.
+- **Mod relics** (2026-10-27): thirteen new relics give every window something for each
+  role -- melee (Warrior/Barbarian), archer (Rogue/Bard), caster (Sorcerer; Monk on the
+  staves) -- and carry Hellfire runs to depth 21. Relic-only bases (dropRate 0, tags
+  `RELIC_*`) at the end of itemdat.tsv, icons 420-432 lifted from TH4's TH3objcurs.cel
+  into runitems.cel; uniques appended to both unique tables (Hellfire-only ones to the
+  Hellfire table). `RunRelics` names relics rather than indexing `_unique_items`, and a
+  static_assert checks every window from depth 5 serves all three roles.
+
+  | Gate | Any | Melee | Archer | Caster |
+  |---|---|---|---|---|
+  | 2-4 | Ring of Truth (2), Empyrean Band (3) | | Thornstring (4) | Optic Amulet (4) |
+  | 5-8 | Harlequin Crest (8) | Emberfang (5), Bovine Plate (6, HF) | Bloodfletch (8) | The Ashen Rod (7) |
+  | 9-14 | Arkaine's Valor (10) | Griswold's Edge (9), Veil of Steel (12) | Skyreaver (12) | Stormcaller's Eye (11), Ring of the Magi (14) |
+  | 16-21 (HF) | | Ravager (16), Dawnbreaker (20) | Nightwing (16), Heartseeker (20) | Staff of Endless Night (17), Archmage's Mantle (21) |
+
+  Item recreation's vanilla `iseed > 109` bound became `UniqueItems.size()`: relics past
+  Hellfire's last unique would otherwise be cleared on sync/load.
 - Origin: a survey of permissively-licensed DevilutionX mods (wkdmod SUL, Middle
   Earth Mod Unlicense) for portable content. Verdict recorded for the future:
   wkdmod's original items all depend on their custom engine powers (IPL_EMPOWER,

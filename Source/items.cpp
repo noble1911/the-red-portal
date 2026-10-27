@@ -3180,29 +3180,85 @@ void DropGambleToken(Point position, bool sendmsg)
 // gated within RunRelicWindow levels of its depth, so the strong ones can't be
 // farmed from cheap shallow runs and deep runs aren't diluted by the weak ones.
 // Duplicates are allowed; relics are loot, not achievements.
+//
+// The mod adds relics of its own (relic-only bases in itemdat.tsv, drawn with The Hell
+// 4's art) so every window holds something for each kind of hero: melee (Warrior,
+// Barbarian), archer (Rogue, Bard) and caster (Sorcerer; Monk on the staves). Each
+// role's gates are at most RunRelicWindow + 1 apart, so no window skips a role. Relics
+// are named, not enum-indexed: the mod's uniques have no _unique_items value and sit
+// at different indices in Diablo's and Hellfire's unique tables.
+enum class RelicRole : uint8_t {
+	Any,
+	Melee,
+	Archer,
+	Caster,
+};
+
 struct RunRelic {
-	_unique_items uid;
+	std::string_view name;
 	int minDepth;
 	bool hellfireOnly;
+	RelicRole role;
 };
 
 constexpr RunRelic RunRelics[] = {
-	{ UITEM_TRING, 2, false },      // Ring of Truth
-	{ UITEM_INFRARING, 3, false },  // Empyrean Band
-	{ UITEM_OPTAMULET, 4, false },  // Optic Amulet
+	{ "Ring of Truth", 2, false, RelicRole::Any },
+	{ "Empyrean Band", 3, false, RelicRole::Any },
+	{ "Optic Amulet", 4, false, RelicRole::Caster },
+	{ "Thornstring", 4, false, RelicRole::Archer },
+	{ "Emberfang", 5, false, RelicRole::Melee },
 	// The Undead Crown is deliberately absent: the Skeleton King's base type carries
 	// Uniq(SKCROWN) treasure, so he already drops it whenever he is the run boss.
-	{ UITEM_BOVINE, 6, true },      // Bovine Plate
+	{ "Bovine Plate", 6, true, RelicRole::Melee },
+	{ "The Ashen Rod", 7, false, RelicRole::Caster },
 	// Harlequin Crest was gated at 2, which made a 200-gold depth-4 scroll a farm for
 	// an endgame helm.
-	{ UITEM_HARCREST, 8, false },   // Harlequin Crest
-	{ UITEM_GRISWOLD, 9, false },   // Griswold's Edge
-	{ UITEM_ARMOFVAL, 10, false },  // Arkaine's Valor
-	{ UITEM_STEELVEIL, 12, false }, // Veil of Steel
+	{ "Harlequin Crest", 8, false, RelicRole::Any },
+	{ "Bloodfletch", 8, false, RelicRole::Archer },
+	{ "Griswold's Edge", 9, false, RelicRole::Melee },
+	{ "Arkaine's Valor", 10, false, RelicRole::Any },
+	{ "Stormcaller's Eye", 11, false, RelicRole::Caster },
+	{ "Veil of Steel", 12, false, RelicRole::Melee },
+	{ "Skyreaver", 12, false, RelicRole::Archer },
+	{ "Ring of the Magi", 14, false, RelicRole::Caster },
+	// The Nest and Crypt (17-24) only exist under Hellfire.
+	{ "Ravager", 16, true, RelicRole::Melee },
+	{ "Nightwing", 16, true, RelicRole::Archer },
+	{ "Staff of Endless Night", 17, true, RelicRole::Caster },
+	{ "Dawnbreaker", 20, true, RelicRole::Melee },
+	{ "Heartseeker", 20, true, RelicRole::Archer },
+	{ "Archmage's Mantle", 21, true, RelicRole::Caster },
 };
 
 /** A vault rolls only relics gated at most this many levels below its depth. */
 constexpr int RunRelicWindow = 3;
+
+/** True if every relic window from depth 5 on (the first with a gate for all three
+ * roles) offers each role at least one relic of its own, in Diablo or Hellfire. Depths
+ * past the deepest gate reuse its window, as TryDropRunRelic does. */
+constexpr bool EveryRelicWindowServesEveryRole(bool hellfire)
+{
+	int deepestGate = 0;
+	for (const RunRelic &relic : RunRelics) {
+		if (!relic.hellfireOnly || hellfire)
+			deepestGate = std::max(deepestGate, relic.minDepth);
+	}
+	for (int depth = 5; depth <= deepestGate; depth++) {
+		for (const RelicRole role : { RelicRole::Melee, RelicRole::Archer, RelicRole::Caster }) {
+			bool served = false;
+			for (const RunRelic &relic : RunRelics) {
+				if (relic.role == role && (!relic.hellfireOnly || hellfire)
+				    && relic.minDepth <= depth && relic.minDepth >= depth - RunRelicWindow)
+					served = true;
+			}
+			if (!served)
+				return false;
+		}
+	}
+	return true;
+}
+static_assert(EveryRelicWindowServesEveryRole(false), "a Diablo relic window has no relic for some role");
+static_assert(EveryRelicWindowServesEveryRole(true), "a Hellfire relic window has no relic for some role");
 
 /** Chance (percent) that a boss vault also holds a relic. 25%, not the original 8%:
  * vanilla hands out roughly five of these as guaranteed quest rewards across depths
@@ -3220,18 +3276,22 @@ void TryDropRunRelic(int depth, Point position)
 			deepestGate = std::max(deepestGate, relic.minDepth);
 	}
 	depth = std::min(depth, deepestGate);
-	_unique_items pool[std::size(RunRelics)];
+	const RunRelic *pool[std::size(RunRelics)];
 	size_t count = 0;
 	for (const RunRelic &relic : RunRelics) {
 		if (depth < relic.minDepth || relic.minDepth < depth - RunRelicWindow)
 			continue;
 		if (relic.hellfireOnly && !gbIsHellfire)
 			continue;
-		pool[count++] = relic.uid;
+		pool[count++] = &relic;
 	}
 	if (count == 0)
 		return;
-	const auto uid = pool[static_cast<size_t>(GenerateRnd(static_cast<int>(count)))];
+	const std::string_view name = pool[static_cast<size_t>(GenerateRnd(static_cast<int>(count)))]->name;
+	const auto found = std::find_if(UniqueItems.begin(), UniqueItems.end(), [name](const UniqueItem &unique) { return unique.UIName == name; });
+	if (found == UniqueItems.end())
+		return; // a unique table without this relic (e.g. a mod replacing the file)
+	const auto uid = static_cast<_unique_items>(found - UniqueItems.begin());
 
 	// Build the exact unique (the jackpot's construction pattern). SpawnUnique is
 	// deliberately NOT used: on Nightmare/Hell it substitutes a random item of the
@@ -3704,7 +3764,9 @@ void SetupAllItems(const Player &player, Item &item, _item_indexes idx, uint32_t
 			ItemRndDur(item);
 	} else {
 		if (item._iLoc != ILOC_UNEQUIPABLE) {
-			if (iseed > 109 || AllItemsList[static_cast<size_t>(idx)].iItemId != UniqueItems[iseed].UIItemId) {
+			// [RUNS MOD] Bounded by the loaded table, not vanilla's hardcoded 109: the mod's
+			// relics are appended past Hellfire's last unique.
+			if (iseed >= UniqueItems.size() || AllItemsList[static_cast<size_t>(idx)].iItemId != UniqueItems[iseed].UIItemId) {
 				item.clear();
 				return;
 			}

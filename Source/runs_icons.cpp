@@ -186,7 +186,7 @@ int RunIconStandInCurs(int curs)
 	if (IsRunIconCurs(curs))
 		return ICURS_SCROLL_OF; // The dungeon scroll is a scroll.
 
-	// One per runitems.cel frame, in order (see itemdat.tsv's rows using 400..419).
+	// One per runitems.cel frame, in order (see itemdat.tsv's rows using 400..432).
 	static constexpr item_cursor_graphic RunItemStandIns[NumRunItemIcons] = {
 		ICURS_FULL_HELM,       // Sallet
 		ICURS_FULL_HELM,       // Corinthian Helm
@@ -208,6 +208,19 @@ int RunIconStandInCurs(int curs)
 		ICURS_LONG_WAR_BOW,    // Elder Bow
 		ICURS_KITE_SHIELD,     // Heater Shield
 		ICURS_TOWER_SHIELD,    // Pavise
+		ICURS_HUNTERS_BOW,     // Thornstring (relic)
+		ICURS_BROAD_SWORD,     // Emberfang (relic)
+		ICURS_LONG_STAFF,      // The Ashen Rod (relic)
+		ICURS_COMPOSITE_BOW,   // Bloodfletch (relic)
+		ICURS_AMULET,          // Stormcaller's Eye (relic)
+		ICURS_LONG_BATTLE_BOW, // Skyreaver (relic)
+		ICURS_RING,            // Ring of the Magi (relic)
+		ICURS_GREAT_AXE,       // Ravager (relic)
+		ICURS_LONG_WAR_BOW,    // Nightwing (relic)
+		ICURS_WAR_STAFF,       // Staff of Endless Night (relic)
+		ICURS_GREAT_SWORD,     // Dawnbreaker (relic)
+		ICURS_LONG_WAR_BOW,    // Heartseeker (relic)
+		ICURS_ROBE,            // Archmage's Mantle (relic)
 	};
 	if (IsRunItemCurs(curs))
 		return RunItemStandIns[curs - RunItemCursFirst];
