@@ -1464,11 +1464,21 @@ void StartGambleJackpotShow()
 	HasScrollbar = false;
 	AddSText(0, 1, _("Farnham's One-Armed Bandit"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
 	AddSLine(3);
-	AddSText(0, 7, _("Tonight's jackpot:"), UiFlags::ColorWhite | UiFlags::AlignCenter, false);
+	AddSText(0, 5, _("Tonight's jackpot:"), UiFlags::ColorWhite | UiFlags::AlignCenter, false);
 	const UiFlags itemColor = GamblerJackpot.getTextColorWithStatCheck();
-	AddSText(20, 11, GamblerJackpot.getName(), itemColor, false);
-	PrintStoreItem(GamblerJackpot, 12, itemColor);
-	AddSText(0, 18, _("Done"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	AddSText(0, 7, GamblerJackpot.getName(), itemColor | UiFlags::AlignCenter, false);
+	// A unique's powers live in its UniqueItems row, not in the prefix/suffix slots
+	// PrintStoreItem reads (vanilla stores never sell uniques), so list them the way the
+	// inventory's unique info panel does: one per line, up to six (lines 9-14).
+	int line = 9;
+	for (const ItemPower &power : UniqueItems[GamblerJackpot._iUid].powers) {
+		if (power.type == IPL_INVALID)
+			break;
+		AddSText(0, line++, PrintItemPower(power.type, GamblerJackpot), UiFlags::ColorWhite | UiFlags::AlignCenter, false);
+	}
+	// Damage/armor, durability and requirements.
+	PrintStoreItem(GamblerJackpot, 16, itemColor);
+	AddSText(0, BackButtonLine(), _("Done"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 }
 
 void GambleEnter()
@@ -4046,7 +4056,7 @@ void StoreEnter()
 		break;
 	case TalkID::GambleJackpotShow: // [RUNS MOD]
 		StartStore(TalkID::Gamble);
-		CurrentTextLine = 14;
+		CurrentTextLine = 16; // back on "Inspect the jackpot" (14 is absent without tokens)
 		break;
 	case TalkID::NoMoney:
 	case TalkID::NoRoom:
