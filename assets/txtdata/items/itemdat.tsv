@@ -201,6 +201,6 @@ IDI_GAMBLETOKEN	0	Misc	Unequippable	BLOOD_STONE	Misc	NONE	Gambler's Token		1	0	0
 	0	Weapon	Two-handed	427	Axe	RELIC_RAVAGER	Ravager		0	80	16	38	0	0	90	0	0		UNIQUE	Null	false	50000
 	0	Weapon	Two-handed	428	Bow	RELIC_NIGHTWING	Nightwing		0	60	4	16	0	0	45	0	80		UNIQUE	Null	false	50000
 	0	Weapon	Two-handed	429	Staff	RELIC_ENDLESSNIGHT	Staff of Endless Night		0	60	8	16	0	0	30	60	0		UNIQUE	Null	false	50000
-	0	Weapon	Two-handed	430	Sword	RELIC_DAWNBREAKER	Dawnbreaker		0	100	18	40	0	0	110	0	0		UNIQUE	Null	false	70000
-	0	Weapon	Two-handed	431	Bow	RELIC_HEARTSEEKER	Heartseeker		0	70	5	18	0	0	50	0	100		UNIQUE	Null	false	70000
-	0	Armor	Armor	432	LightArmor	RELIC_ARCHMANTLE	Archmage's Mantle		0	60	0	0	30	35	0	60	0		UNIQUE	Null	false	70000
+	0	Weapon	Two-handed	430	Sword	RELIC_DAWNBREAKER	Dawnbreaker		0	100	18	40	0	0	110	0	0		UNIQUE	Null	false	60000
+	0	Weapon	Two-handed	431	Bow	RELIC_HEARTSEEKER	Heartseeker		0	70	5	18	0	0	50	0	100		UNIQUE	Null	false	60000
+	0	Armor	Armor	432	LightArmor	RELIC_ARCHMANTLE	Archmage's Mantle		0	60	0	0	30	35	0	60	0		UNIQUE	Null	false	60000
