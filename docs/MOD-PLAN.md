@@ -426,6 +426,52 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
 - Seen on the way, not fixed: a Diablo-mode (non-Hellfire) pack drops every item index
   >= 161 as "Hellfire-only", which includes all the mod's own items (relic bases,
   dungeon scrolls, gems, tokens). Fine while games run with Hellfire on.
+
+**Companion potions** (2026-10-28, built + unit tests + playtested on desktop)
+- Design (user): a potion summons a beast for a few minutes; the POTION carries the stats
+  (rolled from its seed + item level = depth it dropped at), so shallow potions stay weak
+  and early-level farming buys nothing. Any hero may drink any potion (no class lock, no
+  depth requirement -- a fresh hero just can't find a strong one). Best ones are dungeon
+  drops; Adria sells worse ones at a premium. Kinds are roles, not classes.
+- Five roles, rolled from the seed (runs_companion.cpp, all tuning knobs):
+  Tank = Hellboar (Boar Draught): most life/armour. Fighter = Gargoyle (Gargoyle Draught):
+  hardest hitter, fragile. Ranged = Psychorb (Orb Draught): shoots its own flare from 7
+  tiles, flies over players. Elemental = Frost Charger (Frost Draught): hits chill the
+  target 2 s (half-speed animation, ice-blue outline). Healer = Myconid (Spore Draught,
+  art + sounds from The Hell 4 in assets/monsters/myconid, new MT_MYCONID row, never spawns
+  wild): weak, stays within 2 tiles of its owner, heals them every 3 s within 7 tiles.
+  No Hellfire: Tank -> Horned Demon, Ranged -> Familiar. Each kind has its own bottle icon.
+- Stats per kind: life/armour/to-hit/damage curves per item level, each +-15%; tiers
+  ordinary 70% / strong 25% (x1.2) / exceptional 5% (x1.45, +30 s); stays 2:00-3:00.
+  Tooltip shows role, beast, tier, life, armour, damage (or bolts / heal) and duration.
+- Sources: boss vault 12%, Tyrannical champion 5%, any other monster 0.3%, all at the
+  run's depth; Adria stocks one at (deepest beaten - 3), 2x price, once a depth is beaten.
+- Mechanics: the Golem with other art -- MFLAG_GOLEM + Golem AI in the drinker's own
+  reserved minion slot, sent in the Golem's spawn message (potion seed in the seed field,
+  level | 0x80 in the spell-level byte), so peers and late joiners rebuild the same beast.
+  Shares the Golem slot: drinking replaces a Golem, casting Golem dismisses the companion.
+  The drinker's client counts the timer down and dismisses it with a normal kill. All five
+  kinds' art loads on every run level (after the scatter picks, so no monster variety lost).
+- Companions shed the wild monster's SEARCH flag (it made them start a new walk every
+  tick and strand map cells -> dozens of ghost copies) and the Gargoyle's stone start.
+- Look: a constant gold outline (a tint was tried and rejected: it washed the colours out).
+  Companion panel top-left under the party portraits: name, life bar, time-left bar.
+- Healing: a companion regenerates a tenth of a wild monster's rate; Heal Other targets
+  minions (mouse: point at it; controller: your own minion when no player is in reach),
+  healing the deterministic average so co-op clients agree (CMD_HEALOTHER | 0x8000).
+- Tests: pack_test CompanionPotion_survives_repack; CompanionStatsTest.DeeperIsStronger-
+  AndRollsDiffer, .RolesRollAndDiffer; vendor_test allows the potion.
+- Dev: dev.items.companion(level, kind), dev.monsters.cells() (map-cell ownership check).
+- Open: whether difficulty (Nightmare/Hell) should lift a potion found there; Switch
+  memory with five companion types loaded per level.
+
+**Floating numbers on by default, with icons** (2026-10-28)
+- The stock "Floating Numbers - Damage/XP" Lua mods are switched on once for every
+  install (a [RunsMod] marker in the INI; turning them off afterwards sticks).
+- Each number has a hand-drawn 11px icon and one colour per kind: damage dealt gold +
+  sword, damage taken red + skull, healing white + green cross, XP blue + up-arrow
+  (FloatingNumberIcon; floatingnumbers.add takes an optional icon name). Colour now says
+  whose damage it is, not its element.
 - Unchanged: boss's own drop, gold piles, gem, next-depth scroll, uper 15 / +4 tier.
 **Dungeon rules: one exit, any tileset** (2026-10-25, built + drlg tests green, NOT yet playtested)
 - One staircase per run level, and it is the exit: generators skip the down stairs, the

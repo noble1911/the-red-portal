@@ -53,6 +53,7 @@
 #include "portals/validation.hpp"
 #include "quests/validation.hpp"
 #include "run_clock.h"
+#include "runs_companion.h"
 #include "runs_mod.h"
 #include "spells.h"
 #include "storm/storm_net.hpp"
@@ -848,7 +849,7 @@ void DeltaLoadEnemies(const DLevel &deltaLevel)
 			decode_enemy(monster, deltaMonster.menemy);
 		if (monster.position.tile != Point { 0, 0 } && monster.position.tile != GolemHoldingCell)
 			monster.occupyTile(monster.position.tile, false);
-		if (monster.type().type == MT_GOLEM) {
+		if (monster.type().type == MT_GOLEM || monster.isPlayerMinion()) { // [RUNS MOD] companions too
 			GolumAi(monster);
 			monster.flags |= (MFLAG_TARGETS_MONSTER | MFLAG_GOLEM);
 		} else {
@@ -1970,7 +1971,12 @@ size_t OnHealOther(const TCmdParam1 &message, const Player &caster)
 	const uint16_t playerIdx = Swap16LE(message.wParam1);
 
 	if (gbBufferMsgs != 1) {
-		if (caster.isOnActiveLevel() && playerIdx < Players.size()) {
+		if ((playerIdx & HealOtherMinionFlag) != 0) {
+			// [RUNS MOD] Heal Other on a minion (companion or Golem).
+			const size_t monsterId = playerIdx & ~HealOtherMinionFlag;
+			if (caster.isOnActiveLevel() && monsterId < MaxMonsters)
+				DoHealOtherMinion(caster, Monsters[monsterId]);
+		} else if (caster.isOnActiveLevel() && playerIdx < Players.size()) {
 			DoHealOther(caster, Players[playerIdx]);
 		}
 	}
@@ -2707,10 +2713,15 @@ size_t OnSpawnMonster(const TCmdSpawnMonster &message, const Player &player)
 		return sizeof(message);
 	}
 	// Type index 0 is always the golem. Any other spawn carries a run wave tier in this
-	// field instead, which must not be capped by the (unrelated) owner's spell levels.
-	const uint8_t golemSpellLevel = typeIndex == 0
-	    ? std::min(message.golemSpellLevel, static_cast<uint8_t>(MaxSpellLevel + Players[golemOwnerPlayerId]._pISplLvlAdd))
-	    : std::min(message.golemSpellLevel, MaxRunWaveTier);
+	// field instead, which must not be capped by the (unrelated) owner's spell levels --
+	// or, with the marker bit set, a companion potion's level (see runs_companion.h).
+	uint8_t golemSpellLevel;
+	if (typeIndex == 0)
+		golemSpellLevel = std::min(message.golemSpellLevel, static_cast<uint8_t>(MaxSpellLevel + Players[golemOwnerPlayerId]._pISplLvlAdd));
+	else if (IsCompanionSpawnLevel(message.golemSpellLevel))
+		golemSpellLevel = message.golemSpellLevel;
+	else
+		golemSpellLevel = std::min(message.golemSpellLevel, MaxRunWaveTier);
 
 	DLevel &deltaLevel = GetDeltaLevel(player);
 

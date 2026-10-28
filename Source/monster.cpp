@@ -82,6 +82,7 @@
 #include "player.h"
 #include "quests.h"
 #include "run_clock.h"
+#include "runs_companion.h"
 #include "runs_gems.h"
 #include "runs_mod.h"
 #include "scroll_mods.h"
@@ -308,6 +309,7 @@ void InitMonster(Monster &monster, Direction rd, size_t typeIndex, Point positio
 	monster.enemy = 0;
 	monster.isInvalid = false;
 	monster.runWaveTier = 0;
+	monster.chillTicks = 0;
 	monster.uniqueType = UniqueMonsterType::None;
 	monster.activeForTicks = 0;
 	monster.lightId = NO_LIGHT;
@@ -1257,6 +1259,10 @@ void MonsterAttackMonster(Monster &attacker, Monster &target, int hper, int mind
 	const int dam = RandomIntBetween(mind, maxd) << 6;
 	ApplyMonsterDamage(DamageType::Physical, target, dam);
 
+	// [RUNS MOD] An Elemental companion's hits chill: the target slows for a moment.
+	if (attacker.isPlayerMinion() && attacker.type().type == CompanionMonsterType(CompanionKind::Elemental))
+		target.chillTicks = CompanionChillTicks;
+
 	if (attacker.isPlayerMinion()) {
 		const auto playerId = static_cast<size_t>(attacker.goalVar3);
 		const Player &player = Players[playerId];
@@ -1993,7 +1999,12 @@ bool RoundWalk(Monster &monster, Direction direction, int8_t *dir)
 
 bool AiPlanPath(Monster &monster)
 {
-	if (monster.type().type != MT_GOLEM) {
+	// [RUNS MOD] Companions path like the Golem whose AI they run.
+	const bool isMinion = monster.type().type == MT_GOLEM || monster.isPlayerMinion();
+	// Never mid-walk: a second walk would strand the first one's claimed cell.
+	if (isMinion && monster.isWalking())
+		return false;
+	if (!isMinion) {
 		if (monster.activeForTicks == 0)
 			return false;
 		if (monster.mode != MonsterMode::Stand)
@@ -2018,7 +2029,7 @@ bool AiPlanPath(Monster &monster)
 			return true;
 	}
 
-	if (monster.type().type != MT_GOLEM)
+	if (!isMinion)
 		monster.pathCount = 0;
 
 	return false;
@@ -3429,6 +3440,65 @@ void InitGolem(devilution::Monster &monster, uint8_t golemOwnerPlayerId, int16_t
 	UpdateEnemy(monster);
 }
 
+/**
+ * [RUNS MOD] Turns a freshly initialised monster into `ownerId`'s companion: a Golem in all
+ * but art. Its stats come from the potion (`seed`, `level`), so every client builds the same
+ * one from the spawn message.
+ */
+void InitCompanion(Monster &monster, uint8_t ownerId, uint32_t seed, int level)
+{
+	const CompanionStats stats = GetCompanionStats(seed, level);
+	monster.flags |= MFLAG_GOLEM;
+	// The wild Hellboar's SEARCH flag makes ProcessMonsters path-plan before the AI on every
+	// tick, and AiPlanPath skips its "standing still" checks for minions (the Golem only
+	// calls it when idle). Together they started a new walk each tick mid-walk, stranding a
+	// claimed map cell every time -- each one drew another copy of the boar. The Golem AI
+	// does its own path planning, so the companion must not search.
+	monster.flags &= ~MFLAG_SEARCH;
+	// The Gargoyle starts perched in stone (InitMonster), waking only when hit; a companion
+	// must be awake from the first tick.
+	monster.flags &= ~MFLAG_ALLOW_SPECIAL;
+	monster.ai = MonsterAIID::Golem;
+	monster.goalVar3 = static_cast<int8_t>(ownerId);
+	monster.maxHitPoints = stats.life << 6;
+	monster.hitPoints = monster.maxHitPoints;
+	monster.armorClass = static_cast<uint8_t>(stats.armor);
+	monster.golemToHit = static_cast<uint16_t>(stats.toHit);
+	monster.minDamage = static_cast<uint8_t>(stats.minDamage);
+	monster.maxDamage = static_cast<uint8_t>(stats.maxDamage);
+	UpdateEnemy(monster);
+}
+
+/** [RUNS MOD] Loads every companion kind's art, so a potion of any kind can be drunk. */
+tl::expected<void, std::string> AddCompanionMonsterTypes()
+{
+	for (int kind = 0; kind < NumCompanionKinds; kind++) {
+		if (LevelMonsterTypeCount >= MaxLvlMTypes)
+			break;
+		RETURN_IF_ERROR(AddMonsterType(CompanionMonsterType(static_cast<CompanionKind>(kind)), PLACE_SPECIAL));
+	}
+	return {};
+}
+
+/** [RUNS MOD] True for a ranged companion: it shoots instead of closing in. */
+bool IsRangedCompanion(const Monster &monster)
+{
+	return monster.isPlayerMinion() && monster.type().type == CompanionMonsterType(CompanionKind::Ranged);
+}
+
+/** [RUNS MOD] How far a ranged companion shoots, in tiles. */
+constexpr int CompanionShootRange = 7;
+
+/** [RUNS MOD] True for a healing companion: it keeps to its owner instead of hunting. */
+bool IsHealerCompanion(const Monster &monster)
+{
+	return monster.isPlayerMinion() && monster.type().type == CompanionMonsterType(CompanionKind::Healer);
+}
+
+/** [RUNS MOD] How close a healing companion keeps to its owner, in tiles. Well inside its
+ * heal range, so wandering a step never costs a pulse. */
+constexpr int HealerLeashTiles = 2;
+
 bool PosOkMissile(Point position)
 {
 	return !TileHasAny(position, TileProperties::BlockMissile);
@@ -3591,6 +3661,8 @@ tl::expected<void, std::string> GetLevelMTypes()
 		RETURN_IF_ERROR(AddMonsterType(MT_ADVOCATE, PLACE_SCATTER));
 		RETURN_IF_ERROR(AddMonsterType(MT_RBLACK, PLACE_SCATTER));
 		RETURN_IF_ERROR(AddMonsterType(MT_DIABLO, PLACE_SPECIAL));
+		if (RunsModEnabled) // [RUNS MOD] companion art, as on every other run level below
+			RETURN_IF_ERROR(AddCompanionMonsterTypes());
 		return {};
 	}
 
@@ -3686,6 +3758,12 @@ tl::expected<void, std::string> GetLevelMTypes()
 				typelist[i] = typelist[--nt];
 			}
 		}
+
+		// [RUNS MOD] Companion art, loaded on every run level so a potion can be drunk
+		// anywhere -- a spawn can only use a type every client already loaded. Added after
+		// the scatter population so it costs no monster variety, and never placed.
+		if (RunsModEnabled && currlevel >= 1)
+			RETURN_IF_ERROR(AddCompanionMonsterTypes());
 	} else {
 		if (setlvlnum == SL_SKELKING) {
 			RETURN_IF_ERROR(AddMonsterType(MT_SKING, PLACE_UNIQUE));
@@ -4005,6 +4083,8 @@ void LoadDeltaSpawnedMonster(size_t typeIndex, size_t monsterId, uint32_t seed, 
 	InitMonster(monster, Direction::South, typeIndex, position);
 	if (monster.type().type == MT_GOLEM) {
 		InitGolem(monster, golemOwnerPlayerId, golemSpellLevel);
+	} else if (IsCompanionSpawnLevel(golemSpellLevel)) {
+		InitCompanion(monster, golemOwnerPlayerId, seed, DecodeCompanionSpawnLevel(golemSpellLevel));
 	} else {
 		ApplyRunWaveTier(monster, golemSpellLevel);
 	}
@@ -4033,12 +4113,16 @@ void InitializeSpawnedMonster(Point position, Direction dir, size_t typeIndex, s
 	monster.occupyTile(position, false);
 	InitMonster(monster, dir, typeIndex, position);
 
-	if (monster.type().type != MT_GOLEM)
+	const bool isCompanion = monster.type().type != MT_GOLEM && IsCompanionSpawnLevel(golemSpellLevel);
+	if (monster.type().type != MT_GOLEM && !isCompanion)
 		ApplyRunWaveTier(monster, golemSpellLevel);
 
 	if (monster.type().type == MT_GOLEM) {
 		InitGolem(monster, golemOwnerPlayerId, golemSpellLevel);
 		StartSpecialStand(monster, dir);
+	} else if (isCompanion) {
+		InitCompanion(monster, golemOwnerPlayerId, seed, DecodeCompanionSpawnLevel(golemSpellLevel));
+		M_StartStand(monster, dir);
 	} else if (IsSkel(monster.type().type)) {
 		StartSpecialStand(monster, dir);
 	} else {
@@ -4364,12 +4448,21 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 			// depth -- the boss is the reliable way to move up the gem tiers, the same
 			// way it is the only way to move up depth. Spawned on peers, as above.
 			DropRandomGem(static_cast<int>(currlevel), monster.position.tile, /*sendmsg=*/true);
+			// [RUNS MOD] Companion potions are rare magic: a vault holds one now and then,
+			// at this depth's level (see runs_companion.h).
+			if (GenerateRnd(100) < CompanionVaultChancePct)
+				DropCompanionPotion(static_cast<int>(currlevel), monster.position.tile);
 		} else {
 			// [RUNS MOD] Tyrannical champions always pay out: one good item at the
 			// corpse (the pick is re-derived, so no champion state is stored).
 			// Spawned, not sendmsg, and never delta -- see the vault drop above.
-			if (IsRunChampion(static_cast<unsigned>(monster.getId())))
+			const bool isChampion = IsRunChampion(static_cast<unsigned>(monster.getId()));
+			if (isChampion)
 				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/false, /*delta=*/false, /*spawn=*/true);
+			// [RUNS MOD] Companion potion: a fair chance from a champion, a slim one from
+			// anything else, always at this depth's level.
+			if (isChampion ? GenerateRnd(100) < CompanionChampionChancePct : GenerateRnd(1000) < CompanionMonsterChancePerMille)
+				DropCompanionPotion(static_cast<int>(currlevel), monster.position.tile);
 			if (GenerateRnd(100) < 3)
 				DropDungeonScroll(ClampRunDepth(static_cast<int>(currlevel)), monster.position.tile, dropDiff, true);
 			// [RUNS MOD] No gem here: the vault is the only source (see DropRandomGem).
@@ -4558,8 +4651,49 @@ void GolumAi(Monster &golem)
 	if ((golem.flags & MFLAG_TARGETS_MONSTER) == 0)
 		UpdateEnemy(golem);
 
-	if (golem.mode == MonsterMode::MeleeAttack) {
+	if (IsAnyOf(golem.mode, MonsterMode::MeleeAttack, MonsterMode::RangedAttack)) {
 		return;
+	}
+
+	// [RUNS MOD] A healing companion is only useful near its owner, so it never hunts: it
+	// fights back at whatever is next to it, and otherwise walks back to the owner's side.
+	if (IsHealerCompanion(golem)) {
+		if ((golem.flags & MFLAG_NO_ENEMY) == 0) {
+			const Monster &enemy = Monsters[golem.enemy];
+			if (golem.position.tile.WalkingDistance(enemy.position.future) <= 1) {
+				golem.enemyPosition = enemy.position.tile;
+				golem.direction = GetDirection(golem.position.tile, enemy.position.tile);
+				StartAttack(golem);
+				return;
+			}
+		}
+		const Player &owner = Players[golem.goalVar3];
+		if (golem.position.tile.WalkingDistance(owner.position.tile) > HealerLeashTiles) {
+			// Path to the owner like the Golem paths to its enemy; straight at them if the
+			// way is clear.
+			golem.enemyPosition = owner.position.tile;
+			if (!AiPlanPath(golem))
+				RandomWalk(golem, GetDirection(golem.position.tile, owner.position.tile));
+		}
+		return;
+	}
+
+	// [RUNS MOD] A ranged companion shoots whatever it can see within range, and only walks
+	// in (below) when it cannot. Its bolts fly over players (see CheckMissileCol).
+	if ((golem.flags & MFLAG_NO_ENEMY) == 0 && IsRangedCompanion(golem)) {
+		const Monster &enemy = Monsters[golem.enemy];
+		if (golem.position.tile.WalkingDistance(enemy.position.tile) <= CompanionShootRange
+		    && LineClearMovingMissile(golem.position.tile, enemy.position.tile)) {
+			golem.enemyPosition = enemy.position.tile;
+			golem.direction = GetDirection(golem.position.tile, enemy.position.tile);
+			// The monster's own shot (the Psychorb's flare), going by its native AI; a
+			// monster that has none fires a fire bolt.
+			MissileID shot = GetMissileType(golem.data().ai);
+			if (shot == MissileID::Null)
+				shot = MissileID::Firebolt;
+			StartRangedAttack(golem, shot, 0);
+			return;
+		}
 	}
 
 	if ((golem.flags & MFLAG_NO_ENEMY) == 0) {
@@ -4658,11 +4792,15 @@ void ProcessMonsters()
 			monster.aiSeed = AdvanceRndSeed();
 		}
 		if (monster.hitPoints < monster.maxHitPoints && !monster.hasNoLife()) {
-			if (monster.level(sgGameInitInfo.nDifficulty) > 1) {
-				monster.hitPoints += monster.level(sgGameInitInfo.nDifficulty) / 2;
-			} else {
-				monster.hitPoints += monster.level(sgGameInitInfo.nDifficulty);
-			}
+			int regen = monster.level(sgGameInitInfo.nDifficulty) > 1
+			    ? monster.level(sgGameInitInfo.nDifficulty) / 2
+			    : monster.level(sgGameInitInfo.nDifficulty);
+			// [RUNS MOD] A companion only trickles back (a tenth): its life comes from the
+			// potion, and the wild Hellboar's level-23 regeneration outhealed real damage
+			// whatever the potion. Heal Other is how the player tops it up.
+			if (monster.isPlayerMinion() && monster.type().type != MT_GOLEM)
+				regen = std::max(1, (regen + 5) / 10);
+			monster.hitPoints += regen;
 			monster.hitPoints = std::min(monster.hitPoints, monster.maxHitPoints); // prevent going over max HP with part of a single regen tick
 		}
 
@@ -4719,7 +4857,15 @@ void ProcessMonsters()
 
 			GroupUnity(monster);
 		}
-		if (monster.mode != MonsterMode::Petrified && (monster.flags & MFLAG_ALLOW_SPECIAL) == 0) {
+		// [RUNS MOD] A chilled monster skips every other animation step. Its AI acts when an
+		// animation ends, so this halves its walking and attacking alike -- and since monster
+		// AI runs on every client from the same seeds, it stays in step in co-op.
+		bool chillSkip = false;
+		if (monster.chillTicks > 0) {
+			monster.chillTicks--;
+			chillSkip = (monster.chillTicks & 1) != 0;
+		}
+		if (monster.mode != MonsterMode::Petrified && (monster.flags & MFLAG_ALLOW_SPECIAL) == 0 && !chillSkip) {
 			monster.animInfo.processAnimation((monster.flags & MFLAG_LOCK_ANIMATION) != 0);
 		}
 	}
@@ -5057,7 +5203,9 @@ Monster *FindGolemForPlayer(const Player &player)
 	for (size_t i = 0; i < ActiveMonsterCount; i++) {
 		const int monsterId = ActiveMonsters[i];
 		Monster &monster = Monsters[monsterId];
-		if (monster.type().type != MT_GOLEM)
+		// [RUNS MOD] A companion holds the Golem's slot, so it counts as the player's golem:
+		// casting Golem dismisses it, and death or leaving the level takes it too.
+		if (monster.type().type != MT_GOLEM && !monster.isPlayerMinion())
 			continue;
 		if (monster.position.tile == GolemHoldingCell)
 			continue;
@@ -5232,6 +5380,28 @@ void SpawnGolem(const Player &player, Point position, uint8_t spellLevel)
 	// Update local state immediately to increase ActiveMonsterCount instantly (this allows multiple monsters to be spawned in one game tick)
 	InitializeSpawnedMonster(position, Direction::South, 0, monsterIndex, seed, player.getId(), spellLevel);
 	NetSendCmdSpawnMonster(position, Direction::South, 0, static_cast<uint16_t>(monsterIndex), seed, player.getId(), spellLevel);
+}
+
+int SpawnCompanion(const Player &player, Point position, uint32_t seed, int level)
+{
+	// The player's own reserved slot only. The Golem may also borrow another free reserved
+	// slot or a normal one, but that needs the level owner to pick it (two clients choosing
+	// at once would collide). Slot == player id is the one no other client ever picks for
+	// itself, so the drinker can spawn here directly.
+	const size_t playerId = player.getId();
+	if (playerId >= ReservedMonsterSlotsForGolems)
+		return -1;
+	const Monster &slot = Monsters[playerId];
+	if (slot.position.tile != GolemHoldingCell && slot.hitPoints != 0)
+		return -1;
+	const size_t typeIndex = GetMonsterTypeIndex(CompanionMonsterType(CompanionKindOf(seed)));
+	if (typeIndex >= LevelMonsterTypeCount)
+		return -1;
+
+	const uint8_t spawnLevel = EncodeCompanionSpawnLevel(level);
+	InitializeSpawnedMonster(position, Direction::South, typeIndex, playerId, seed, static_cast<uint8_t>(playerId), spawnLevel);
+	NetSendCmdSpawnMonster(position, Direction::South, static_cast<uint16_t>(typeIndex), static_cast<uint16_t>(playerId), seed, static_cast<uint8_t>(playerId), spawnLevel);
+	return static_cast<int>(playerId);
 }
 
 bool CanTalkToMonst(const Monster &monster)

@@ -7,6 +7,7 @@
 #include "engine/random.hpp"
 #include "game_mode.hpp"
 #include "pack.h"
+#include "runs_companion.h"
 #include "stores.h"
 #include "tables/monstdat.h"
 #include "tables/playerdat.hpp"
@@ -1528,6 +1529,84 @@ TEST_F(PackTest, LegacyRelic_rebuilt_from_base)
 		EXPECT_NE(rebuilt.dwBuff & CF_CHOSENUNIQUE, 0U) << "rebuilt relic should carry its index from now on";
 	}
 	SetHellfireState(false);
+}
+
+// [RUNS MOD] A companion potion is its seed and level; a save or sync must bring back the
+// same companion. Hellfire mode: the potion row sits past index 161 (see the relic test).
+TEST_F(PackTest, CompanionPotion_survives_repack)
+{
+	SetHellfireState(true);
+	gbIsMultiplayer = true;
+	gbIsSpawn = false;
+
+	for (int level : { 1, 8, 20 }) {
+		Item potion;
+		CreateCompanionPotion(potion, level, 12345U + static_cast<uint32_t>(level));
+		ASSERT_FALSE(potion.isEmpty());
+		ASSERT_TRUE(IsCompanionPotion(potion));
+
+		ItemPack packed;
+		PackItem(packed, potion, gbIsHellfire);
+		Item rebuilt;
+		UnPackItem(packed, *MyPlayer, rebuilt, true);
+
+		ASSERT_TRUE(IsCompanionPotion(rebuilt)) << "level " << level;
+		EXPECT_EQ(rebuilt._iSeed, potion._iSeed);
+		EXPECT_EQ(rebuilt._iCreateInfo & CF_LEVEL, level);
+		const CompanionStats before = GetCompanionStats(potion._iSeed, level);
+		const CompanionStats after = GetCompanionStats(rebuilt._iSeed, rebuilt._iCreateInfo & CF_LEVEL);
+		EXPECT_EQ(after.life, before.life);
+		EXPECT_EQ(after.armor, before.armor);
+		EXPECT_EQ(after.maxDamage, before.maxDamage);
+		EXPECT_EQ(after.durationSeconds, before.durationSeconds);
+	}
+	SetHellfireState(false);
+}
+
+// [RUNS MOD] The potion, not where it is drunk, sets the companion: deeper potions are
+// stronger, and two potions of one level are not identical.
+TEST(CompanionStatsTest, DeeperIsStrongerAndRollsDiffer)
+{
+	long shallowLife = 0;
+	long deepLife = 0;
+	bool differ = false;
+	const CompanionStats first = GetCompanionStats(1, 10);
+	for (uint32_t seed = 1; seed <= 200; seed++) {
+		shallowLife += GetCompanionStats(seed, 3).life;
+		deepLife += GetCompanionStats(seed, 15).life;
+		const CompanionStats other = GetCompanionStats(seed, 10);
+		differ = differ || other.life != first.life || other.armor != first.armor;
+		EXPECT_EQ(GetCompanionStats(seed, 10).life, other.life) << "stats must be deterministic";
+		EXPECT_LE(other.minDamage, other.maxDamage);
+		EXPECT_GE(other.durationSeconds, 120);
+	}
+	EXPECT_GT(deepLife, shallowLife * 2);
+	EXPECT_TRUE(differ);
+}
+
+// [RUNS MOD] Every role turns up, and each plays its part: the Tank has the most life, the
+// Fighter the most damage, and only the Healer heals.
+TEST(CompanionStatsTest, RolesRollAndDiffer)
+{
+	long life[NumCompanionKinds] = {};
+	long damage[NumCompanionKinds] = {};
+	int count[NumCompanionKinds] = {};
+	for (uint32_t seed = 1; seed <= 2000; seed++) {
+		const CompanionStats stats = GetCompanionStats(seed, 12);
+		const auto kind = static_cast<size_t>(stats.kind);
+		ASSERT_EQ(stats.kind, CompanionKindOf(seed));
+		life[kind] += stats.life;
+		damage[kind] += stats.minDamage + stats.maxDamage;
+		count[kind]++;
+		EXPECT_EQ(stats.heal > 0, stats.kind == CompanionKind::Healer) << "seed " << seed;
+	}
+	for (int kind = 0; kind < NumCompanionKinds; kind++)
+		ASSERT_GT(count[kind], 300) << "kind " << kind << " rarely rolls";
+	const auto avg = [&](const long *sum, CompanionKind kind) { return sum[static_cast<size_t>(kind)] / count[static_cast<size_t>(kind)]; };
+	EXPECT_GT(avg(life, CompanionKind::Tank), avg(life, CompanionKind::Fighter));
+	EXPECT_GT(avg(life, CompanionKind::Fighter), avg(life, CompanionKind::Ranged));
+	EXPECT_GT(avg(damage, CompanionKind::Fighter), avg(damage, CompanionKind::Tank));
+	EXPECT_GT(avg(damage, CompanionKind::Fighter), avg(damage, CompanionKind::Healer));
 }
 
 } // namespace

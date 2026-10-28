@@ -235,6 +235,18 @@ tl::expected<_monster_id, std::string> ParseMonsterId(std::string_view value)
 	return tl::make_unexpected("Unknown enum value");
 }
 
+} // namespace
+
+std::optional<_monster_id> FindMonsterIdByString(std::string_view id)
+{
+	const tl::expected<_monster_id, std::string> parsed = ParseMonsterId(id);
+	if (!parsed.has_value())
+		return std::nullopt;
+	return *parsed;
+}
+
+namespace {
+
 tl::expected<MonsterAvailability, std::string> ParseMonsterAvailability(std::string_view value)
 {
 	if (value == "Always") return MonsterAvailability::Always;

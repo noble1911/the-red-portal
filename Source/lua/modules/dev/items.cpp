@@ -1,6 +1,7 @@
 #ifdef _DEBUG
 #include "lua/modules/dev/items.hpp"
 
+#include <optional>
 #include <random>
 #include <string>
 
@@ -18,6 +19,7 @@
 #include "lua/metadoc.hpp"
 #include "pack.h"
 #include "player.h"
+#include "runs_companion.h"
 #include "runs_gems.h"
 #include "utils/is_of.hpp"
 #include "utils/str_case.hpp"
@@ -253,6 +255,39 @@ std::string DebugSpawnGem(std::string typeName, int quality)
 	return StrCat("Spawned ", GemName(static_cast<GemType>(type), static_cast<GemQuality>(quality)), ".");
 }
 
+/** [RUNS MOD] Drops a companion potion of item level `level` (a run depth) at your feet:
+ * of the given kind (tank/fighter/ranged/elemental/healer), or any kind. */
+std::string DebugSpawnCompanionPotion(int level, std::optional<std::string> kindName)
+{
+	if (ActiveItemCount >= MAXITEMS) return "No space to generate the item!";
+	if (level < 1 || level > 24) return "Level must be 1-24 (a run depth).";
+
+	int wanted = -1;
+	if (kindName) {
+		AsciiStrToLower(*kindName);
+		const std::string_view names[] = { "tank", "fighter", "ranged", "elemental", "healer" };
+		for (int i = 0; i < NumCompanionKinds; i++) {
+			if (*kindName == names[i])
+				wanted = i;
+		}
+		if (wanted < 0) return "Kind must be tank, fighter, ranged, elemental or healer.";
+	}
+	// The kind comes from the seed, so draw seeds until one holds the wanted kind.
+	uint32_t seed = AdvanceRndSeed();
+	while (wanted >= 0 && static_cast<int>(CompanionKindOf(seed)) != wanted)
+		seed = AdvanceRndSeed();
+
+	const int ii = AllocateItem();
+	Item &item = Items[ii];
+	CreateCompanionPotion(item, level, seed);
+	if (item.isEmpty()) return "This item table has no companion potion.";
+	item.setNewAnimation(MyPlayer != nullptr && MyPlayer->pLvlLoad == 0);
+	Point pos = MyPlayer->position.tile;
+	GetSuperItemSpace(pos, ii);
+	NetSendCmdPItem(false, CMD_SPAWNITEM, item.position, item);
+	return StrCat("Spawned a level ", level, " companion potion.");
+}
+
 /** [RUNS MOD] Drops one of every gem -- the quick way to eyeball all 35 icons. */
 std::string DebugSpawnAllGems()
 {
@@ -284,6 +319,7 @@ sol::table LuaDevItemsModule(sol::state_view &lua)
 	LuaSetDocFn(table, "spawnUnique", "(name: string)", "Attempt to generate a unique item.", &DebugSpawnUniqueItem);
 	LuaSetDocFn(table, "gem", "(type: string, quality: number)", "[RUNS MOD] Spawn a gem (quality 0=chipped .. 4=perfect).", &DebugSpawnGem);
 	LuaSetDocFn(table, "gemsAll", "()", "[RUNS MOD] Spawn one of every gem.", &DebugSpawnAllGems);
+	LuaSetDocFn(table, "companion", "(level: number, kind: string = nil)", "[RUNS MOD] Spawn a companion potion of item level 1-24; kind tank/fighter/ranged/elemental/healer, or any.", &DebugSpawnCompanionPotion);
 	LuaSetDocFn(table, "gemDump", "()", "[RUNS MOD] Dump the live palette + gem colour mapping to gemdump.txt.",
 	    []() { return DumpGemPaletteMapping("gemdump.txt"); });
 	return table;

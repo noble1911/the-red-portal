@@ -289,6 +289,8 @@ struct Monster { // note: missing field _mAFNum
 	uint8_t packSize;
 	/** [RUNS MOD] Overtime escalation tier of a run wave monster; 0 for everything else. */
 	uint8_t runWaveTier;
+	/** [RUNS MOD] Ticks left of an Elemental companion's chill: animates at half speed. */
+	uint8_t chillTicks;
 	int8_t lightId;
 
 	static constexpr uint8_t NoLeader = -1;
@@ -585,6 +587,12 @@ void ActivateSkeleton(Monster &monster, Point position);
 Monster *PreSpawnSkeleton();
 void TalktoMonster(Player &player, Monster &monster);
 void SpawnGolem(const Player &player, Point position, uint8_t spellLevel);
+/**
+ * @brief [RUNS MOD] Summons `player`'s companion from a potion of `seed` and `level` into the
+ * player's own reserved minion slot (see runs_companion.h).
+ * @return the monster id, or -1 if the slot is taken or the companion type is not loaded.
+ */
+int SpawnCompanion(const Player &player, Point position, uint32_t seed, int level);
 /** @brief [RUNS MOD] Spawns one escalation-wave monster near `target` for the run
  * clock: picks a living non-boss monster on the level as the template (only types
  * already registered on the level can spawn) using the caller's deterministic

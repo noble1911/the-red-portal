@@ -951,8 +951,16 @@ bool CheckCursorActions(const Point currentTile, bool flipflag)
 		}
 	}
 
-	return TrySelectPlayer(flipflag, currentTile)
-	    || TrySelectObject(flipflag, currentTile)
+	if (TrySelectPlayer(flipflag, currentTile))
+		return true;
+	// [RUNS MOD] Heal Other can target a minion (companion or Golem) too.
+	if (leveltype != DTYPE_TOWN && pcurs == CURSOR_HEALOTHER
+	    && TrySelectMonster(flipflag, currentTile, [](const Monster &monster) {
+		       return monster.isPlayerMinion() && !monster.hasNoLife();
+	       })) {
+		return true;
+	}
+	return TrySelectObject(flipflag, currentTile)
 	    || TrySelectItem(flipflag, currentTile);
 }
 

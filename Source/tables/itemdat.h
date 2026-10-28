@@ -496,6 +496,7 @@ enum item_misc_id : int8_t {
 	IMISC_DUNGEONSCROLL, // [RUNS MOD] opens a dungeon run at the level stored on the item
 	IMISC_PRESERVE,      // [RUNS MOD] marks one carried item to survive a single death
 	IMISC_GEM,           // [RUNS MOD] D2-style gem; type/quality live in the create-info
+	IMISC_COMPANION,     // [RUNS MOD] summons a companion beast; level in the create-info
 	IMISC_INVALID = -1,
 };
 

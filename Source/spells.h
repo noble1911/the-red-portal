@@ -39,6 +39,15 @@ void CastSpell(Player &player, SpellID spl, WorldTilePosition src, WorldTilePosi
 void SpawnResurrectBeam(Player &caster, Player &target);
 void ApplyResurrect(Player &target);
 void DoHealOther(const Player &caster, Player &target);
+/**
+ * @brief [RUNS MOD] Heal Other cast on a player's minion (companion or Golem).
+ *
+ * Heals the average of what the same cast gives a player, not a fresh roll: every client
+ * applies it to its own copy of the monster, and a roll would leave them disagreeing.
+ */
+void DoHealOtherMinion(const Player &caster, Monster &target);
+/** @brief [RUNS MOD] CMD_HEALOTHER parameter bit marking a monster id rather than a player. */
+constexpr uint16_t HealOtherMinionFlag = 0x8000;
 int GetSpellBookLevel(SpellID s);
 int GetSpellStaffLevel(SpellID s);
 

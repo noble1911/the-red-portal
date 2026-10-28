@@ -7,7 +7,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <magic_enum/magic_enum.hpp>
@@ -352,6 +354,9 @@ extern const _monster_id MonstConvTbl[];
 extern std::vector<UniqueMonsterData> UniqueMonstersData;
 
 void LoadMonstDatFromFile(DataFile &dataFile, std::string_view filename, bool grow);
+/** @brief [RUNS MOD] The monster type with this ID string ("MT_GOLEM", or one a data file
+ * added, like "MT_MYCONID"), if loaded. */
+std::optional<_monster_id> FindMonsterIdByString(std::string_view id);
 void LoadUniqueMonstDatFromFile(DataFile &dataFile, std::string_view filename);
 void LoadMonsterData();
 

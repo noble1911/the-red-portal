@@ -1,7 +1,10 @@
 #include "panels/partypanel.hpp"
 
+#include <algorithm>
 #include <expected.hpp>
 #include <optional>
+
+#include <fmt/format.h>
 
 #include "automap.h"
 #include "control/control.hpp"
@@ -15,13 +18,18 @@
 #include "engine/render/primitive_render.hpp"
 #include "engine/size.hpp"
 #include "inv.h"
+#include "levels/gendung.h"
+#include "monster.h"
+#include "multi.h"
 #include "options.h"
 #include "pfile.h"
 #include "qol/monhealthbar.h"
 #include "qol/stash.h"
+#include "runs_companion.h"
 #include "stores.h"
 #include "tables/playerdat.hpp"
 #include "utils/status_macros.hpp"
+#include "utils/str_cat.hpp"
 #include "utils/surface_to_clx.hpp"
 
 namespace devilution {
@@ -56,6 +64,13 @@ constexpr Size FrameSections = { 4, 4 }; // x/y can't be less than 2
 constexpr Size PortraitFrameSize = { FrameSections.width * FrameSpriteSize, FrameSections.height *FrameSpriteSize };
 
 constexpr uint8_t FrameBackgroundColor = PAL16_BLUE + 14;
+
+/** [RUNS MOD] Where the party portraits ended this frame, so the minion panel can sit
+ * under them. DrawMinionPanel consumes it (resets to 0), so a frame without portraits
+ * leaves the panel at the top. */
+int PartyPanelBottomY = 0;
+/** [RUNS MOD] Width of the minion panel's bars. */
+constexpr int MinionBarWidth = 100;
 
 void DrawBar(const Surface &out, Rectangle rect, uint8_t color)
 {
@@ -300,11 +315,60 @@ void DrawPartyMemberInfoPanel(const Surface &out)
 		}
 	}
 
+	PartyPanelBottomY = pos.y;
+
 	if (RightClickedPortraitIndex != -1)
 		HandleRightClickPortait();
 
 	if (!portraitUnderCursor)
 		PortraitIdUnderCursor = -1;
+}
+
+void DrawMinionPanel(const Surface &out)
+{
+	const int partyBottom = PartyPanelBottomY;
+	PartyPanelBottomY = 0;
+
+	// The left-hand panels cover this corner; minions only exist in the dungeon.
+	if (CharFlag || IsPlayerInStore() || IsStashOpen || MyPlayer == nullptr || leveltype == DTYPE_TOWN)
+		return;
+	const Monster *minion = FindGolemForPlayer(*MyPlayer);
+	if (minion == nullptr)
+		return;
+
+	Point pos = PartyPanelPos;
+	if (AutomapActive)
+		pos.y += (FrameGap * 4);
+	if (*GetOptions().Graphics.showFPS)
+		pos.y += FrameGap;
+	pos.y = std::max(pos.y, partyBottom);
+
+	const Surface gameScreen = out.subregionY(0, gnViewportHeight);
+	const TextRenderOptions labelStyle { .flags = UiFlags::ColorWhite | UiFlags::Outlined | UiFlags::FontSize12 };
+	constexpr int LabelGap = 4;
+	constexpr int LabelRaise = 3; // centres the 12px text on the 7px bar
+
+	DrawString(gameScreen, minion->name(), pos, { .flags = UiFlags::ColorGold | UiFlags::Outlined | UiFlags::FontSize12 });
+	pos.y += FrameGap;
+
+	// Life, with the numbers beside the bar.
+	const int life = std::max(minion->hitPoints, 0) >> 6;
+	const int maxLife = std::max(minion->maxHitPoints >> 6, 1);
+	DrawBar(gameScreen, { pos, { MinionBarWidth, HealthBarHeight } }, PAL16_GRAY + 10);
+	DrawBar(gameScreen, { pos, { (life * MinionBarWidth + maxLife / 2) / maxLife, HealthBarHeight } }, PAL8_RED + 4);
+	DrawString(gameScreen, StrCat(life, "/", maxLife), { pos.x + MinionBarWidth + LabelGap, pos.y - LabelRaise }, labelStyle);
+	pos.y += HealthBarHeight + 3;
+
+	// A companion's time left; a Golem has no timer.
+	int ticksLeft = 0;
+	int ticksTotal = 0;
+	if (LocalCompanionTime(ticksLeft, ticksTotal)) {
+		const int tickRate = std::max<int>(sgGameInitInfo.nTickRate, 1);
+		const int secondsLeft = (ticksLeft + tickRate - 1) / tickRate;
+		DrawBar(gameScreen, { pos, { MinionBarWidth, HealthBarHeight } }, PAL16_GRAY + 10);
+		DrawBar(gameScreen, { pos, { (ticksLeft * MinionBarWidth + ticksTotal / 2) / ticksTotal, HealthBarHeight } }, PAL8_YELLOW + 5);
+		DrawString(gameScreen, fmt::format("{:d}:{:02d}", secondsLeft / 60, secondsLeft % 60), { pos.x + MinionBarWidth + LabelGap, pos.y - LabelRaise }, labelStyle);
+	}
 }
 
 bool DidRightClickPartyPortrait()

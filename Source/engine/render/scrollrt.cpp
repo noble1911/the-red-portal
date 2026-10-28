@@ -66,6 +66,7 @@
 #include "qol/stash.h"
 #include "qol/visual_store.h"
 #include "qol/xpbar.h"
+#include "runs_mod.h"
 #include "stores.h"
 #include "towners.h"
 #include "utils/attributes.h"
@@ -97,6 +98,10 @@ enum OutlineColors : uint8_t {
 	OutlineColorsObject = (PAL16_YELLOW + 2),
 	OutlineColorsTowner = (PAL16_BEIGE + 6),
 	OutlineColorsMonster = (PAL16_RED + 9),
+	// [RUNS MOD] A companion's constant outline: gold, so it reads as friendly beside the
+	// red of a hovered monster. A monster an Elemental companion has chilled: ice blue.
+	OutlineColorsCompanion = (PAL8_YELLOW + 2),
+	OutlineColorsChilled = (PAL8_BLUE + 2),
 };
 
 bool AutoMapShowItems;
@@ -766,6 +771,13 @@ void DrawMonsterHelper(const Surface &out, Point tilePosition, Point targetBuffe
 	const Point monsterRenderPosition = targetBufferPosition + offset;
 	if (mi == pcursmonst) {
 		ClxDrawOutlineSkipColorZero(out, OutlineColorsMonster, monsterRenderPosition, sprite);
+	} else if (RunsModEnabled && monster.isPlayerMinion() && monster.type().type != MT_GOLEM) {
+		// [RUNS MOD] Companions keep their own colours and lighting, ringed in gold so they
+		// never pass for the wild monster they borrow their art from.
+		ClxDrawOutlineSkipColorZero(out, OutlineColorsCompanion, monsterRenderPosition, sprite);
+	} else if (RunsModEnabled && monster.chillTicks > 0) {
+		// [RUNS MOD] Chilled by an Elemental companion: an ice-blue ring while it lasts.
+		ClxDrawOutlineSkipColorZero(out, OutlineColorsChilled, monsterRenderPosition, sprite);
 	}
 	DrawMonster(out, tilePosition, monsterRenderPosition, monster, lightTableIndex);
 }
@@ -1901,6 +1913,7 @@ void DrawAndBlit()
 
 	if (*GetOptions().Gameplay.showMultiplayerPartyInfo && PartySidePanelOpen)
 		DrawPartyMemberInfoPanel(out);
+	DrawMinionPanel(out); // [RUNS MOD] under the party portraits, if any
 
 	DrawCursor(out);
 

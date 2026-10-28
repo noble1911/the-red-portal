@@ -167,6 +167,40 @@ std::string DebugCmdSpawnMonster(std::string name, std::optional<unsigned> count
 	return StrCat("Spawned ", spawnedMonster, " monsters.");
 }
 
+/**
+ * [RUNS MOD] Diagnostic for the companion: which monsters own map cells, and how many.
+ * A monster should own one cell (two while walking); more means stale entries that draw
+ * copies of it. Also reports the reserved minion slots.
+ */
+std::string DebugCmdMonsterCells()
+{
+	int cellsOf[MaxMonsters] = {};
+	int bad = 0;
+	for (int x = 0; x < MAXDUNX; x++) {
+		for (int y = 0; y < MAXDUNY; y++) {
+			const int mi = std::abs(dMonster[x][y]) - 1;
+			if (mi < 0)
+				continue;
+			if (mi >= static_cast<int>(MaxMonsters)) {
+				bad++;
+				continue;
+			}
+			cellsOf[mi]++;
+		}
+	}
+	std::string out = StrCat("active ", ActiveMonsterCount, ", bad ids ", bad, ". ");
+	for (int i = 0; i < 4; i++) {
+		const Monster &m = Monsters[i];
+		out += StrCat("slot", i, ": ", m.name(), " mode ", static_cast<int>(m.mode), " hp ", m.hitPoints >> 6,
+		    m.isPlayerMinion() ? " minion" : "", " at ", m.position.tile.x, ",", m.position.tile.y, " cells ", cellsOf[i], ". ");
+	}
+	for (size_t i = 4; i < MaxMonsters; i++) {
+		if (cellsOf[i] > 2)
+			out += StrCat("#", i, " ", Monsters[i].name(), " owns ", cellsOf[i], " cells. ");
+	}
+	return out;
+}
+
 } // namespace
 
 sol::table LuaDevMonstersModule(sol::state_view &lua)
@@ -174,6 +208,7 @@ sol::table LuaDevMonstersModule(sol::state_view &lua)
 	sol::table table = lua.create_table();
 	LuaSetDocFn(table, "spawn", "(name: string, count: number = 1)", "Spawn monster(s)", &DebugCmdSpawnMonster);
 	LuaSetDocFn(table, "spawnUnique", "(name: string, count: number = 1)", "Spawn unique monster(s)", &DebugCmdSpawnUniqueMonster);
+	LuaSetDocFn(table, "cells", "()", "[RUNS MOD] Report which monsters own map cells (stale-copy diagnostic).", &DebugCmdMonsterCells);
 	return table;
 }
 

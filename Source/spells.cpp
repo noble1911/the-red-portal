@@ -278,6 +278,27 @@ void ApplyResurrect(Player &target)
 	}
 }
 
+void DoHealOtherMinion(const Player &caster, Monster &target)
+{
+	if (!target.isPlayerMinion() || target.hasNoLife())
+		return;
+
+	// Expected value of DoHealOther's roll, in 1/64ths: d10, d4 per character level, d6 per
+	// spell level, then the same class multiplier.
+	int hp = (11 << 6) / 2;
+	hp += static_cast<int>(caster.getCharacterLevel()) * ((5 << 6) / 2);
+	hp += caster.GetSpellLevel(SpellID::HealOther) * ((7 << 6) / 2);
+	if (caster._pClass == HeroClass::Warrior || caster._pClass == HeroClass::Barbarian) {
+		hp *= 2;
+	} else if (caster._pClass == HeroClass::Rogue || caster._pClass == HeroClass::Bard) {
+		hp += hp / 2;
+	} else if (caster._pClass == HeroClass::Monk) {
+		hp *= 3;
+	}
+
+	target.hitPoints = std::min(target.hitPoints + hp, target.maxHitPoints);
+}
+
 void DoHealOther(const Player &caster, Player &target)
 {
 	if (target.hasNoLife()) {

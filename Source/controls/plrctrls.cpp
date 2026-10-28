@@ -2495,7 +2495,9 @@ void PerformSpellAction()
 
 	const Player &myPlayer = *MyPlayer;
 	const SpellID spl = myPlayer._pRSpell;
-	if ((PlayerUnderCursor == nullptr && (spl == SpellID::Resurrect || spl == SpellID::HealOther))
+	// [RUNS MOD] Heal Other with no player in reach still has a target if you have a minion.
+	const bool healsMinion = spl == SpellID::HealOther && FindGolemForPlayer(myPlayer) != nullptr;
+	if ((PlayerUnderCursor == nullptr && (spl == SpellID::Resurrect || (spl == SpellID::HealOther && !healsMinion)))
 	    || (ObjectUnderCursor == nullptr && spl == SpellID::TrapDisarm)) {
 		myPlayer.Say(HeroSpeech::ICantCastThatHere);
 		return;

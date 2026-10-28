@@ -185,6 +185,21 @@ set(devilutionx_assets
   "lua/mods/Floating Numbers - Damage/init.lua"
   "lua/mods/Floating Numbers - XP/init.lua"
   lua/repl_prelude.lua
+  # [RUNS MOD] The Healer companion: art and sounds from The Hell 4.
+  monsters/myconid/a1.wav
+  monsters/myconid/a2.wav
+  monsters/myconid/d1.wav
+  monsters/myconid/d2.wav
+  monsters/myconid/h1.wav
+  monsters/myconid/h2.wav
+  monsters/myconid/myconid_a.cl2
+  monsters/myconid/myconid_d.cl2
+  monsters/myconid/myconid_h.cl2
+  monsters/myconid/myconid_n.cl2
+  monsters/myconid/myconid_s.cl2
+  monsters/myconid/myconid_w.cl2
+  monsters/myconid/s1.wav
+  monsters/myconid/s2.wav
   plrgfx/warrior/whu/whufm.trn
   plrgfx/warrior/whu/whulm.trn
   plrgfx/warrior/whu/whuqm.trn

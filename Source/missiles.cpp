@@ -525,7 +525,9 @@ void CheckMissileCol(Missile &missile, DamageType damageType, int minDamage, int
 					isPlayerHit = Plr2PlrMHit(Players[missile._misource], *player, minDamage, maxDamage, missile._midist, missile._mitype, damageType, isDamageShifted, &blocked);
 			} else {
 				Monster &monster = Monsters[missile._misource];
-				isPlayerHit = PlayerMHit(*player, &monster, missile._midist, minDamage, maxDamage, missile._mitype, damageType, isDamageShifted, DeathReason::MonsterOrTrap, &blocked);
+				// [RUNS MOD] A minion's shot (a ranged companion) flies over players.
+				if (!monster.isPlayerMinion())
+					isPlayerHit = PlayerMHit(*player, &monster, missile._midist, minDamage, maxDamage, missile._mitype, damageType, isDamageShifted, DeathReason::MonsterOrTrap, &blocked);
 			}
 		} else {
 			const DeathReason deathReason = missile.sourceType() == MissileSource::Player ? DeathReason::Player : DeathReason::MonsterOrTrap;
@@ -2371,8 +2373,8 @@ void AddStoneCurse(Missile &missile, AddMissileParameter &parameter)
 
 		    const Monster &monster = Monsters[monsterId];
 
-		    if (IsAnyOf(monster.type().type, MT_GOLEM, MT_DIABLO, MT_NAKRUL)) {
-			    return false;
+		    if (IsAnyOf(monster.type().type, MT_GOLEM, MT_DIABLO, MT_NAKRUL) || monster.isPlayerMinion()) {
+			    return false; // [RUNS MOD] companions are minions too
 		    }
 		    if (IsAnyOf(monster.mode, MonsterMode::FadeIn, MonsterMode::FadeOut, MonsterMode::Charge)) {
 			    return false;

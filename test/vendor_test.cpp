@@ -60,6 +60,7 @@ MATCHER_P(WitchMiscMatch, i, "Valid misc. item type from Adria")
 	if (arg >= IMISC_SCROLL && arg <= IMISC_SCROLLT) return true;
 	if (arg >= IMISC_RUNEFIRST && arg <= IMISC_RUNELAST) return true;
 	if (arg == IMISC_BOOK) return true;
+	if (arg == IMISC_COMPANION) return true; // [RUNS MOD] her one companion potion
 
 	*result_listener << "At index " << i << ": Invalid misc. item type " << misctype_str(arg);
 	return false;

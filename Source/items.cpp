@@ -73,6 +73,7 @@
 #include "portal.h"
 #include "qol/stash.h"
 #include "quests.h"
+#include "runs_companion.h"
 #include "runs_gems.h"
 #include "runs_icons.h"
 #include "runs_mod.h"
@@ -1881,6 +1882,14 @@ void printItemMiscGamepad(const Item &item, bool isOil, bool isCastOnTarget)
 
 void PrintItemMisc(const Item &item)
 {
+	if (item._iMiscId == IMISC_COMPANION) {
+		// [RUNS MOD] The potion IS its companion's stats, so show them before it is drunk.
+		std::vector<std::string> lines;
+		GetCompanionPotionLines(item, lines);
+		for (std::string &line : lines)
+			AddItemInfoBoxString(std::move(line));
+		return;
+	}
 	if (item._iMiscId == IMISC_GEM) {
 		// [RUNS MOD] A gem does something different depending on what it is fused into,
 		// so the tooltip lists all three outcomes -- that choice is the whole item.
@@ -2323,6 +2332,10 @@ StringOrView GetTranslatedItemName(const Item &item)
 	// table name and they all read "Gem".
 	if (RunsModEnabled && item._iMiscId == IMISC_GEM) {
 		return GemName(GemTypeOf(item), GemQualityOf(item));
+	}
+	// [RUNS MOD] A companion potion is named for the beast its seed holds.
+	if (RunsModEnabled && item._iMiscId == IMISC_COMPANION) {
+		return CompanionPotionName(item);
 	}
 
 	if (item._iCreateInfo == 0) {
@@ -4165,6 +4178,15 @@ void RecreateItem(const Player &player, Item &item, _item_indexes idx, uint16_t 
 		return;
 	}
 
+	if (RunsModEnabled && AllItemsList[idx].iMiscId == IMISC_COMPANION) {
+		// [RUNS MOD] A companion potion is its seed and level (create-info); everything
+		// else, the companion's stats included, is derived from those.
+		CreateCompanionPotion(item, icreateinfo & CF_LEVEL, iseed);
+		item.dwBuff = dwBuff;
+		gbIsHellfire = tmpIsHellfire;
+		return;
+	}
+
 	// [RUNS MOD] Chosen uniques (relics, the jackpot) are rebuilt from the unique index
 	// they carry; re-rolling them as vanilla does turns them into plain base items. Relics
 	// from before the index existed are recognised by their base and rebuilt too.
@@ -5299,6 +5321,22 @@ void SpawnWitch(int lvl)
 		item._iIdentified = true;
 
 		WitchItems.push_back(item);
+	}
+
+	// [RUNS MOD] One companion potion, and a poor one at a premium: its level sits a few
+	// depths under the hero's deepest beaten run, so anything found at the depth they are
+	// actually fighting is better. Shops are the fallback, not the source. Stamped by
+	// level like her other stock, so a bought potion rebuilds without the hero's state.
+	if (RunsModEnabled && MyPlayer != nullptr && MyPlayer->pDeepestBeatenDepth >= 1) {
+		Item potion;
+		const int potionLevel = std::max(1, static_cast<int>(MyPlayer->pDeepestBeatenDepth) - WitchCompanionLevelsBelow);
+		CreateCompanionPotion(potion, potionLevel, AdvanceRndSeed());
+		if (!potion.isEmpty()) {
+			potion._iIvalue = potion._ivalue = potion._ivalue * WitchCompanionMarkupPct / 100;
+			if (WitchItems.size() >= static_cast<size_t>(gbIsHellfire ? NumWitchItemsHf : NumWitchItems))
+				WitchItems.pop_back(); // a full shelf gives up one random item for it
+			WitchItems.push_back(potion);
+		}
 	}
 
 	SortVendor(WitchItems, PinnedItemCount);

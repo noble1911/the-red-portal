@@ -101,6 +101,7 @@
 #include "quick_messages.hpp"
 #include "restrict.h"
 #include "run_clock.h"
+#include "runs_companion.h"
 #include "runs_gems.h"
 #include "runs_mod.h"
 #include "scroll_mods.h"
@@ -1573,6 +1574,7 @@ void GameLogic()
 		if (!DebugInvisible)
 #endif
 			ProcessMonsters();
+		UpdateCompanionTimer(); // [RUNS MOD]
 		gGameLogicStep = GameLogicStep::ProcessObjects;
 		ProcessObjects();
 		gGameLogicStep = GameLogicStep::ProcessMissiles;
@@ -2907,6 +2909,18 @@ bool TryIconCurs()
 	if (pcurs == CURSOR_HEALOTHER) {
 		if (PlayerUnderCursor != nullptr) {
 			NetSendCmdParam1(true, CMD_HEALOTHER, PlayerUnderCursor->getId());
+			NewCursor(CURSOR_HAND);
+			return true;
+		}
+		// [RUNS MOD] Or a minion: the one under the mouse, or -- on a controller, which
+		// cannot point at it -- your own.
+		const Monster *minion = nullptr;
+		if (pcursmonst != -1 && Monsters[pcursmonst].isPlayerMinion())
+			minion = &Monsters[pcursmonst];
+		else if (ControlMode != ControlTypes::KeyboardAndMouse)
+			minion = FindGolemForPlayer(*MyPlayer);
+		if (minion != nullptr) {
+			NetSendCmdParam1(true, CMD_HEALOTHER, static_cast<uint16_t>(HealOtherMinionFlag | minion->getId()));
 			NewCursor(CURSOR_HAND);
 			return true;
 		}

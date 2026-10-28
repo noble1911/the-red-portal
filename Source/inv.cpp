@@ -41,6 +41,7 @@
 #include "portal.h"
 #include "qol/stash.h"
 #include "qol/visual_store.h"
+#include "runs_companion.h"
 #include "runs_gems.h"
 #include "runs_mod.h"
 #include "stores.h"
@@ -2546,8 +2547,8 @@ bool UseInvItem(int cii)
 	}
 
 	if (item->_iMiscId == IMISC_GEM) {
-		// [RUNS MOD] Gems have no socket to sit in, so using one starts targeting: pick
-		// the weapon or armour to fuse it into. Like the preservation scroll, the gem is
+		// [RUNS MOD] Using a gem starts targeting: pick the socketed weapon or armour to
+		// fuse it into. Like the preservation scroll, the gem is
 		// spent only on a successful fuse, so aiming badly or cancelling costs nothing.
 		if (&player == MyPlayer) {
 			BeginGemTargeting(*item, static_cast<int8_t>(cii));
@@ -2556,6 +2557,18 @@ bool UseInvItem(int cii)
 			if (!invflag)
 				invflag = true;
 			NewCursor(CURSOR_OIL);
+		}
+		return true;
+	}
+
+	if (item->_iMiscId == IMISC_COMPANION) {
+		// [RUNS MOD] Companion potion: summon its beast, and spend the potion only if the
+		// beast actually arrived (not in town, not with nowhere to stand).
+		if (&player == MyPlayer && UseCompanionPotion(player, *item)) {
+			if (speedlist)
+				player.RemoveSpdBarItem(c);
+			else
+				player.RemoveInvItem(c);
 		}
 		return true;
 	}
