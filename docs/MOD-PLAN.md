@@ -483,7 +483,16 @@ A review of player options against the dungeon found four systemic problems, fix
    runs at about twice the depth, matching the engine's +15/+30. Applied to the boss drop's
    base pick and affix level, the vault items' level, the relic window, gem quality and every
    companion potion's level. Vault item COUNT and the next-depth scroll stay on the real depth.
-3. Modifier extremes -- pending.
+3. **Modifier extremes.** Boon and bane both grow with depth and tier (x1/x1.5/x2.2) and
+   same-kind modifiers add up, so deep tier-III scrolls ran away: Tyrannical made 64-86% of
+   monsters champions (each drops a good item), Gilded scattered 40-53 extra chests, three
+   life banes could stack past +400%. AggregateRunMods now caps the combined effect: monster
+   life +200%, damage +150%, boss life +200%, speed +50%, clock +150%, resistant share 75%,
+   champions 30%, extra packs +100%, chests +100%, shrines +200% (each scroll's own lines
+   still show what it rolled). Gold boons (Avaricious/Savage/Frenzied) are half again larger
+   -- gold was the weakest reward against full-gear-loss death -- and Jeweled's boon grows
+   +1/depth like its bane. Twinned/Enchanted were cheap only because bosses were weak (fix 1).
+   Tests: scroll_mods_test (new target).
 4. Companion supply -- pending.
 
 **Floating numbers on by default, with icons** (2026-10-28)

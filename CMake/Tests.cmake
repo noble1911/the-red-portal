@@ -32,6 +32,7 @@ set(tests
   player_test
   quests_test
   scrollrt_test
+  scroll_mods_test
   stores_test
   tile_properties_test
   timedemo_test

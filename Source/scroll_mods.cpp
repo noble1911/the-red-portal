@@ -105,9 +105,12 @@ struct AffixData {
 };
 
 // Indexed by ScrollAffix. Each affix is a boon paired with an offsetting bane.
+// [RUNS MOD] Balance review (2026-10-28): the gold boons are half again larger -- gold was
+// the weakest reward to weigh against a death that drops your whole kit -- and Jeweled's boon
+// now grows with depth like its bane does.
 constexpr std::array<AffixData, 14> Affixes = { {
     // Avaricious: +gold / monsters have more life
-    { "Avaricious", Effect::GoldFind, 40, 70, 3, Effect::MonsterHp, 15, 30, 2 },
+    { "Avaricious", Effect::GoldFind, 60, 105, 4, Effect::MonsterHp, 15, 30, 2 },
     // Enchanted: +magic find / boss has more life & damage
     { "Enchanted", Effect::MagicFind, 12, 25, 2, Effect::BossHp, 30, 60, 4 },
     // Bountiful: +extra item drops / monsters deal more damage
@@ -115,7 +118,7 @@ constexpr std::array<AffixData, 14> Affixes = { {
     // Erudite: +experience / monsters have more life
     { "Erudite", Effect::Experience, 25, 50, 3, Effect::MonsterHp, 20, 40, 2 },
     // Savage: +gold / monsters deal more damage
-    { "Savage", Effect::GoldFind, 30, 55, 3, Effect::MonsterDmg, 20, 40, 3 },
+    { "Savage", Effect::GoldFind, 45, 80, 4, Effect::MonsterDmg, 20, 40, 3 },
     // Volatile: big +item drops / the run clock (grace, waves, collapse) runs faster
     { "Volatile", Effect::ItemQuantity, 40, 80, 4, Effect::Collapse, 30, 60, 2 },
     // Teeming: +experience / the dungeon holds more monsters
@@ -123,7 +126,7 @@ constexpr std::array<AffixData, 14> Affixes = { {
     // Tyrannical: +magic find / part of the population are champions
     { "Tyrannical", Effect::MagicFind, 15, 30, 2, Effect::Champions, 10, 20, 1 },
     // Frenzied: +gold / monsters act faster
-    { "Frenzied", Effect::GoldFind, 35, 60, 3, Effect::MonsterSpeed, 15, 30, 1 },
+    { "Frenzied", Effect::GoldFind, 50, 90, 4, Effect::MonsterSpeed, 15, 30, 1 },
     // Hexbound: +magic find / part of the population resists fire & lightning
     { "Hexbound", Effect::MagicFind, 18, 35, 2, Effect::ElemResist, 35, 65, 2 },
     // Gilded: extra chests / monsters deal more damage (the treasure is guarded)
@@ -135,7 +138,7 @@ constexpr std::array<AffixData, 14> Affixes = { {
     { "Twinned", Effect::TwinBoss, 0, 0, 0, Effect::BossHp, 20, 40, 3 },
     // Jeweled: more of the run's drops have a socket / monsters have more life.
     // Points, not percent: tier 1 is roughly double the 8% base drop chance.
-    { "Jeweled", Effect::Sockets, 8, 15, 0, Effect::MonsterHp, 20, 40, 2 },
+    { "Jeweled", Effect::Sockets, 8, 15, 1, Effect::MonsterHp, 20, 40, 2 },
 } };
 
 /** Magnitude multiplier (percent) per tier: tier 2/3 rolls run hotter on BOTH sides. */
@@ -143,6 +146,21 @@ constexpr int TierScalePct[3] = { 100, 150, 220 };
 
 /** [RUNS MOD] Tyrannical champion stat boosts (on top of the scroll's flat mods). */
 constexpr int ChampionHpBonusPct = 150;
+
+/** [RUNS MOD] Ceilings on a scroll's combined modifiers (see AggregateRunMods). The banes
+ * stop at what a geared hero can still push through; the boons that are really loot --
+ * champions (each drops a good item), chests, shrines, extra packs -- stop before they swamp
+ * the boss vault. */
+constexpr int MaxMonsterHpPct = 200;
+constexpr int MaxMonsterDmgPct = 150;
+constexpr int MaxBossHpPct = 200;
+constexpr int MaxSpeedPct = 50;
+constexpr int MaxCollapsePct = 150;
+constexpr int MaxElemResistPct = 75;
+constexpr int MaxChampionPct = 30;
+constexpr int MaxPackPct = 100;
+constexpr int MaxChestsPct = 100;
+constexpr int MaxShrinesPct = 200;
 constexpr int ChampionDmgBonusPct = 40;
 
 /** Stream salts so the champion and elemental per-monster rolls are independent. */
@@ -334,6 +352,21 @@ RunModMultipliers AggregateRunMods(const ScrollModSet &set)
 		ApplyEffect(out, data.boon, set.mods[i].boonPct);
 		ApplyEffect(out, data.bane, set.mods[i].banePct);
 	}
+	// [RUNS MOD] Ceilings on the combined effect. Magnitudes grow with depth and tier (up to
+	// x2.2), and modifiers of one kind add up, so a deep tier-III scroll could turn most of
+	// the population into loot-dropping champions, scatter fifty extra chests, or stack three
+	// life banes past +400%. Each scroll's own lines still show what it rolled; only the
+	// total is held here.
+	out.monsterHpPct = std::min(out.monsterHpPct, MaxMonsterHpPct);
+	out.monsterDmgPct = std::min(out.monsterDmgPct, MaxMonsterDmgPct);
+	out.bossHpPct = std::min(out.bossHpPct, MaxBossHpPct);
+	out.speedPct = std::min(out.speedPct, MaxSpeedPct);
+	out.collapsePct = std::min(out.collapsePct, MaxCollapsePct);
+	out.elemResistPct = std::min(out.elemResistPct, MaxElemResistPct);
+	out.championPct = std::min(out.championPct, MaxChampionPct);
+	out.packPct = std::min(out.packPct, MaxPackPct);
+	out.chestsPct = std::min(out.chestsPct, MaxChestsPct);
+	out.shrinesPct = std::min(out.shrinesPct, MaxShrinesPct);
 	return out;
 }
 
