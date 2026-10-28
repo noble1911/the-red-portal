@@ -83,7 +83,7 @@ bool RunIconsAvailable();
  * frame), so the constant below is part of the data format: keep the two in step.
  */
 constexpr int RunItemCursFirst = 400;
-constexpr int NumRunItemIcons = 33;
+constexpr int NumRunItemIcons = 39;
 
 constexpr bool IsRunItemCurs(int curs)
 {

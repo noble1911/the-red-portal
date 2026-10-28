@@ -205,3 +205,9 @@ IDI_GAMBLETOKEN	0	Misc	Unequippable	BLOOD_STONE	Misc	NONE	Gambler's Token		1	0	0
 	0	Weapon	Two-handed	431	Bow	RELIC_HEARTSEEKER	Heartseeker		0	70	5	18	0	0	50	0	100		UNIQUE	Null	false	60000
 	0	Armor	Armor	432	LightArmor	RELIC_ARCHMANTLE	Archmage's Mantle		0	60	0	0	30	35	0	60	0		UNIQUE	Null	false	60000
 	0	Misc	Unequippable	SPECTRAL_ELIXIR	Misc	NONE	Boar Draught		1	0	0	0	0	0	0	0	0		COMPANION	Null	true	1000
+	0	Weapon	Two-handed	433	Axe	RELIC_GLACIERBANE	Glacierbane		0	120	20	46	0	0	120	0	0		UNIQUE	Null	false	60000
+	0	Weapon	Two-handed	434	Bow	RELIC_CRIMSONECLIPSE	Crimson Eclipse		0	70	5	19	0	0	50	0	110		UNIQUE	Null	false	60000
+	0	Weapon	Two-handed	435	Staff	RELIC_DROWNEDSTAR	Drowned Star		0	60	6	14	0	0	30	80	0		UNIQUE	Null	false	60000
+	0	Weapon	Two-handed	436	Sword	RELIC_HELLFORGE	Hellforge		0	120	24	50	0	0	130	0	0		UNIQUE	Null	false	65000
+	0	Weapon	Two-handed	437	Bow	RELIC_THORNSPINE	Thornspine		0	80	6	22	0	0	55	0	120		UNIQUE	Null	false	65000
+	0	Weapon	Two-handed	438	Staff	RELIC_NINTHCIRCLE	The Ninth Circle		0	70	8	18	0	0	35	110	0		UNIQUE	Null	false	65000

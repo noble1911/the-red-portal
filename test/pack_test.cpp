@@ -8,6 +8,7 @@
 #include "game_mode.hpp"
 #include "pack.h"
 #include "runs_companion.h"
+#include "runs_icons.h"
 #include "stores.h"
 #include "tables/monstdat.h"
 #include "tables/playerdat.hpp"
@@ -1607,6 +1608,29 @@ TEST(CompanionStatsTest, RolesRollAndDiffer)
 	EXPECT_GT(avg(life, CompanionKind::Fighter), avg(life, CompanionKind::Ranged));
 	EXPECT_GT(avg(damage, CompanionKind::Fighter), avg(damage, CompanionKind::Tank));
 	EXPECT_GT(avg(damage, CompanionKind::Fighter), avg(damage, CompanionKind::Healer));
+}
+
+// [RUNS MOD] The elite relics -- the Nightmare/Hell chase -- are in both games' unique tables,
+// each on its own relic-only base (dropRate 0, so it never drops normally or turns up in the
+// gamble) drawn with a run icon.
+TEST_F(PackTest, EliteRelics_are_relic_only)
+{
+	for (bool hellfire : { false, true }) {
+		SetHellfireState(hellfire);
+		for (std::string_view name : { "Glacierbane", "Crimson Eclipse", "Drowned Star", "Hellforge", "Thornspine", "The Ninth Circle" }) {
+			size_t uid = 0;
+			while (uid < UniqueItems.size() && UniqueItems[uid].UIName != name)
+				uid++;
+			ASSERT_LT(uid, UniqueItems.size()) << name << (hellfire ? " (Hellfire)" : " (Diablo)");
+			size_t idx = 0;
+			while (idx < AllItemsList.size() && AllItemsList[idx].iItemId != UniqueItems[uid].UIItemId)
+				idx++;
+			ASSERT_LT(idx, AllItemsList.size()) << name;
+			EXPECT_EQ(AllItemsList[idx].dropRate, 0U) << name;
+			EXPECT_TRUE(IsRunItemCurs(AllItemsList[idx].iCurs)) << name;
+		}
+	}
+	SetHellfireState(false);
 }
 
 } // namespace

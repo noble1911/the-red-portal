@@ -608,8 +608,8 @@ void TryDropRunRelic(int depth, Point position);
  * roll hands out), so the info box can say so. */
 bool IsRunRelic(const Item &item);
 /** @brief [RUNS MOD] Appends the dungeon scroll tooltip's relic line: how many relics a
- * boss at `depth` can drop and the vault's relic chance. */
-void GetRunRelicScrollLines(int depth, std::vector<std::string> &lines);
+ * boss at `depth` on `difficulty` can drop -- elites included -- and the vault's relic chance. */
+void GetRunRelicScrollLines(int depth, int difficulty, std::vector<std::string> &lines);
 /** @brief [RUNS MOD] Drops a Gambler's Token (one free pull at Farnham's machine). */
 void DropGambleToken(Point position, bool sendmsg);
 
@@ -711,6 +711,9 @@ void DropBossGradeItem(Point position);
  * twice the depth, so these match the engine's lift.
  */
 int RunRewardDepthBonus();
+/** @brief [RUNS MOD] RunRewardDepthBonus for a given difficulty rather than the current one
+ * (a scroll's tooltip, read in town). */
+int RewardDepthBonusFor(int difficulty);
 
 /** @brief [RUNS MOD] Rolls Adria's companion potion for this restock (a boss kill, or the first
  * hub visit), at a premium and a few depths under the hero's deepest. SpawnWitch shelves it

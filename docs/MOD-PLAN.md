@@ -501,6 +501,20 @@ A review of player options against the dungeon found four systemic problems, fix
    The Healer heals 5 + 2/level (was 6 + 3: ~12 life/s at depth 10 made solo play very safe
    alongside Heal Other).
 
+**Nightmare/Hell chase** (2026-10-28, NOT yet playtested)
+- With the reward lift (balance fix 2) Nightmare/Hell paid better rolls, but nothing was
+  exclusive to them: every unique (max level 27) and base (max 30) is reachable on Normal by
+  about depth 12-15, and relics top out at Normal depth 21.
+- **Elite relics** (one per role per tier, relic-only bases, both games, icons 433-438 lifted
+  from TH4's TH3objcurs.cel frames 551/1146/882/741/1148/1473):
+  Nightmare -- Glacierbane (2H axe), Crimson Eclipse (bow), Drowned Star (staff);
+  Hell -- Hellforge (2H sword), Thornspine (bow), The Ninth Circle (staff).
+  Each sits above the best Normal relic of its role. When a Nightmare/Hell vault rolls a
+  relic (12%), 40% come from the elite pool (EliteRelicSharePct): the Nightmare three on
+  Nightmare, all six on Hell. RunRelic.minDifficulty marks them; the depth windows and the
+  every-role static_assert skip them. A scroll's relic line counts its own difficulty
+  ("Relics: N + M elite, 12% per boss"). Test: pack_test EliteRelics_are_relic_only.
+
 **Floating numbers on by default, with icons** (2026-10-28)
 - The stock "Floating Numbers - Damage/XP" Lua mods are switched on once for every
   install (a [RunsMod] marker in the INI; turning them off afterwards sticks).

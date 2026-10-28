@@ -1917,7 +1917,7 @@ void PrintItemMisc(const Item &item)
 			AddInfoBoxString(DescribeScrollMod(mods.mods[i], /*full=*/true), /*floatingBox=*/true);
 		// How many relics this depth's boss can drop, and how often.
 		std::vector<std::string> relicLines;
-		GetRunRelicScrollLines(DungeonScrollLevel(item), relicLines);
+		GetRunRelicScrollLines(DungeonScrollLevel(item), DungeonScrollDifficulty(item), relicLines);
 		for (std::string &line : relicLines)
 			AddInfoBoxString(std::move(line), /*floatingBox=*/true);
 		return;
@@ -3223,6 +3223,9 @@ struct RunRelic {
 	int minDepth;
 	bool hellfireOnly;
 	RelicRole role;
+	/** 0 for the depth-gated relics; DIFF_NIGHTMARE or DIFF_HELL for an elite relic, which
+	 * only a vault on that difficulty or harder can hold, at any depth. */
+	int minDifficulty = 0;
 };
 
 constexpr RunRelic RunRelics[] = {
@@ -3252,7 +3255,20 @@ constexpr RunRelic RunRelics[] = {
 	{ "Dawnbreaker", 20, true, RelicRole::Melee },
 	{ "Heartseeker", 20, true, RelicRole::Archer },
 	{ "Archmage's Mantle", 21, true, RelicRole::Caster },
+	// [RUNS MOD] Elite relics: the chase on the harder difficulties. Nothing else in the game
+	// is exclusive to them -- every unique and base is reachable on Normal -- so these are
+	// the items only Nightmare and Hell vaults hold, one per role per tier, above the best of
+	// Normal. In both games, since both have the difficulties.
+	{ "Glacierbane", 0, false, RelicRole::Melee, DIFF_NIGHTMARE },
+	{ "Crimson Eclipse", 0, false, RelicRole::Archer, DIFF_NIGHTMARE },
+	{ "Drowned Star", 0, false, RelicRole::Caster, DIFF_NIGHTMARE },
+	{ "Hellforge", 0, false, RelicRole::Melee, DIFF_HELL },
+	{ "Thornspine", 0, false, RelicRole::Archer, DIFF_HELL },
+	{ "The Ninth Circle", 0, false, RelicRole::Caster, DIFF_HELL },
 };
+
+/** Of the relics a Nightmare or Hell vault holds, this percent come from the elite pool. */
+constexpr int EliteRelicSharePct = 40;
 
 /** A vault rolls only relics gated at most this many levels below its depth. */
 constexpr int RunRelicWindow = 3;
@@ -3264,14 +3280,14 @@ constexpr bool EveryRelicWindowServesEveryRole(bool hellfire)
 {
 	int deepestGate = 0;
 	for (const RunRelic &relic : RunRelics) {
-		if (!relic.hellfireOnly || hellfire)
+		if (relic.minDifficulty == 0 && (!relic.hellfireOnly || hellfire))
 			deepestGate = std::max(deepestGate, relic.minDepth);
 	}
 	for (int depth = 5; depth <= deepestGate; depth++) {
 		for (const RelicRole role : { RelicRole::Melee, RelicRole::Archer, RelicRole::Caster }) {
 			bool served = false;
 			for (const RunRelic &relic : RunRelics) {
-				if (relic.role == role && (!relic.hellfireOnly || hellfire)
+				if (relic.minDifficulty == 0 && relic.role == role && (!relic.hellfireOnly || hellfire)
 				    && relic.minDepth <= depth && relic.minDepth >= depth - RunRelicWindow)
 					served = true;
 			}
@@ -3299,12 +3315,14 @@ size_t GetRunRelicPool(int depth, const RunRelic *(&pool)[std::size(RunRelics)])
 	// Past the deepest gate the window stays on the top relics instead of emptying.
 	int deepestGate = 0;
 	for (const RunRelic &relic : RunRelics) {
-		if (!relic.hellfireOnly || gbIsHellfire)
+		if (relic.minDifficulty == 0 && (!relic.hellfireOnly || gbIsHellfire))
 			deepestGate = std::max(deepestGate, relic.minDepth);
 	}
 	depth = std::min(depth, deepestGate);
 	size_t count = 0;
 	for (const RunRelic &relic : RunRelics) {
+		if (relic.minDifficulty != 0)
+			continue; // elites are not depth-gated (see GetEliteRelicPool)
 		if (depth < relic.minDepth || relic.minDepth < depth - RunRelicWindow)
 			continue;
 		if (relic.hellfireOnly && !gbIsHellfire)
@@ -3380,6 +3398,17 @@ int LegacyRelicUid(_item_indexes idx, uint16_t createInfo, uint32_t seed)
 	return match;
 }
 
+/** Fills `pool` with the elite relics a vault on `difficulty` can hold; returns the count. */
+size_t GetEliteRelicPool(int difficulty, const RunRelic *(&pool)[std::size(RunRelics)])
+{
+	size_t count = 0;
+	for (const RunRelic &relic : RunRelics) {
+		if (relic.minDifficulty != 0 && relic.minDifficulty <= difficulty && (!relic.hellfireOnly || gbIsHellfire))
+			pool[count++] = &relic;
+	}
+	return count;
+}
+
 } // namespace
 
 bool IsRunRelic(const Item &item)
@@ -3391,13 +3420,19 @@ bool IsRunRelic(const Item &item)
 	return std::any_of(std::begin(RunRelics), std::end(RunRelics), [name](const RunRelic &relic) { return relic.name == name; });
 }
 
-void GetRunRelicScrollLines(int depth, std::vector<std::string> &lines)
+void GetRunRelicScrollLines(int depth, int difficulty, std::vector<std::string> &lines)
 {
 	const RunRelic *pool[std::size(RunRelics)];
-	const size_t count = GetRunRelicPool(depth, pool);
-	if (count == 0)
+	// The scroll's own difficulty, not the hub's: its vault pays deeper and holds elites.
+	const size_t count = GetRunRelicPool(depth + RewardDepthBonusFor(difficulty), pool);
+	const size_t elites = difficulty > DIFF_NORMAL ? GetEliteRelicPool(difficulty, pool) : 0;
+	if (count == 0 && elites == 0)
 		return;
 	// One short line, no names: listing up to five relics swamped the tooltip.
+	if (elites > 0) {
+		lines.push_back(fmt::format(fmt::runtime(_(/* TRANSLATORS: {:d} counts of relic kinds, then a percent chance */ "Relics: {:d} + {:d} elite, {:d}% per boss")), count, elites, RunRelicChancePct));
+		return;
+	}
 	lines.push_back(fmt::format(fmt::runtime(ngettext(/* TRANSLATORS: {:d} is a count of relic kinds, {:d}% a percent chance */ "Relics: {:d} kind, {:d}% per boss", "Relics: {:d} kinds, {:d}% per boss", static_cast<int>(count))), count, RunRelicChancePct));
 }
 
@@ -3406,7 +3441,13 @@ void TryDropRunRelic(int depth, Point position)
 	if (GenerateRnd(100) >= RunRelicChancePct)
 		return;
 	const RunRelic *pool[std::size(RunRelics)];
-	const size_t count = GetRunRelicPool(depth, pool);
+	// On Nightmare and Hell some of the relics come from the elite pool instead.
+	size_t count = 0;
+	const int difficulty = sgGameInitInfo.nDifficulty;
+	if (difficulty > DIFF_NORMAL && GenerateRnd(100) < EliteRelicSharePct)
+		count = GetEliteRelicPool(difficulty, pool);
+	if (count == 0)
+		count = GetRunRelicPool(depth, pool);
 	if (count == 0)
 		return;
 	const std::string_view name = pool[static_cast<size_t>(GenerateRnd(static_cast<int>(count)))]->name;
@@ -3445,9 +3486,14 @@ constexpr int HellRewardDepthBonus = 15;
 
 int RunRewardDepthBonus()
 {
+	return RewardDepthBonusFor(sgGameInitInfo.nDifficulty);
+}
+
+int RewardDepthBonusFor(int difficulty)
+{
 	if (!RunsModEnabled)
 		return 0;
-	switch (sgGameInitInfo.nDifficulty) {
+	switch (difficulty) {
 	case DIFF_NIGHTMARE:
 		return NightmareRewardDepthBonus;
 	case DIFF_HELL:
