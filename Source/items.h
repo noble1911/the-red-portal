@@ -204,6 +204,11 @@ enum icreateinfo_flag2 {
 	/** [RUNS MOD] This item has a socket, so a gem can be fused into it (see runs_gems.h).
 	 * Rolled once when the item is created and carried here from then on, like the gem. */
 	CF_SOCKETED = 1 << 20,
+	/** [RUNS MOD] A unique chosen by index (relic, fruit-machine jackpot) rather than
+	 * rolled. Vanilla rebuilds a unique by re-rolling it from seed + item level, which a
+	 * chosen unique cannot survive, so RecreateItem rebuilds these from the index here. */
+	CF_CHOSENUNIQUE = 1 << 21,
+	CF_CHOSENUNIQUEID = ((1 << 9) - 1) << 22, // bits 22-30: index into UniqueItems
 	// clang-format on
 };
 

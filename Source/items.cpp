@@ -3297,6 +3297,72 @@ size_t GetRunRelicPool(int depth, const RunRelic *(&pool)[std::size(RunRelics)])
 	return count;
 }
 
+/** The base item a unique is built on, or IDI_NONE if this item table has none. */
+_item_indexes ChosenUniqueBase(size_t uid)
+{
+	if (uid >= UniqueItems.size())
+		return IDI_NONE;
+	for (size_t i = 0; i < AllItemsList.size(); i++) {
+		if (AllItemsList[i].iItemId == UniqueItems[uid].UIItemId)
+			return static_cast<_item_indexes>(i);
+	}
+	return IDI_NONE;
+}
+
+/**
+ * Builds exactly unique `uid` from `seed` (relics, the fruit machine's jackpot), and marks
+ * it CF_CHOSENUNIQUE so RecreateItem can build it again the same way. The base's armour
+ * roll is drawn from `seed`, so a rebuild matches the original.
+ *
+ * SpawnUnique is deliberately NOT used: on Nightmare/Hell it substitutes a random item of
+ * the same type (vanilla quest behavior), which would break relics precisely on the
+ * harder runs.
+ */
+bool BuildChosenUnique(const Player &player, Item &item, size_t uid, uint32_t seed)
+{
+	if (uid >= UniqueItems.size() || uid > (CF_CHOSENUNIQUEID >> 22))
+		return false;
+	const _item_indexes idx = ChosenUniqueBase(uid);
+	if (idx == IDI_NONE)
+		return false;
+	item = {};
+	SetRndSeed(seed);
+	GetItemAttrs(item, idx, std::max<int>(1, UniqueItems[uid].UIMinLvl));
+	item._iSeed = seed;
+	GetUniqueItem(player, item, static_cast<_unique_items>(uid));
+	item.dwBuff |= CF_CHOSENUNIQUE | (static_cast<uint32_t>(uid) << 22);
+	if (gbIsHellfire)
+		item.dwBuff |= CF_HELLFIRE;
+	SetupItem(item);
+	return true;
+}
+
+/**
+ * The relic a pre-fix relic was, or -1. Relics used to be built with seed 0 and item level
+ * 0, which RecreateItem re-rolled into a plain base item -- after which the next save
+ * stored it with a create-info of 0. Both forms are recognisable: seed 0, no create-info
+ * beyond CF_UNIQUE, and a relic-only base (dropRate 0) that exactly one relic is built on.
+ * Starting gear also has a zero create-info, but its bases drop normally.
+ */
+int LegacyRelicUid(_item_indexes idx, uint16_t createInfo, uint32_t seed)
+{
+	if (seed != 0 || (createInfo & ~CF_UNIQUE) != 0 || static_cast<size_t>(idx) >= AllItemsList.size())
+		return -1;
+	if (AllItemsList[idx].dropRate != 0)
+		return -1;
+	int match = -1;
+	for (const RunRelic &relic : RunRelics) {
+		for (size_t uid = 0; uid < UniqueItems.size(); uid++) {
+			if (UniqueItems[uid].UIName != relic.name || UniqueItems[uid].UIItemId != AllItemsList[idx].iItemId)
+				continue;
+			if (match != -1)
+				return -1; // two relics on one base: cannot tell which it was
+			match = static_cast<int>(uid);
+		}
+	}
+	return match;
+}
+
 } // namespace
 
 bool IsRunRelic(const Item &item)
@@ -3330,24 +3396,12 @@ void TryDropRunRelic(int depth, Point position)
 	const auto found = std::find_if(UniqueItems.begin(), UniqueItems.end(), [name](const UniqueItem &unique) { return unique.UIName == name; });
 	if (found == UniqueItems.end())
 		return; // a unique table without this relic (e.g. a mod replacing the file)
-	const auto uid = static_cast<_unique_items>(found - UniqueItems.begin());
+	const auto uid = static_cast<size_t>(found - UniqueItems.begin());
 
-	// Build the exact unique (the jackpot's construction pattern). SpawnUnique is
-	// deliberately NOT used: on Nightmare/Hell it substitutes a random item of the
-	// same type (vanilla quest behavior), which would break relics precisely on the
-	// harder runs.
-	std::underlying_type_t<_item_indexes> idx = 0;
-	while (AllItemsList[idx].iItemId != UniqueItems[uid].UIItemId)
-		idx++;
-	Item item = {};
-	GetItemAttrs(item, static_cast<_item_indexes>(idx), UniqueItems[uid].UIMinLvl);
-	GetUniqueItem(*MyPlayer, item, uid);
-	SetupItem(item);
-	// Built here with no seed, so RollSocket's seed hash would give every relic the same
-	// answer. This runs on the killer's client alone and the socket travels in dwBuff,
-	// so the game RNG is fine.
-	if (GenerateRnd(100) < SocketChanceUniquePct + ActiveRunMods.socketPct)
-		item.dwBuff |= CF_SOCKETED;
+	Item item;
+	if (!BuildChosenUnique(*MyPlayer, item, uid, AdvanceRndSeed()))
+		return;
+	RollSocket(item, SocketChanceUniquePct);
 	DropPrizeItem(item, position);
 	InitDiabloMsg(_("A relic of the old world!"));
 }
@@ -3444,11 +3498,11 @@ void SpawnGamblerJackpot(int qlvlCap)
 		poolSize++;
 	const Candidate &pick = eligible[static_cast<size_t>(GenerateRnd(static_cast<int>(poolSize)))];
 	const size_t uid = pick.uid;
-	const _item_indexes baseIdx = pick.baseIdx;
 	Item &item = GamblerJackpot;
-	GetItemAttrs(item, baseIdx, std::max<int>(1, UniqueItems[uid].UIMinLvl));
-	GetUniqueItem(*MyPlayer, item, static_cast<_unique_items>(uid));
-	SetupItem(item);
+	if (!BuildChosenUnique(*MyPlayer, item, uid, AdvanceRndSeed())) {
+		item.clear();
+		return;
+	}
 	item._iIdentified = true;
 	item.updateRequiredStatsCacheForPlayer(*MyPlayer);
 }
@@ -4109,6 +4163,24 @@ void RecreateItem(const Player &player, Item &item, _item_indexes idx, uint16_t 
 		item.dwBuff = dwBuff;
 		gbIsHellfire = tmpIsHellfire;
 		return;
+	}
+
+	// [RUNS MOD] Chosen uniques (relics, the jackpot) are rebuilt from the unique index
+	// they carry; re-rolling them as vanilla does turns them into plain base items. Relics
+	// from before the index existed are recognised by their base and rebuilt too.
+	if (RunsModEnabled) {
+		int chosenUid = -1;
+		if ((dwBuff & CF_CHOSENUNIQUE) != 0)
+			chosenUid = static_cast<int>((dwBuff & CF_CHOSENUNIQUEID) >> 22);
+		else
+			chosenUid = LegacyRelicUid(idx, icreateinfo, iseed);
+		if (chosenUid >= 0 && ChosenUniqueBase(static_cast<size_t>(chosenUid)) == idx
+		    && BuildChosenUnique(player, item, static_cast<size_t>(chosenUid), iseed)) {
+			item.dwBuff |= dwBuff; // socket, gem, preservation
+			ReapplyFusedGem(item);
+			gbIsHellfire = tmpIsHellfire;
+			return;
+		}
 	}
 
 	if (icreateinfo == 0) {

@@ -4,8 +4,10 @@
 
 #include "cursor.h"
 #include "engine/assets.hpp"
+#include "engine/random.hpp"
 #include "game_mode.hpp"
 #include "pack.h"
+#include "stores.h"
 #include "tables/monstdat.h"
 #include "tables/playerdat.hpp"
 #include "utils/endian_swap.hpp"
@@ -1457,6 +1459,75 @@ TEST_F(NetPackTest, UnPackNetPlayer_invalid_monsterItemLevel)
 	}
 	ASSERT_GT(count, 0);
 	ASSERT_TRUE(TestNetPackValidation());
+}
+
+// [RUNS MOD] Chosen uniques (relics, the fruit-machine jackpot) are built from a unique
+// index, not rolled. Multiplayer saves and network sync rebuild items from the pack, so the
+// index has to bring back the same unique rather than a plain base item.
+TEST_F(PackTest, ChosenUnique_survives_repack)
+{
+	SetHellfireState(false);
+	gbIsMultiplayer = true;
+	gbIsSpawn = false;
+	MyPlayer->_pMaxManaBase = 125 << 6;
+	MyPlayer->_pMaxHPBase = 125 << 6;
+
+	for (int cap : { 10, 30, 60 }) {
+		SetRndSeed(static_cast<uint32_t>(cap));
+		SpawnGamblerJackpot(cap);
+		const Item original = GamblerJackpot;
+		ASSERT_FALSE(original.isEmpty());
+		ASSERT_EQ(original._iMagical, ITEM_QUALITY_UNIQUE);
+
+		ItemPack packed;
+		PackItem(packed, original, gbIsHellfire);
+		Item rebuilt;
+		UnPackItem(packed, *MyPlayer, rebuilt, false);
+
+		EXPECT_EQ(rebuilt._iMagical, ITEM_QUALITY_UNIQUE) << original._iIName;
+		EXPECT_EQ(rebuilt._iUid, original._iUid) << original._iIName;
+		EXPECT_STREQ(rebuilt._iIName, original._iIName);
+		EXPECT_EQ(rebuilt._iAC, original._iAC) << original._iIName;
+		EXPECT_EQ(rebuilt._iPLDam, original._iPLDam) << original._iIName;
+		EXPECT_EQ(rebuilt._iPLStr, original._iPLStr) << original._iIName;
+	}
+}
+
+// [RUNS MOD] Relics built before the unique index existed were stored with seed 0 and a
+// create-info of CF_UNIQUE (or 0, once a rebuild had already flattened them). They are
+// recognised by their relic-only base and rebuilt as the relic. Hellfire mode: the relic
+// bases sit past index 161, which a Diablo-mode pack treats as Hellfire-only and drops.
+TEST_F(PackTest, LegacyRelic_rebuilt_from_base)
+{
+	SetHellfireState(true);
+	gbIsMultiplayer = true;
+	gbIsSpawn = false;
+
+	size_t uid = 0;
+	while (uid < UniqueItems.size() && UniqueItems[uid].UIName != "Thornstring")
+		uid++;
+	ASSERT_LT(uid, UniqueItems.size());
+	size_t idx = 0;
+	while (idx < AllItemsList.size() && AllItemsList[idx].iItemId != UniqueItems[uid].UIItemId)
+		idx++;
+	ASSERT_LT(idx, AllItemsList.size());
+
+	for (uint16_t createInfo : { static_cast<uint16_t>(CF_UNIQUE), static_cast<uint16_t>(0) }) {
+		Item legacy;
+		InitializeItem(legacy, static_cast<_item_indexes>(idx));
+		legacy._iCreateInfo = createInfo;
+		legacy._iSeed = 0;
+
+		ItemPack packed;
+		PackItem(packed, legacy, gbIsHellfire);
+		Item rebuilt;
+		UnPackItem(packed, *MyPlayer, rebuilt, true);
+
+		EXPECT_EQ(rebuilt._iMagical, ITEM_QUALITY_UNIQUE) << "create-info " << createInfo;
+		EXPECT_STREQ(rebuilt._iIName, "Thornstring") << "create-info " << createInfo;
+		EXPECT_NE(rebuilt.dwBuff & CF_CHOSENUNIQUE, 0U) << "rebuilt relic should carry its index from now on";
+	}
+	SetHellfireState(false);
 }
 
 } // namespace

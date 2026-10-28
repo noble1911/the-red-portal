@@ -412,6 +412,20 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   / "Socket: <gem>" (shown unidentified too); text-shop rows say "Socketed".
 - Fix found on the way: RecreateItem never re-applied a fused gem to shop-bought or
   starting gear (and wiped dwBuff on the latter), so those lost their gem on save/sync.
+
+**Relic / jackpot rebuild fix** (2026-10-28, built + pack tests, NOT yet playtested)
+- Bug: relics and the fruit-machine jackpot were built by unique index with seed 0 and
+  item level 0. Multiplayer hero saves and network sync rebuild items from the pack by
+  RE-ROLLING them, and a level-0 roll is almost never unique -- so a relic came back as a
+  plain base item after a reload (and was then saved that way).
+- Fix: BuildChosenUnique gives the item a real seed and records the unique index in
+  dwBuff (CF_CHOSENUNIQUE, bits 21-30); RecreateItem rebuilds from that index. Relics
+  already flattened by the bug are recognised (seed 0, create-info 0 or CF_UNIQUE, a
+  relic-only base exactly one relic sits on) and restored on their next load.
+- Tests: pack_test ChosenUnique_survives_repack + LegacyRelic_rebuilt_from_base.
+- Seen on the way, not fixed: a Diablo-mode (non-Hellfire) pack drops every item index
+  >= 161 as "Hellfire-only", which includes all the mod's own items (relic bases,
+  dungeon scrolls, gems, tokens). Fine while games run with Hellfire on.
 - Unchanged: boss's own drop, gold piles, gem, next-depth scroll, uper 15 / +4 tier.
 **Dungeon rules: one exit, any tileset** (2026-10-25, built + drlg tests green, NOT yet playtested)
 - One staircase per run level, and it is the exit: generators skip the down stairs, the
