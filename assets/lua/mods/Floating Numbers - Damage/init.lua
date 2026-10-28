@@ -12,8 +12,10 @@ local DAMAGE_TYPE = {
     ACID = 4,
 }
 
-local function get_damage_style(damage_val, damage_type)
-    local style = 0
+-- [RUNS MOD] Colour says whose damage it is, not its element: damage dealt is gold with a
+-- sword, damage taken red with a skull, so the two never get confused.
+local function get_damage_style(damage_val, base_color)
+    local style = base_color
     
     local v = damage_val
     if v >= 64 * 300 then
@@ -22,19 +24,6 @@ local function get_damage_style(damage_val, damage_type)
         style = style | render.UiFlags.FontSize24
     else
         style = style | render.UiFlags.FontSize12
-    end
-
-    local damage_type_styles = {
-        [DAMAGE_TYPE.PHYSICAL] = render.UiFlags.ColorGold,
-        [DAMAGE_TYPE.FIRE] = render.UiFlags.ColorUiSilver, -- shows as DarkRed in game
-        [DAMAGE_TYPE.LIGHTNING] = render.UiFlags.ColorBlue,
-        [DAMAGE_TYPE.MAGIC] = render.UiFlags.ColorOrange,
-        [DAMAGE_TYPE.ACID] = render.UiFlags.ColorYellow,
-    }
-
-    local type_style = damage_type_styles[damage_type]
-    if type_style then
-        style = style | type_style
     end
 
     return style
@@ -65,8 +54,8 @@ events.OnMonsterTakeDamage.add(function(monster, damage, damage_type)
     entry.time = now
 
     local text = format_damage(entry.damage)
-    local style = get_damage_style(entry.damage, damage_type)
-    floatingnumbers.add(text, monster.position, style, id, false) 
+    local style = get_damage_style(entry.damage, render.UiFlags.ColorGold)
+    floatingnumbers.add(text, monster.position, style, id, false, "dealt")
 end)
 
 events.OnPlayerTakeDamage.add(function(_player, damage, damage_type)
@@ -84,7 +73,7 @@ events.OnPlayerTakeDamage.add(function(_player, damage, damage_type)
         entry.time = now
 
         local text = format_damage(entry.damage)
-        local style = get_damage_style(entry.damage, damage_type)
-        floatingnumbers.add(text, _player.position, style, id, true)
+        local style = get_damage_style(entry.damage, render.UiFlags.ColorRed)
+        floatingnumbers.add(text, _player.position, style, id, true, "taken")
     end
 end)

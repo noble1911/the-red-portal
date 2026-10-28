@@ -222,6 +222,15 @@ void LoadOptions()
 {
 	LoadIni();
 	DiscoverMods();
+	// [RUNS MOD] Damage and XP numbers are on by default. Every mod found is written to
+	// the INI as "off", so a changed default would never reach an existing install: switch
+	// them on once, before the INI is read, and remember having done so -- turning them off
+	// again afterwards sticks.
+	if (!ini->getBool("RunsMod", "Default Mods Enabled", false)) {
+		for (const char *mod : { "Floating Numbers - Damage", "Floating Numbers - XP" })
+			ini->set("Mods", mod, true);
+		ini->set("RunsMod", "Default Mods Enabled", true);
+	}
 	Options &options = GetOptions();
 	for (OptionCategoryBase *pCategory : options.GetCategories()) {
 		for (OptionEntryBase *pEntry : pCategory->GetEntries()) {

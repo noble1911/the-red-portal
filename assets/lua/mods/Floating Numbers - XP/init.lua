@@ -22,6 +22,7 @@ events.OnPlayerGainExperience.add(function(_player, experience)
         entry.time = now
 
         local text = tostring(entry.experience) .. " XP"
-        floatingnumbers.add(text, _player.position, render.UiFlags.ColorWhite, id, true)
+        -- [RUNS MOD] Blue with an up-arrow, apart from the damage numbers' gold and red.
+        floatingnumbers.add(text, _player.position, render.UiFlags.ColorBlue, id, true, "xp")
     end
 end)
