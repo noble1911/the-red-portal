@@ -449,7 +449,9 @@ int PremiumBaseLevel(const Player &player)
 	if (!RunsModEnabled)
 		return charLevel;
 	const int maxSlotAdd = gbIsHellfire ? itemLevelAddHf[NumSmithItemsHf - 1] : itemLevelAdd[NumSmithItems - 1];
-	const int ceiling = std::max(2 * static_cast<int>(player.pDeepestBeatenDepth), MinPremiumMagicLevel);
+	// The unlocked difficulty lifts the ceiling like the run rewards (balance review): a hero
+	// who has opened Nightmare or Hell shops at that tier's depth.
+	const int ceiling = std::max(2 * (static_cast<int>(player.pDeepestBeatenDepth) + UnlockedRewardDepthBonus(player)), MinPremiumMagicLevel);
 	// std::max on the upper bound, not std::clamp's hi directly: a not-yet-initialised
 	// player reports level 0, and std::clamp with lo > hi is undefined behaviour.
 	return std::clamp(ceiling - maxSlotAdd, 1, std::max(1, charLevel));
@@ -2072,10 +2074,14 @@ void SpawnOnePremium(Item &premiumItem, int plvl, const Player &player)
 	dexterity += dexterity / 5;
 	magic += magic / 5;
 
-	plvl = std::clamp(plvl, 1, 30);
+	// [RUNS MOD] Vanilla's cap of 30 rises with the unlocked difficulty, so the shelf can follow
+	// the hero into Nightmare and Hell (PremiumBaseLevel still holds it to the hero's level).
+	plvl = std::clamp(plvl, 1, 30 + (RunsModEnabled ? UnlockedRewardDepthBonus(player) : 0));
 
 	const int maxCount = 150;
-	const bool unlimited = !gbIsHellfire; // TODO: This could lead to an infinite loop if a suitable item can never be generated
+	// [RUNS MOD] Bounded in run mode: above vanilla's level 30 an item under the value cap
+	// gets rare, and the unbounded Diablo loop could spin forever looking for one.
+	const bool unlimited = !gbIsHellfire && !RunsModEnabled; // TODO: This could lead to an infinite loop if a suitable item can never be generated
 	for (int count = 0; unlimited || count < maxCount; count++) {
 		premiumItem = {};
 		premiumItem._iSeed = AdvanceRndSeed();
@@ -3501,6 +3507,12 @@ constexpr int HellRewardDepthBonus = 15;
 int RunRewardDepthBonus()
 {
 	return RewardDepthBonusFor(sgGameInitInfo.nDifficulty);
+}
+
+int UnlockedRewardDepthBonus(const Player &player)
+{
+	// pDiabloKillLevel is the hardest difficulty cleared, plus one: the next one is open.
+	return RewardDepthBonusFor(std::min<int>(player.pDiabloKillLevel, DIFF_HELL));
 }
 
 int RewardDepthBonusFor(int difficulty)
@@ -5343,7 +5355,7 @@ void RestockWitchCompanion()
 	WitchCompanionStock.clear();
 	if (!RunsModEnabled || MyPlayer == nullptr || MyPlayer->pDeepestBeatenDepth < 1)
 		return;
-	const int potionLevel = std::max(1, static_cast<int>(MyPlayer->pDeepestBeatenDepth) - WitchCompanionLevelsBelow);
+	const int potionLevel = std::max(1, static_cast<int>(MyPlayer->pDeepestBeatenDepth) + UnlockedRewardDepthBonus(*MyPlayer) - WitchCompanionLevelsBelow);
 	CreateCompanionPotion(WitchCompanionStock, potionLevel, AdvanceRndSeed());
 	if (!WitchCompanionStock.isEmpty())
 		WitchCompanionStock._iIvalue = WitchCompanionStock._ivalue = WitchCompanionStock._ivalue * WitchCompanionMarkupPct / 100;

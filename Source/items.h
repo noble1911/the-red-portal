@@ -714,6 +714,9 @@ int RunRewardDepthBonus();
 /** @brief [RUNS MOD] RunRewardDepthBonus for a given difficulty rather than the current one
  * (a scroll's tooltip, read in town). */
 int RewardDepthBonusFor(int difficulty);
+/** @brief [RUNS MOD] The reward lift of the hardest difficulty `player` has unlocked, for the
+ * shops: what they stock follows the hero into Nightmare and Hell. */
+int UnlockedRewardDepthBonus(const Player &player);
 
 /** @brief [RUNS MOD] Rolls Adria's companion potion for this restock (a boss kill, or the first
  * hub visit), at a premium and a few depths under the hero's deepest. SpawnWitch shelves it

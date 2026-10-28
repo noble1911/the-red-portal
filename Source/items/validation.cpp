@@ -52,7 +52,8 @@ bool IsTownItemValid(uint16_t iCreateInfo, const Player &player)
 {
 	const uint8_t level = iCreateInfo & CF_LEVEL;
 	const bool isBoyItem = (iCreateInfo & CF_BOY) != 0;
-	const uint8_t maxTownItemLevel = 30;
+	// [RUNS MOD] Griswold's premium shelf rises past vanilla's 30 with the unlocked difficulty.
+	const uint8_t maxTownItemLevel = RunsModEnabled ? CF_LEVEL : 30;
 
 	// Wirt items in multiplayer are equal to the level of the player, therefore they cannot exceed the max character level
 	if (isBoyItem && level <= player.getMaxCharacterLevel())
@@ -63,6 +64,11 @@ bool IsTownItemValid(uint16_t iCreateInfo, const Player &player)
 
 bool IsShopPriceValid(const Item &item)
 {
+	// [RUNS MOD] Shop stock above vanilla's level 30 (see IsTownItemValid) can be worth more
+	// than vanilla's price limits, and the premium roll gives up after a bounded number of tries.
+	if (RunsModEnabled)
+		return true;
+
 	const int boyPriceLimit = MaxBoyValue;
 	if (!gbIsHellfire && (item._iCreateInfo & CF_BOY) != 0 && item._iIvalue > boyPriceLimit)
 		return false;

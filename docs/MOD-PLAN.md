@@ -526,6 +526,14 @@ A review of player options against the dungeon found four systemic problems, fix
   potion levels failed that, so a partner never saw a Nightmare/Hell vault item ("sent an
   invalid packet"). In run mode IsDungeonItemValid/IsUniqueMonsterItemValid accept any level
   create-info can hold.
+- **Shops follow the unlocked difficulty** (UnlockedRewardDepthBonus, from pDiabloKillLevel):
+  Griswold's premium shelf ceiling rises +8 depths once Nightmare is open and +15 once Hell
+  is, and vanilla's level cap of 30 rises with it (38 / 45); PremiumBaseLevel still holds the
+  shelf to the hero's level. In run mode the premium roll is bounded (150 tries, as Hellfire
+  already was) -- above 30 an item under the value cap gets rare and the Diablo loop was
+  unbounded -- and co-op accepts town items up to level 63 with no shop price limit. Adria's
+  companion potion takes the same lift. The basic Griswold/Adria shelves stay at vanilla's
+  shop level 16, which they already reach by the end of Normal.
 
 **Floating numbers on by default, with icons** (2026-10-28)
 - The stock "Floating Numbers - Damage/XP" Lua mods are switched on once for every
