@@ -514,6 +514,18 @@ A review of player options against the dungeon found four systemic problems, fix
   Nightmare, all six on Hell. RunRelic.minDifficulty marks them; the depth windows and the
   every-role static_assert skip them. A scroll's relic line counts its own difficulty
   ("Relics: N + M elite, 12% per boss"). Test: pack_test EliteRelics_are_relic_only.
+- **Chests, barrels and floor items** roll at the reward depth too (ItemsRewardCurrlevel:
+  ItemsGetCurrlevel + RunRewardDepthBonus, capped so the item level fits create-info's 63):
+  floor items at generation, chest/barrel drops (random, good-only, typed, magic weapons and
+  armour), useful items and champion payouts. Not gold -- vanilla already lifts it +16/+32
+  item levels on Nightmare/Hell -- nor quest items, spell books (Hellfire validates their
+  level against the spell) or the boss/vault (they add the lift themselves).
+- **Co-op validation** (found on the way): vanilla accepts a remote dungeon item only if its
+  level matches a monster's base level or sits under 2x the deepest container level, and a
+  unique-monster item only at a unique's level. The reward lift (up to 62 on Hell) and
+  potion levels failed that, so a partner never saw a Nightmare/Hell vault item ("sent an
+  invalid packet"). In run mode IsDungeonItemValid/IsUniqueMonsterItemValid accept any level
+  create-info can hold.
 
 **Floating numbers on by default, with icons** (2026-10-28)
 - The stock "Floating Numbers - Damage/XP" Lua mods are switched on once for every

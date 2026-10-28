@@ -486,6 +486,20 @@ int ItemsGetCurrlevel()
 	return currlevel;
 }
 
+/**
+ * [RUNS MOD] The item level the dungeon's own loot rolls at: ItemsGetCurrlevel, plus the run's
+ * reward lift on Nightmare and Hell (RunRewardDepthBonus). Used for floor items, chests,
+ * barrels and champion payouts, which otherwise paid Normal's loot on every difficulty.
+ * Not for gold (vanilla already lifts it per difficulty), quest items, spell books (whose
+ * level Hellfire validates against the spell) or the boss and vault (which add the lift
+ * themselves).
+ */
+int ItemsRewardCurrlevel()
+{
+	// Twice this is the item level, and the create-info holds at most 63.
+	return std::min(ItemsGetCurrlevel() + RunRewardDepthBonus(), 31);
+}
+
 bool ItemPlace(Point position)
 {
 	if (dMonster[position.x][position.y] != 0)
@@ -516,7 +530,7 @@ Point GetRandomAvailableItemPosition()
 
 void AddInitItems()
 {
-	const int curlv = ItemsGetCurrlevel();
+	const int curlv = ItemsRewardCurrlevel();
 	const int rnd = GenerateRnd(3) + 3;
 	for (int j = 0; j < rnd; j++) {
 		const int ii = AllocateItem();
@@ -1454,7 +1468,7 @@ _item_indexes RndUItem(Monster *monster)
 {
 	if (monster != nullptr)
 		return RndUItemUpTo(monster->level(sgGameInitInfo.nDifficulty));
-	return RndUItemUpTo(ItemsGetCurrlevel() * 2);
+	return RndUItemUpTo(ItemsRewardCurrlevel() * 2);
 }
 
 _item_indexes RndAllItems()
@@ -1462,7 +1476,7 @@ _item_indexes RndAllItems()
 	if (GenerateRnd(100) > 25)
 		return IDI_GOLD;
 
-	int itemMaxLevel = ItemsGetCurrlevel() * 2;
+	int itemMaxLevel = ItemsRewardCurrlevel() * 2;
 	return GetItemIndexForDroppableItem(false, [&itemMaxLevel](const ItemData &item) {
 		return itemMaxLevel >= item.iMinMLvl;
 	});
@@ -1568,7 +1582,7 @@ void SetupBaseItem(Point position, _item_indexes idx, bool onlygood, bool sendms
 	const int ii = AllocateItem();
 	auto &item = Items[ii];
 	GetSuperItemSpace(position, ii);
-	const int curlv = ItemsGetCurrlevel();
+	const int curlv = ItemsRewardCurrlevel();
 
 	SetupAllItems(*MyPlayer, item, idx, AdvanceRndSeed(), 2 * curlv, 1, onlygood, delta);
 	TryRandomUniqueItem(item, idx, 2 * curlv, 1, onlygood, delta);
@@ -1664,7 +1678,7 @@ void SpawnRock()
 
 	item.position = stand->position;
 	dItem[item.position.x][item.position.y] = ii + 1;
-	const int curlv = ItemsGetCurrlevel();
+	const int curlv = ItemsRewardCurrlevel();
 	GetItemAttrs(item, IDI_ROCK, curlv);
 	SetupItem(item);
 	item.selectionRegion = SelectionRegion::Middle;
@@ -4188,7 +4202,7 @@ void CreateRndUseful(Point position, bool sendmsg)
 	const int ii = AllocateItem();
 	auto &item = Items[ii];
 	GetSuperItemSpace(position, ii);
-	const int curlv = ItemsGetCurrlevel();
+	const int curlv = ItemsRewardCurrlevel();
 
 	SetupAllUseful(item, AdvanceRndSeed(), curlv);
 	if (sendmsg)
@@ -4199,7 +4213,7 @@ void CreateTypeItem(Point position, bool onlygood, ItemType itemType, int imisc,
 {
 	_item_indexes idx;
 
-	const int curlv = ItemsGetCurrlevel();
+	const int curlv = ItemsRewardCurrlevel();
 	if (itemType != ItemType::Gold)
 		idx = RndTypeItems(itemType, imisc, curlv);
 	else
@@ -5683,7 +5697,7 @@ void CreateMagicWeapon(Point position, ItemType itemType, int icurs, bool sendms
 	if (itemType == ItemType::Staff)
 		imid = IMISC_STAFF;
 
-	const int curlv = ItemsGetCurrlevel();
+	const int curlv = ItemsRewardCurrlevel();
 
 	CreateMagicItem(position, curlv, itemType, imid, icurs, sendmsg, delta);
 }
