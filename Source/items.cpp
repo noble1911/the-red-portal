@@ -1901,6 +1901,11 @@ void PrintItemMisc(const Item &item)
 		const ScrollModSet mods = RollScrollMods(item._iSeed, DungeonScrollLevel(item), DungeonScrollModCount(item));
 		for (int i = 0; i < mods.count; i++)
 			AddInfoBoxString(DescribeScrollMod(mods.mods[i], /*full=*/true), /*floatingBox=*/true);
+		// How many relics this depth's boss can drop, and how often.
+		std::vector<std::string> relicLines;
+		GetRunRelicScrollLines(DungeonScrollLevel(item), relicLines);
+		for (std::string &line : relicLines)
+			AddInfoBoxString(std::move(line), /*floatingBox=*/true);
 		return;
 	}
 	if (item._iMiscId == IMISC_PRESERVE) {
@@ -3260,15 +3265,18 @@ constexpr bool EveryRelicWindowServesEveryRole(bool hellfire)
 static_assert(EveryRelicWindowServesEveryRole(false), "a Diablo relic window has no relic for some role");
 static_assert(EveryRelicWindowServesEveryRole(true), "a Hellfire relic window has no relic for some role");
 
-/** Chance (percent) that a boss vault also holds a relic. 25%, not the original 8%:
- * vanilla hands out roughly five of these as guaranteed quest rewards across depths
- * 5-13, and relics are now their only source. */
-constexpr int RunRelicChancePct = 25;
+/** Chance (percent) that a boss vault also holds a relic. Kept below a kill's odds of
+ * an ordinary unique (~20%: the boss drop plus the vault, ~10% each) so a relic stays
+ * the rarer find; at 25% it out-dropped the uniques it is meant to outrank, and 8% was
+ * too thin to farm a chosen relic. */
+constexpr int RunRelicChancePct = 12;
 
-void TryDropRunRelic(int depth, Point position)
+namespace {
+
+/** Fills `pool` with the relics a boss vault at `depth` can roll; returns the count.
+ * Shared by the drop and the dungeon scroll's tooltip so the two cannot disagree. */
+size_t GetRunRelicPool(int depth, const RunRelic *(&pool)[std::size(RunRelics)])
 {
-	if (GenerateRnd(100) >= RunRelicChancePct)
-		return;
 	// Past the deepest gate the window stays on the top relics instead of emptying.
 	int deepestGate = 0;
 	for (const RunRelic &relic : RunRelics) {
@@ -3276,7 +3284,6 @@ void TryDropRunRelic(int depth, Point position)
 			deepestGate = std::max(deepestGate, relic.minDepth);
 	}
 	depth = std::min(depth, deepestGate);
-	const RunRelic *pool[std::size(RunRelics)];
 	size_t count = 0;
 	for (const RunRelic &relic : RunRelics) {
 		if (depth < relic.minDepth || relic.minDepth < depth - RunRelicWindow)
@@ -3285,6 +3292,36 @@ void TryDropRunRelic(int depth, Point position)
 			continue;
 		pool[count++] = &relic;
 	}
+	return count;
+}
+
+} // namespace
+
+bool IsRunRelic(const Item &item)
+{
+	if (!RunsModEnabled || item._iMagical != ITEM_QUALITY_UNIQUE || item._iUid < 0
+	    || static_cast<size_t>(item._iUid) >= UniqueItems.size())
+		return false;
+	const std::string_view name = UniqueItems[item._iUid].UIName;
+	return std::any_of(std::begin(RunRelics), std::end(RunRelics), [name](const RunRelic &relic) { return relic.name == name; });
+}
+
+void GetRunRelicScrollLines(int depth, std::vector<std::string> &lines)
+{
+	const RunRelic *pool[std::size(RunRelics)];
+	const size_t count = GetRunRelicPool(depth, pool);
+	if (count == 0)
+		return;
+	// One short line, no names: listing up to five relics swamped the tooltip.
+	lines.push_back(fmt::format(fmt::runtime(ngettext(/* TRANSLATORS: {:d} is a count of relic kinds, {:d}% a percent chance */ "Relics: {:d} kind, {:d}% per boss", "Relics: {:d} kinds, {:d}% per boss", static_cast<int>(count))), count, RunRelicChancePct));
+}
+
+void TryDropRunRelic(int depth, Point position)
+{
+	if (GenerateRnd(100) >= RunRelicChancePct)
+		return;
+	const RunRelic *pool[std::size(RunRelics)];
+	const size_t count = GetRunRelicPool(depth, pool);
 	if (count == 0)
 		return;
 	const std::string_view name = pool[static_cast<size_t>(GenerateRnd(static_cast<int>(count)))]->name;
@@ -4362,6 +4399,9 @@ void GetItemStr(Item &item)
 	if (item._itype != ItemType::Gold) {
 		InfoString = item.getName();
 		InfoColor = item.getTextColor();
+		// [RUNS MOD] Name the relic on the ground too, not just once it is picked up.
+		if (IsRunRelic(item))
+			AddInfoBoxString(_("relic of the old world"));
 	} else {
 		const int nGold = item._ivalue;
 		InfoString = fmt::format(fmt::runtime(ngettext("{:s} gold piece", "{:s} gold pieces", nGold)), FormatInteger(nGold));
@@ -4756,6 +4796,9 @@ void PrintItemDetails(const Item &item)
 		ShowUniqueItemInfoBox = true;
 		curruitem = item;
 	}
+	// [RUNS MOD] Relics look like any other unique; say which ones came from the relic roll.
+	if (IsRunRelic(item))
+		AddItemInfoBoxString(_("relic of the old world"));
 	// [RUNS MOD] A fused gem is not a prefix or suffix power, so the loop above cannot
 	// see it and the item would otherwise show no sign of having been gemmed at all.
 	if (RunsModEnabled && HasGem(item)) {
@@ -4803,6 +4846,9 @@ void PrintItemDur(const Item &item)
 	}
 	if (IsAnyOf(item._itype, ItemType::Ring, ItemType::Amulet))
 		AddItemInfoBoxString(_("Not Identified"));
+	// [RUNS MOD] Flagged even unidentified: spotting a relic is the point of the label.
+	if (IsRunRelic(item))
+		AddItemInfoBoxString(_("relic of the old world"));
 	PrintItemInfo(item);
 }
 

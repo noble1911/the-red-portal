@@ -294,7 +294,7 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
 - With quests retired, the classic quest uniques (Harlequin Crest, Ring of Truth,
   Empyrean Band, Optic Amulet, The Undead Crown, Griswold's Edge, Arkaine's Valor,
   Veil of Steel, + Bovine Plate on Hellfire) were dead data: their base items have
-  dropRate 0 and nothing referenced them. They now drop as **relics** — a 25% roll (was 8%; see the loot pass)
+  dropRate 0 and nothing referenced them. They now drop as **relics** — a 12% roll (briefly 25%; see the loot passes)
   per boss vault (`TryDropRunRelic`, items.cpp), uniform over the relics whose
   depth gate the run has reached, announced
   with "A relic of the old world!". Duplicates allowed: relics are loot, not
@@ -376,6 +376,21 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   same as the boss's own drop). Gold piles/tokens/gem unchanged.
 - Relic chance 8% -> 25% per vault (relics are the quest uniques' only source).
 - Trash drops and item levels deliberately unchanged (vanilla parity).
+
+**Boss loot trim** (2026-10-28, built, NOT yet playtested)
+- Playtest: a depth-7 boss (L17 hero on floor-5 uniques) died easily and dropped 2
+  uniques; the vault read as a pile. At 3 + depth/4 items + 25% relic a kill averaged
+  ~0.77 uniques (~56% at least one).
+- Vault: (1 + depth/8) items per player (1 through depth 7, 2 at 8-15, 3 at 16-23).
+- Gambler's Tokens per vault 5-10 -> 2-4.
+- Relic 25% -> 12%, below a kill's ~20% odds of an ordinary unique (boss drop + vault
+  item, ~10% each), so relics stay the rarer find (8% was tried: too thin to farm).
+- Relics are meant to be FARMED, so they are now legible: relic items carry a
+  "relic of the old world" line (ground, inventory, stash, shop; even unidentified),
+  and a dungeon scroll's tooltip adds one line, "Relics: N kinds, 12% per boss", for
+  its depth's window (GetRunRelicPool, shared with the drop so the two can't drift).
+  Names were tried and dropped: up to five of them swamped the tooltip.
+- Unchanged: boss's own drop, gold piles, gem, next-depth scroll, uper 15 / +4 tier.
 **Dungeon rules: one exit, any tileset** (2026-10-25, built + drlg tests green, NOT yet playtested)
 - One staircase per run level, and it is the exit: generators skip the down stairs, the
   town-shortcut stairs (5/9/13) and the hell gate under `RunDungeonRules`. Players arrive on

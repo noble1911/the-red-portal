@@ -57,9 +57,10 @@ constexpr int DifficultyUnlockDepth = DiabloMaxRunDepth;
 // Gambler's Tokens paid by a boss vault (inclusive range), so clearing a run buys a
 // proper session at Farnham's rather than the single stray chip trash drops. Flat by
 // design: a token is one pull at the current stake, which already scales with earned
-// depth, so the same handful is worth more the deeper the hero has got. Tunable.
-constexpr int GambleTokenVaultMin = 5;
-constexpr int GambleTokenVaultMax = 10;
+// depth, so the same handful is worth more the deeper the hero has got. Tunable; was
+// 5-10, which buried the vault in chips.
+constexpr int GambleTokenVaultMin = 2;
+constexpr int GambleTokenVaultMax = 4;
 
 /** @brief Deepest reachable run level: 24 when Hellfire is active, otherwise 15.
  *

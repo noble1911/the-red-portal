@@ -4335,13 +4335,15 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 			// vault pays in QUANTITY and unique odds instead. One vault is
 			// shared by the whole party, so its size is per player in the game -- at a
 			// flat size co-op split it. Each item is boss-grade (uper 15: the boss drop's
-			// 16% unique chance and +4 affix tier); see DropBossGradeItem.
+			// 16% unique chance and +4 affix tier); see DropBossGradeItem. One item per
+			// player through depth 7, one more every 8 depths -- the old 3 + depth/4 made
+			// the vault a pile and handed out a unique on most kills.
 			int partySize = 0;
 			for (const Player &player : Players) {
 				if (player.plractive)
 					partySize++;
 			}
-			const int vaultItems = (3 + static_cast<int>(currlevel) / 4) * std::max(partySize, 1);
+			const int vaultItems = (1 + static_cast<int>(currlevel) / 8) * std::max(partySize, 1);
 			const int goldPiles = 2 + static_cast<int>(currlevel) / 10;
 			for (int i = 0; i < vaultItems; i++)
 				DropBossGradeItem(monster.position.tile);

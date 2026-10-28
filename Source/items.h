@@ -7,6 +7,8 @@
 
 #include <cstdint>
 #include <optional>
+#include <string>
+#include <vector>
 
 #include "DiabloUI/ui_flags.hpp"
 #include "cursor.h"
@@ -594,6 +596,12 @@ void DropDungeonScroll(int level, Point position, int difficulty, bool sendmsg);
 /** @brief [RUNS MOD] Rolls the boss vault's relic chance: a retired quest unique
  * gated within a few levels of `depth`, dropped at `position`. No-op most of the time. */
 void TryDropRunRelic(int depth, Point position);
+/** @brief [RUNS MOD] True if the item is a relic (a unique only the boss vault's relic
+ * roll hands out), so the info box can say so. */
+bool IsRunRelic(const Item &item);
+/** @brief [RUNS MOD] Appends the dungeon scroll tooltip's relic line: how many relics a
+ * boss at `depth` can drop and the vault's relic chance. */
+void GetRunRelicScrollLines(int depth, std::vector<std::string> &lines);
 /** @brief [RUNS MOD] Drops a Gambler's Token (one free pull at Farnham's machine). */
 void DropGambleToken(Point position, bool sendmsg);
 
