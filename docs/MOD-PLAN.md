@@ -444,8 +444,8 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
 - Stats per kind: life/armour/to-hit/damage curves per item level, each +-15%; tiers
   ordinary 70% / strong 25% (x1.2) / exceptional 5% (x1.45, +30 s); stays 2:00-3:00.
   Tooltip shows role, beast, tier, life, armour, damage (or bolts / heal) and duration.
-- Sources: boss vault 12%, Tyrannical champion 5%, any other monster 0.3%, all at the
-  run's depth; Adria stocks one at (deepest beaten - 3), 2x price, once a depth is beaten.
+- Sources: boss vault 12%, Tyrannical champion 5%, any other monster 0.1%, all at the
+  run's (reward) depth; Adria stocks one per restock at (deepest beaten - 3), 2x price.
 - Mechanics: the Golem with other art -- MFLAG_GOLEM + Golem AI in the drinker's own
   reserved minion slot, sent in the Golem's spawn message (potion seed in the seed field,
   level | 0x80 in the spell-level byte), so peers and late joiners rebuild the same beast.
@@ -493,7 +493,13 @@ A review of player options against the dungeon found four systemic problems, fix
    -- gold was the weakest reward against full-gear-loss death -- and Jeweled's boon grows
    +1/depth like its bane. Twinned/Enchanted were cheap only because bosses were weak (fix 1).
    Tests: scroll_mods_test (new target).
-4. Companion supply -- pending.
+4. **Companion potions were commoner than intended.** Ordinary monsters dropped one at 3 per
+   mille, about one every other run across a run's 150-225 monsters; now 1 per mille. Adria's
+   whole shelf rebuilds on every hub visit, so her potion was really one per town trip; it is
+   now rolled once per restock (boss kill or first visit, with the Dungeon Merchant --
+   RestockWitchCompanion) and stays sold until the next (NoteWitchItemSold, both shop UIs).
+   The Healer heals 5 + 2/level (was 6 + 3: ~12 life/s at depth 10 made solo play very safe
+   alongside Heal Other).
 
 **Floating numbers on by default, with icons** (2026-10-28)
 - The stock "Floating Numbers - Damage/XP" Lua mods are switched on once for every

@@ -56,8 +56,10 @@ constexpr KindCurve KindCurves[NumCompanionKinds] = {
 	{ 30, 14, 8, 2, 50, 5, 3, 3, 8, 6, 0, 0 },
 	// Elemental: a middleweight whose hits chill (slow) what they land on.
 	{ 50, 24, 12, 3, 45, 4, 3, 3, 8, 6, 0, 0 },
-	// Healer: weak in a fight, but heals its owner every few seconds while close.
-	{ 35, 16, 8, 2, 35, 3, 1, 1, 4, 2, 6, 3 },
+	// Healer: weak in a fight, but heals its owner every few seconds while close. Its heal was
+	// 6 + 3/level, about 12 life a second at depth 10 -- with Heal Other too, solo play got
+	// very safe -- now 5 + 2/level.
+	{ 35, 16, 8, 2, 35, 3, 1, 1, 4, 2, 5, 2 },
 };
 
 /** The Healer heals its owner this often, if the owner is within HealRange tiles. */

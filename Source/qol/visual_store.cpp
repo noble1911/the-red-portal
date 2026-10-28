@@ -675,6 +675,7 @@ void CheckVisualStoreItem(Point mousePosition, bool isCtrlHeld, bool isShiftHeld
 		break;
 	}
 	case VisualStoreVendor::Witch: {
+		NoteWitchItemSold(item); // [RUNS MOD]
 		// First 3 items are pinned, don't remove them
 		if (itemIndex >= 3) {
 			WitchItems.erase(WitchItems.begin() + itemIndex);

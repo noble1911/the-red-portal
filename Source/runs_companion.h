@@ -67,10 +67,11 @@ constexpr int WitchCompanionLevelsBelow = 3;
 constexpr int WitchCompanionMarkupPct = 200;
 
 /** Drop chances (percent, or per mille for ordinary monsters): a rare magic item, on the
- * scale of a unique rather than a scroll. */
+ * scale of a unique rather than a scroll. Ordinary monsters were 3 per mille, which across a
+ * run's 150-225 monsters made a potion every other run (balance review 2026-10-28). */
 constexpr int CompanionVaultChancePct = 12;
 constexpr int CompanionChampionChancePct = 5;
-constexpr int CompanionMonsterChancePerMille = 3;
+constexpr int CompanionMonsterChancePerMille = 1;
 
 /** @brief The companion a potion of this seed and item level summons. Pure and
  * deterministic (private RNG), so every client derives the same stats from the same item. */

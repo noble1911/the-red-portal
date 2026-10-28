@@ -2954,6 +2954,7 @@ void WitchBuyItem(Item &item)
 
 	TakePlrsMoney(item._iIvalue);
 	StoreAutoPlace(item, true);
+	NoteWitchItemSold(item); // [RUNS MOD]
 
 	if (idx >= 3) {
 		WitchItems.erase(WitchItems.begin() + idx);
@@ -3613,6 +3614,10 @@ void SetupTownStores()
 		l = ClampRunDepth(myPlayer.pDeepestBeatenDepth + 1);
 
 	l = std::clamp(l + 2, 6, 16);
+	// [RUNS MOD] Adria's companion potion restocks with the Dungeon Merchant (below), not on
+	// every hub visit -- and before her shelf is built, so it shows up straight away.
+	if (RunsModEnabled && (DungeonVendorItems.empty() || DungeonVendorRestockPending))
+		RestockWitchCompanion();
 	SpawnSmith(l);
 	SpawnWitch(l);
 	// [RUNS MOD] The Dungeon Merchant's stock persists between hub visits (it only

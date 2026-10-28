@@ -5271,6 +5271,30 @@ void SpawnPremium(const Player &player)
 	}
 }
 
+/** [RUNS MOD] Adria's companion potion for the current restock; empty once sold. */
+Item WitchCompanionStock;
+
+void RestockWitchCompanion()
+{
+	// One potion, and a poor one at a premium: its level sits a few depths under the hero's
+	// deepest beaten run, so anything found at the depth they are actually fighting is
+	// better. Shops are the fallback, not the source. Stamped by level like her other stock,
+	// so a bought potion rebuilds without the hero's state.
+	WitchCompanionStock.clear();
+	if (!RunsModEnabled || MyPlayer == nullptr || MyPlayer->pDeepestBeatenDepth < 1)
+		return;
+	const int potionLevel = std::max(1, static_cast<int>(MyPlayer->pDeepestBeatenDepth) - WitchCompanionLevelsBelow);
+	CreateCompanionPotion(WitchCompanionStock, potionLevel, AdvanceRndSeed());
+	if (!WitchCompanionStock.isEmpty())
+		WitchCompanionStock._iIvalue = WitchCompanionStock._ivalue = WitchCompanionStock._ivalue * WitchCompanionMarkupPct / 100;
+}
+
+void NoteWitchItemSold(const Item &item)
+{
+	if (IsCompanionPotion(item) && !WitchCompanionStock.isEmpty() && item._iSeed == WitchCompanionStock._iSeed)
+		WitchCompanionStock.clear();
+}
+
 void SpawnWitch(int lvl)
 {
 	constexpr int PinnedItemCount = NumWitchPinnedItems;
@@ -5347,20 +5371,13 @@ void SpawnWitch(int lvl)
 		WitchItems.push_back(item);
 	}
 
-	// [RUNS MOD] One companion potion, and a poor one at a premium: its level sits a few
-	// depths under the hero's deepest beaten run, so anything found at the depth they are
-	// actually fighting is better. Shops are the fallback, not the source. Stamped by
-	// level like her other stock, so a bought potion rebuilds without the hero's state.
-	if (RunsModEnabled && MyPlayer != nullptr && MyPlayer->pDeepestBeatenDepth >= 1) {
-		Item potion;
-		const int potionLevel = std::max(1, static_cast<int>(MyPlayer->pDeepestBeatenDepth) - WitchCompanionLevelsBelow);
-		CreateCompanionPotion(potion, potionLevel, AdvanceRndSeed());
-		if (!potion.isEmpty()) {
-			potion._iIvalue = potion._ivalue = potion._ivalue * WitchCompanionMarkupPct / 100;
-			if (WitchItems.size() >= static_cast<size_t>(gbIsHellfire ? NumWitchItemsHf : NumWitchItems))
-				WitchItems.pop_back(); // a full shelf gives up one random item for it
-			WitchItems.push_back(potion);
-		}
+	// [RUNS MOD] Her companion potion, if this restock's is still unsold (see
+	// RestockWitchCompanion). The rest of her shelf rebuilds on every hub visit; rolling the
+	// potion here too made it one per trip to town, not the rare fallback it is meant to be.
+	if (RunsModEnabled && !WitchCompanionStock.isEmpty()) {
+		if (WitchItems.size() >= static_cast<size_t>(gbIsHellfire ? NumWitchItemsHf : NumWitchItems))
+			WitchItems.pop_back(); // a full shelf gives up one random item for it
+		WitchItems.push_back(WitchCompanionStock);
 	}
 
 	SortVendor(WitchItems, PinnedItemCount);

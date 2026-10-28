@@ -711,6 +711,14 @@ void DropBossGradeItem(Point position);
  * twice the depth, so these match the engine's lift.
  */
 int RunRewardDepthBonus();
+
+/** @brief [RUNS MOD] Rolls Adria's companion potion for this restock (a boss kill, or the first
+ * hub visit), at a premium and a few depths under the hero's deepest. SpawnWitch shelves it
+ * until it is bought; it does not come back until the next restock. */
+void RestockWitchCompanion();
+/** @brief [RUNS MOD] Call when Adria sells `item`: selling her companion potion takes it off the
+ * shelf until the next restock. */
+void NoteWitchItemSold(const Item &item);
 void SpawnBoy(int lvl);
 void SpawnHealer(int lvl);
 void MakeGoldStack(Item &goldItem, int value);
