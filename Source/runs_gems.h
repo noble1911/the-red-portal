@@ -1,13 +1,14 @@
 /**
  * @file runs_gems.h
  *
- * [RUNS MOD] Diablo II style gems, adapted to a game with no sockets.
+ * [RUNS MOD] Diablo II style gems and sockets.
  *
  * A gem is a one-shot consumable: use it from the inventory and the cursor turns into
- * the gem, then click a weapon, shield or armour piece to fuse it in permanently. The
+ * the gem, then click a socketed weapon, shield or armour piece to fuse it in. The
  * interaction is Hellfire's oil flow (see UseItem / ApplyOilToItem); the difference is
  * that a gem's effect depends on both its type and the class of item it lands on, the
- * way a D2 socket does.
+ * way a D2 socket does. Only Griswold can take a gem back out: he destroys the gem to
+ * free the socket, or breaks up the item to save the gem.
  *
  * Seven types x five qualities = 35 gems, in the D2 order:
  *   Amethyst, Topaz, Sapphire, Emerald, Ruby, Diamond, Skull
@@ -30,6 +31,7 @@
 
 #include "engine/clx_sprite.hpp"
 #include "engine/point.hpp"
+#include "engine/surface.hpp"
 
 namespace devilution {
 
@@ -157,6 +159,47 @@ std::string GemName(GemType type, GemQuality quality);
  * Returned rather than printed so the info-box plumbing stays inside items.cpp. */
 void GetGemEffectLines(GemType type, GemQuality quality, std::vector<std::string> &out);
 
+// --- Sockets ------------------------------------------------------------------------
+//
+// A gem only goes into an item with a socket, and an item has at most one. Any weapon,
+// shield or armour piece can roll one when it is created; whether it did is CF_SOCKETED
+// in dwBuff, so it rides through saves and the network with the rest of the item.
+// Gear gemmed before sockets existed counts as socketed.
+
+/** Socket chance (percent) for an ordinary drop: monsters, chests, floor items. */
+constexpr int SocketChanceDropPct = 8;
+/** Socket chance for a boss-vault item (and the fruit machine's item prize). */
+constexpr int SocketChanceVaultPct = 20;
+/** Socket chance for Griswold's stock: the item may be rubbish, the socket is not. */
+constexpr int SocketChanceShopPct = 10;
+/** Socket chance for any unique or relic, whatever the source: a socketed unique is a chase. */
+constexpr int SocketChanceUniquePct = 4;
+
+/** @brief True if this kind of item could have a socket (weapons, shields, armour). */
+bool CanHaveSocket(const Item &item);
+/** @brief True if the item has a socket, empty or filled. */
+bool HasSocket(const Item &item);
+
+/** @brief Rolls a socket onto a freshly created item at `chancePct` (uniques use
+ * SocketChanceUniquePct instead), plus the run's Jeweled bonus.
+ *
+ * The roll is a hash of the item's seed, not the game RNG: ordinary monster loot is built
+ * separately on every client in the level, and all of them have to agree -- and drawing
+ * from the shared RNG would shift every roll after it.
+ */
+void RollSocket(Item &item, int chancePct);
+
+/** @brief Gold Griswold charges to destroy the gem in this item, freeing the socket. */
+int GemRemovalCost(const Item &item);
+/** @brief Destroys the item's gem, leaving the socket empty and the item otherwise as it was. */
+void RemoveFusedGem(const Player &player, Item &item);
+/** @brief Builds the gem fused into `item` as a loose gem (Griswold's salvage). */
+void ExtractFusedGem(const Item &item, Item &gem);
+
+/** @brief Draws the item's socket (and its gem) over the item's icon in a grid.
+ * `position` and `itemSprite` are what DrawItem was given. */
+void DrawItemSocket(const Surface &out, const Item &item, Point position, ClxSprite itemSprite);
+
 /** @brief True if a gem has been fused into this item. One gem per item. */
 bool HasGem(const Item &item);
 /** @brief The gem fused into this item. Only meaningful when HasGem(). */
@@ -172,7 +215,8 @@ GemQuality FusedGemQuality(const Item &item);
  */
 void ReapplyFusedGem(Item &item);
 
-/** @brief Appends the "what gem is in this, and what did it give" lines for an item. */
+/** @brief Appends the item's socket lines: "Socket: empty", or the gem it holds and what
+ * that gem gives. Nothing for an item without a socket. */
 void GetFusedGemLines(const Item &item, std::vector<std::string> &out);
 
 

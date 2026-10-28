@@ -201,6 +201,9 @@ enum icreateinfo_flag2 {
 	CF_ISGEM = 1 << 13,
 	CF_GEMITEMTYPE = ((1 << 3) - 1) << 14,     // bits 14-16: GemType
 	CF_GEMITEMQUALITY = ((1 << 3) - 1) << 17,  // bits 17-19: GemQuality
+	/** [RUNS MOD] This item has a socket, so a gem can be fused into it (see runs_gems.h).
+	 * Rolled once when the item is created and carried here from then on, like the gem. */
+	CF_SOCKETED = 1 << 20,
 	// clang-format on
 };
 

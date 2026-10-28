@@ -68,7 +68,7 @@ void OpenVendor(TalkID vendor)
  * @brief In a top-level vendor menu, select a menu option by its text line.
  *
  * The line numbers are fixed by the Start*() functions:
- *   Smith:  12=Buy, 14=Premium, 16=Sell, 18=Repair, 20=Leave
+ *   Smith:  12=Buy, 14=Premium, 16=Sell, 18=Repair, 20=Gem work, 22=Leave
  *   Witch:  12=Talk, 14=Buy, 16=Sell, 18=Recharge, 20=Leave
  *   Healer: 12=Talk, 14=Buy, 18=Leave
  *   Storyteller: 12=Talk, 14=Identify, 18=Leave
@@ -849,8 +849,8 @@ TEST_F(StoreTransactionTest, StoreESC_ClosesStore)
 	ASSERT_EQ(ActiveStore, TalkID::Smith);
 	ASSERT_TRUE(IsPlayerInStore());
 
-	// Select "Leave" (line 20 for Smith without visual store, or the last option).
-	SelectMenuLine(20);
+	// Select "Leave" (line 22 for Smith without visual store: Gem work took line 20).
+	SelectMenuLine(22);
 
 	EXPECT_EQ(ActiveStore, TalkID::None)
 	    << "Leaving the store should set ActiveStore to None";

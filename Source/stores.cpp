@@ -41,6 +41,7 @@
 #include "panels/info_box.hpp"
 #include "qol/stash.h"
 #include "qol/visual_store.h"
+#include "runs_gems.h"
 #include "runs_mod.h"
 #include "scroll_mods.h"
 #include "tables/townerdat.hpp"
@@ -401,6 +402,12 @@ void PrintStoreItem(const Item &item, int l, UiFlags flags, bool cursIndent = fa
 			productLine.append(_(",  "));
 		productLine.append(fmt::format(fmt::runtime(_("Charges: {:d}/{:d}")), item._iCharges, item._iMaxCharges));
 	}
+	// [RUNS MOD] The socket is often the whole reason to buy a plain shelf item.
+	if (HasSocket(item)) {
+		if (!productLine.empty())
+			productLine.append(_(",  "));
+		productLine.append(HasGem(item) ? GemName(FusedGemType(item), FusedGemQuality(item)) : std::string(_("Socketed")));
+	}
 	if (!productLine.empty()) {
 		AddSText(40, l, productLine, flags, false, -1, cursIndent);
 		l++;
@@ -458,6 +465,17 @@ void ScrollVendorStore(std::span<Item> itemData, int storeLimit, int idx, int se
 	}
 }
 
+/** Menu lines of the gem services, so Back can return to the one it came from. */
+constexpr int SmithGemRemoveLine = 12;
+constexpr int SmithGemSalvageLine = 14;
+
+/** Griswold's main-menu line for gem work: after Repair in the text shop, after Trade in
+ * the visual one. */
+int SmithGemsLine()
+{
+	return *GetOptions().Gameplay.visualStoreUI ? 14 : 20;
+}
+
 void StartSmith()
 {
 	IsTextFullSize = false;
@@ -466,15 +484,20 @@ void StartSmith()
 	AddSText(0, 3, _("Blacksmith's shop"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
 	AddSText(0, 7, _("Would you like to:"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
 	AddSText(0, 10, _("Talk to Griswold"), UiFlags::ColorBlue | UiFlags::AlignCenter, true);
+	// [RUNS MOD] Gem work sits just above Leave, which moves down a line to make room.
 	if (*GetOptions().Gameplay.visualStoreUI) {
 		AddSText(0, 12, _("Trade / Repair"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
-		AddSText(0, 14, _("Leave the shop"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+		if (RunsModEnabled)
+			AddSText(0, SmithGemsLine(), _("Gem work"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+		AddSText(0, RunsModEnabled ? 16 : 14, _("Leave the shop"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 	} else {
 		AddSText(0, 12, _("Buy basic items"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 		AddSText(0, 14, _("Buy premium items"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 		AddSText(0, 16, _("Sell items"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 		AddSText(0, 18, _("Repair items"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
-		AddSText(0, 20, _("Leave the shop"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+		if (RunsModEnabled)
+			AddSText(0, SmithGemsLine(), _("Gem work"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+		AddSText(0, RunsModEnabled ? 22 : 20, _("Leave the shop"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
 	}
 	AddSLine(5);
 	CurrentItemIndex = 20;
@@ -712,6 +735,92 @@ void StartSmithRepair()
 	AddSText(20, 1, _("Repair which item?"), UiFlags::ColorWhitegold, false);
 	AddSLine(3);
 
+	ScrollSmithSell(ScrollPos);
+	AddItemListBackButton();
+}
+
+// [RUNS MOD] --- Griswold's gem work ---
+//
+// Gems go into sockets anywhere, but only Griswold takes them out: he destroys the gem to
+// free the socket (for a quarter of the gem's worth), or breaks up the item to save the
+// gem (free). Body items use the repair list's negative indices.
+
+inv_body_loc GemWorkBodySlot(int8_t i)
+{
+	switch (i) {
+	case -1:
+		return INVLOC_HEAD;
+	case -2:
+		return INVLOC_CHEST;
+	case -3:
+		return INVLOC_HAND_LEFT;
+	default:
+		return INVLOC_HAND_RIGHT;
+	}
+}
+
+Item &GemWorkTarget(Player &player, int8_t i)
+{
+	return i >= 0 ? player.InvList[i] : player.InvBody[GemWorkBodySlot(i)];
+}
+
+void StartSmithGems()
+{
+	IsTextFullSize = false;
+	HasScrollbar = false;
+	AddSText(0, 2, _("Griswold's gem work"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+	AddSLine(5);
+	AddSText(0, 8, _("A gem only comes out in pieces:"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+	AddSText(0, 9, _("the gem's, or the item's."), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+	AddSText(0, SmithGemRemoveLine, _("Remove a gem (destroys the gem)"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	AddSText(0, SmithGemSalvageLine, _("Salvage a gem (destroys the item)"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	AddSText(0, 18, _("Back"), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
+	CurrentItemIndex = 20;
+}
+
+void StartSmithGemWork(TalkID work)
+{
+	IsTextFullSize = true;
+	CurrentItemIndex = 0;
+
+	for (auto &item : PlayerItems) {
+		item.clear();
+	}
+
+	const bool remove = work == TalkID::SmithGemRemove;
+	const auto addIfGemmed = [remove](const Item &item, int8_t i) {
+		if (CurrentItemIndex >= 48 || !HasGem(item))
+			return;
+		const int price = remove ? GemRemovalCost(item) : 0;
+		PlayerItems[CurrentItemIndex] = item;
+		PlayerItems[CurrentItemIndex]._iIvalue = price;
+		PlayerItems[CurrentItemIndex]._ivalue = price;
+		PlayerItemIndexes[CurrentItemIndex] = i;
+		CurrentItemIndex++;
+	};
+
+	Player &myPlayer = *MyPlayer;
+	addIfGemmed(myPlayer.InvBody[INVLOC_HEAD], -1);
+	addIfGemmed(myPlayer.InvBody[INVLOC_CHEST], -2);
+	addIfGemmed(myPlayer.InvBody[INVLOC_HAND_LEFT], -3);
+	addIfGemmed(myPlayer.InvBody[INVLOC_HAND_RIGHT], -4);
+	for (int i = 0; i < myPlayer._pNumInv; i++)
+		addIfGemmed(myPlayer.InvList[i], static_cast<int8_t>(i));
+
+	RenderGold = true;
+	if (CurrentItemIndex == 0) {
+		HasScrollbar = false;
+		AddSText(20, 1, _("You have no gemmed items."), UiFlags::ColorWhitegold, false);
+		AddSLine(3);
+		AddItemListBackButton(/*selectable=*/true);
+		return;
+	}
+
+	HasScrollbar = true;
+	ScrollPos = 0;
+	NumTextLines = myPlayer._pNumInv;
+	AddSText(20, 1, remove ? _("Destroy the gem in which item?") : _("Break up which item for its gem?"), UiFlags::ColorWhitegold, false);
+	AddSLine(3);
 	ScrollSmithSell(ScrollPos);
 	AddItemListBackButton();
 }
@@ -1859,6 +1968,12 @@ void StoreConfirm(Item &item)
 	case TalkID::SmithRepair:
 		prompt = _("Are you sure you want to repair this item?");
 		break;
+	case TalkID::SmithGemRemove:
+		prompt = _("Destroy the gem to free the socket?");
+		break;
+	case TalkID::SmithGemSalvage:
+		prompt = _("Destroy this item to keep its gem?");
+		break;
 	case TalkID::DungeonVendorCraftMaterial:
 		switch (CraftOp) {
 		case ScrollCraftOp::Upgrade:
@@ -2451,6 +2566,12 @@ void SmithEnter()
 			OpenVisualStore(VisualStoreVendor::Smith);
 			break;
 		case 14:
+			if (RunsModEnabled)
+				StartStore(TalkID::SmithGems);
+			else
+				ActiveStore = TalkID::None;
+			break;
+		case 16:
 			ActiveStore = TalkID::None;
 			break;
 		}
@@ -2477,6 +2598,12 @@ void SmithEnter()
 		StartStore(TalkID::SmithRepair);
 		break;
 	case 20:
+		if (RunsModEnabled)
+			StartStore(TalkID::SmithGems);
+		else
+			ActiveStore = TalkID::None;
+		break;
+	case 22:
 		ActiveStore = TalkID::None;
 		break;
 	}
@@ -2658,6 +2785,92 @@ void SmithRepairItem(int price)
 
 	myPlayer.InvList[i]._iDurability = myPlayer.InvList[i]._iMaxDur;
 	TakePlrsMoney(price);
+}
+
+void SmithGemsEnter()
+{
+	switch (CurrentTextLine) {
+	case SmithGemRemoveLine:
+		StartStore(TalkID::SmithGemRemove);
+		break;
+	case SmithGemSalvageLine:
+		StartStore(TalkID::SmithGemSalvage);
+		break;
+	case 18:
+		StartStore(TalkID::Smith);
+		CurrentTextLine = SmithGemsLine();
+		break;
+	}
+}
+
+void SmithGemWorkEnter(TalkID work)
+{
+	if (CurrentTextLine == BackButtonLine()) {
+		StartStore(TalkID::SmithGems);
+		CurrentTextLine = work == TalkID::SmithGemRemove ? SmithGemRemoveLine : SmithGemSalvageLine;
+		return;
+	}
+
+	OldActiveStore = work;
+	OldTextLine = CurrentTextLine;
+	OldScrollPos = ScrollPos;
+
+	const int idx = ScrollPos + ((CurrentTextLine - PreviousScrollPos) / 4);
+
+	if (work == TalkID::SmithGemRemove && !PlayerCanAfford(PlayerItems[idx]._iIvalue)) {
+		StartStore(TalkID::NoMoney);
+		return;
+	}
+	// Breaking up a worn item frees no pack space, so the gem needs somewhere to go.
+	if (work == TalkID::SmithGemSalvage && PlayerItemIndexes[idx] < 0) {
+		Item gem;
+		ExtractFusedGem(PlayerItems[idx], gem);
+		if (!StoreAutoPlace(gem, false)) {
+			StartStore(TalkID::NoRoom);
+			return;
+		}
+	}
+
+	TempItem = PlayerItems[idx];
+	StartStore(TalkID::Confirm);
+}
+
+/**
+ * @brief [RUNS MOD] Destroys the gem in the chosen item, leaving its socket empty.
+ */
+void SmithRemoveGem(int price)
+{
+	const int idx = OldScrollPos + ((OldTextLine - PreviousScrollPos) / 4);
+	const int8_t i = PlayerItemIndexes[idx];
+	Player &myPlayer = *MyPlayer;
+
+	RemoveFusedGem(myPlayer, GemWorkTarget(myPlayer, i));
+	if (i < 0)
+		NetSendCmdChItem(true, GemWorkBodySlot(i));
+	else
+		NetSyncInvItem(myPlayer, i);
+
+	TakePlrsMoney(price);
+	CalcPlrInv(myPlayer, true);
+}
+
+/**
+ * @brief [RUNS MOD] Breaks up the chosen item and hands its gem back.
+ */
+void SmithSalvageGem()
+{
+	const int idx = OldScrollPos + ((OldTextLine - PreviousScrollPos) / 4);
+	const int8_t i = PlayerItemIndexes[idx];
+	Player &myPlayer = *MyPlayer;
+
+	Item gem;
+	ExtractFusedGem(GemWorkTarget(myPlayer, i), gem);
+	if (i < 0)
+		RemoveEquipment(myPlayer, GemWorkBodySlot(i), true);
+	else
+		myPlayer.RemoveInvItem(i);
+	StoreAutoPlace(gem, true);
+	CalcPlrInv(myPlayer, true);
 }
 
 void SmithRepairEnter()
@@ -2990,6 +3203,12 @@ void ConfirmEnter(Item &item)
 			break;
 		case TalkID::SmithRepair:
 			SmithRepairItem(item._iIvalue);
+			break;
+		case TalkID::SmithGemRemove:
+			SmithRemoveGem(item._iIvalue);
+			break;
+		case TalkID::SmithGemSalvage:
+			SmithSalvageGem();
 			break;
 		case TalkID::WitchBuy:
 			WitchBuyItem(item);
@@ -3563,6 +3782,13 @@ void StartStore(TalkID s)
 	case TalkID::SmithRepair:
 		StartSmithRepair();
 		break;
+	case TalkID::SmithGems:
+		StartSmithGems();
+		break;
+	case TalkID::SmithGemRemove:
+	case TalkID::SmithGemSalvage:
+		StartSmithGemWork(s);
+		break;
 	case TalkID::Witch:
 		StartWitch();
 		break;
@@ -3716,6 +3942,8 @@ void DrawSText(const Surface &out)
 			break;
 		case TalkID::SmithSell:
 		case TalkID::SmithRepair:
+		case TalkID::SmithGemRemove:
+		case TalkID::SmithGemSalvage:
 		case TalkID::WitchSell:
 		case TalkID::WitchRecharge:
 		case TalkID::StorytellerIdentify:
@@ -3798,6 +4026,18 @@ void StoreESC()
 	case TalkID::SmithRepair:
 		StartStore(TalkID::Smith);
 		CurrentTextLine = 18;
+		break;
+	case TalkID::SmithGems:
+		StartStore(TalkID::Smith);
+		CurrentTextLine = SmithGemsLine();
+		break;
+	case TalkID::SmithGemRemove:
+		StartStore(TalkID::SmithGems);
+		CurrentTextLine = SmithGemRemoveLine;
+		break;
+	case TalkID::SmithGemSalvage:
+		StartStore(TalkID::SmithGems);
+		CurrentTextLine = SmithGemSalvageLine;
 		break;
 	case TalkID::WitchBuy:
 		StartStore(TalkID::Witch);
@@ -4023,6 +4263,13 @@ void StoreEnter()
 		break;
 	case TalkID::SmithRepair:
 		SmithRepairEnter();
+		break;
+	case TalkID::SmithGems:
+		SmithGemsEnter();
+		break;
+	case TalkID::SmithGemRemove:
+	case TalkID::SmithGemSalvage:
+		SmithGemWorkEnter(ActiveStore);
 		break;
 	case TalkID::Witch:
 		WitchEnter();

@@ -390,6 +390,28 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
   and a dungeon scroll's tooltip adds one line, "Relics: N kinds, 12% per boss", for
   its depth's window (GetRunRelicPool, shared with the drop so the two can't drift).
   Names were tried and dropped: up to five of them swamped the tooltip.
+
+**Sockets** (2026-10-28, built, NOT yet playtested)
+- Why: gems fused into ANY gear, so every gem went straight into the best item and the
+  only brake was the per-stat caps. Now a gem needs a socket; any weapon, shield or
+  armour piece can roll ONE (CF_SOCKETED, dwBuff bit 20). One socket max keeps the
+  existing gem caps meaningful. Gear gemmed before this counts as socketed.
+- Socket chance: drops 8%, boss vault (and fruit-machine item prize) 20%, Griswold's
+  basic + premium shelves 10%, uniques/relics 4% whatever the source. The roll is a hash
+  of the item seed (RollSocket), not the game RNG: monster loot is built on every client
+  separately and they must agree. Relics have no seed, so theirs uses the game RNG on
+  the killer's client (the bit then travels in dwBuff).
+- New scroll affix **Jeweled**: +8-15 points of socket chance (x tier) / monsters
+  +20-40% life. Adding an affix re-rolls the modifiers shown on existing scrolls once.
+- Gems still fuse anywhere. Only Griswold takes them out, via a new "Gem work" menu
+  (both the text shop and the visual-store menu): Remove (gem destroyed, socket kept,
+  costs a quarter of the gem's value; the item is rebuilt from its seed, so Hellfire
+  oils on it are lost) or Salvage (item destroyed, gem back, free).
+- Visible: a stone socket ring in the icon's bottom-right corner (inventory, stash,
+  visual store, cursor), with a shrunken gem in it when filled; tooltip "Socket: empty"
+  / "Socket: <gem>" (shown unidentified too); text-shop rows say "Socketed".
+- Fix found on the way: RecreateItem never re-applied a fused gem to shop-bought or
+  starting gear (and wiped dwBuff on the latter), so those lost their gem on save/sync.
 - Unchanged: boss's own drop, gold piles, gem, next-depth scroll, uper 15 / +4 tier.
 **Dungeon rules: one exit, any tileset** (2026-10-25, built + drlg tests green, NOT yet playtested)
 - One staircase per run level, and it is the exit: generators skip the down stairs, the

@@ -599,6 +599,9 @@ void DrawItem(const Item &item, const Surface &out, Point position, ClxSprite cl
 	} else {
 		ClxDrawTRN(out, position, clx, GetInfravisionTRN());
 	}
+	// [RUNS MOD] Every grid (inventory, stash, visual store) and the held item come
+	// through here, so the socket marker is drawn once for all of them.
+	DrawItemSocket(out, item, position, clx);
 }
 
 void ResetCursor()

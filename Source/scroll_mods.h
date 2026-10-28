@@ -32,7 +32,8 @@ enum class ScrollAffix : uint8_t {
 	Gilded,      // +chests spawn      / monsters deal more damage
 	Hallowed,    // +shrines spawn     / monsters have more life
 	Twinned,     // a second run boss (and its vault) / both bosses have more life
-	Last = Twinned,
+	Jeweled,     // +socketed item drops / monsters have more life
+	Last = Jeweled,
 };
 
 /** One rolled modifier: an affix plus the magnitudes (percent) of its boon/bane.
@@ -95,6 +96,7 @@ struct RunModMultipliers {
 	int chestsPct = 0;      // extra random chests (relative to the vanilla baseline)
 	int shrinesPct = 0;     // extra random shrines (relative to a 2-shrine baseline)
 	bool twinBoss = false;  // a second run boss (and second vault) spawns
+	int socketPct = 0;      // percentage points added to every drop's socket chance
 };
 
 /** @brief Sums a modifier set into the aggregate run multipliers. */

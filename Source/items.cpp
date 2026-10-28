@@ -1568,6 +1568,7 @@ void SetupBaseItem(Point position, _item_indexes idx, bool onlygood, bool sendms
 	SetupAllItems(*MyPlayer, item, idx, AdvanceRndSeed(), 2 * curlv, 1, onlygood, delta);
 	TryRandomUniqueItem(item, idx, 2 * curlv, 1, onlygood, delta);
 	SetupItem(item);
+	RollSocket(item, SocketChanceDropPct); // [RUNS MOD]
 
 	if (sendmsg)
 		NetSendCmdPItem(false, CMD_DROPITEM, item.position, item);
@@ -2106,6 +2107,7 @@ void SpawnOnePremium(Item &premiumItem, int plvl, const Player &player)
 	premiumItem._iCreateInfo = plvl | CF_SMITHPREMIUM;
 	premiumItem._iIdentified = true;
 	premiumItem._iStatFlag = player.CanUseItem(premiumItem);
+	RollSocket(premiumItem, SocketChanceShopPct); // [RUNS MOD]
 }
 
 bool WitchItemOk(const Player & /*player*/, const ItemData &item)
@@ -3341,6 +3343,11 @@ void TryDropRunRelic(int depth, Point position)
 	GetItemAttrs(item, static_cast<_item_indexes>(idx), UniqueItems[uid].UIMinLvl);
 	GetUniqueItem(*MyPlayer, item, uid);
 	SetupItem(item);
+	// Built here with no seed, so RollSocket's seed hash would give every relic the same
+	// answer. This runs on the killer's client alone and the socket travels in dwBuff,
+	// so the game RNG is fine.
+	if (GenerateRnd(100) < SocketChanceUniquePct + ActiveRunMods.socketPct)
+		item.dwBuff |= CF_SOCKETED;
 	DropPrizeItem(item, position);
 	InitDiabloMsg(_("A relic of the old world!"));
 }
@@ -3387,6 +3394,7 @@ Item RollGamblePrizeItem(int lvl)
 		return true;
 	});
 	SetupAllItems(*MyPlayer, item, idx, AdvanceRndSeed(), lvl, 15, /*onlygood=*/true, /*pregen=*/false);
+	RollSocket(item, SocketChanceVaultPct);
 	return item;
 }
 
@@ -4015,6 +4023,9 @@ void SpawnItem(Monster &monster, Point position, bool sendmsg, bool spawn /*= fa
 	SetupAllItems(*MyPlayer, item, idx, AdvanceRndSeed(), mLevel, uper, onlygood, false);
 	TryRandomUniqueItem(item, idx, mLevel, uper, onlygood, false);
 	SetupItem(item);
+	// [RUNS MOD] Every client on the level builds this item itself; the roll is seeded
+	// from the item, so they all agree on the socket.
+	RollSocket(item, SocketChanceDropPct);
 
 	if (sendmsg)
 		NetSendCmdPItem(false, CMD_DROPITEM, item.position, item);
@@ -4103,6 +4114,12 @@ void RecreateItem(const Player &player, Item &item, _item_indexes idx, uint16_t 
 	if (icreateinfo == 0) {
 		InitializeItem(item, idx);
 		item._iSeed = iseed;
+		// [RUNS MOD] InitializeItem zeroes dwBuff, which held the socket and any fused
+		// gem: put it back and re-apply the gem, as the rolled-item path below does.
+		if (RunsModEnabled) {
+			item.dwBuff = dwBuff;
+			ReapplyFusedGem(item);
+		}
 		gbIsHellfire = tmpIsHellfire;
 		return;
 	}
@@ -4110,6 +4127,10 @@ void RecreateItem(const Player &player, Item &item, _item_indexes idx, uint16_t 
 	if ((icreateinfo & CF_UNIQUE) == 0) {
 		if ((icreateinfo & CF_TOWN) != 0) {
 			RecreateTownItem(player, item, idx, icreateinfo, iseed);
+			// [RUNS MOD] Shop-bought gear keeps dwBuff but was never re-gemmed, so a gem
+			// fused into it fell off at the first save or sync.
+			if (RunsModEnabled)
+				ReapplyFusedGem(item);
 			gbIsHellfire = tmpIsHellfire;
 			return;
 		}
@@ -4799,9 +4820,9 @@ void PrintItemDetails(const Item &item)
 	// [RUNS MOD] Relics look like any other unique; say which ones came from the relic roll.
 	if (IsRunRelic(item))
 		AddItemInfoBoxString(_("relic of the old world"));
-	// [RUNS MOD] A fused gem is not a prefix or suffix power, so the loop above cannot
-	// see it and the item would otherwise show no sign of having been gemmed at all.
-	if (RunsModEnabled && HasGem(item)) {
+	// [RUNS MOD] A socket (and any gem in it) is not a prefix or suffix power, so the
+	// lines above cannot show it.
+	if (HasSocket(item)) {
 		std::vector<std::string> gemLines;
 		GetFusedGemLines(item, gemLines);
 		for (std::string &line : gemLines)
@@ -4849,6 +4870,10 @@ void PrintItemDur(const Item &item)
 	// [RUNS MOD] Flagged even unidentified: spotting a relic is the point of the label.
 	if (IsRunRelic(item))
 		AddItemInfoBoxString(_("relic of the old world"));
+	// [RUNS MOD] A socket shows before identifying, as in Diablo II. It can only be
+	// empty here: fusing a gem identifies the item.
+	if (HasSocket(item))
+		AddItemInfoBoxString(_("Socket: empty"));
 	PrintItemInfo(item);
 }
 
@@ -5068,6 +5093,8 @@ void SpawnSmith(int lvl)
 
 		newItem._iCreateInfo = lvl | CF_SMITH;
 		newItem._iIdentified = true;
+		// [RUNS MOD] A plain shelf item with a socket is a cheap home for a good gem.
+		RollSocket(newItem, SocketChanceShopPct);
 
 		SmithItems.push_back(newItem);
 	}

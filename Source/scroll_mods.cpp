@@ -74,6 +74,7 @@ enum class Effect : uint8_t {
 	Chests,      // extra random chests
 	Shrines,     // extra random shrines
 	TwinBoss,    // a second run boss spawns (its own vault + scroll)
+	Sockets,     // drops are more likely to have a socket (percentage points)
 };
 
 struct AffixData {
@@ -89,7 +90,7 @@ struct AffixData {
 };
 
 // Indexed by ScrollAffix. Each affix is a boon paired with an offsetting bane.
-constexpr std::array<AffixData, 13> Affixes = { {
+constexpr std::array<AffixData, 14> Affixes = { {
     // Avaricious: +gold / monsters have more life
     { "Avaricious", Effect::GoldFind, 40, 70, 3, Effect::MonsterHp, 15, 30, 2 },
     // Enchanted: +magic find / boss has more life & damage
@@ -117,6 +118,9 @@ constexpr std::array<AffixData, 13> Affixes = { {
     // Twinned: a second boss and its whole jackpot / both bosses are tougher.
     // The boon pct is unused (presence is the boon); the bane pct feeds BossHp.
     { "Twinned", Effect::TwinBoss, 0, 0, 0, Effect::BossHp, 20, 40, 3 },
+    // Jeweled: more of the run's drops have a socket / monsters have more life.
+    // Points, not percent: tier 1 is roughly double the 8% base drop chance.
+    { "Jeweled", Effect::Sockets, 8, 15, 0, Effect::MonsterHp, 20, 40, 2 },
 } };
 
 /** Magnitude multiplier (percent) per tier: tier 2/3 rolls run hotter on BOTH sides. */
@@ -192,6 +196,9 @@ void ApplyEffect(RunModMultipliers &out, Effect effect, int pct)
 	case Effect::TwinBoss:
 		out.twinBoss = true;
 		break;
+	case Effect::Sockets:
+		out.socketPct += pct;
+		break;
 	}
 }
 
@@ -230,6 +237,8 @@ std::string DescribeEffect(Effect effect, int pct, bool full)
 		return fmt::format(fmt::runtime(full ? _("+{:d}% shrines") : _("+{:d}% shrines")), pct);
 	case Effect::TwinBoss:
 		return std::string(full ? _("the boss is twinned (a second vault awaits)") : _("twin boss"));
+	case Effect::Sockets:
+		return fmt::format(fmt::runtime(full ? _("+{:d}% chance of socketed items") : _("+{:d}% sockets")), pct);
 	}
 	return {};
 }

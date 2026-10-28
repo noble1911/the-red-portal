@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <limits>
@@ -20,12 +21,14 @@
 #include "engine/load_file.hpp"
 #include "engine/palette.h"
 #include "engine/random.hpp"
+#include "engine/render/clx_render.hpp"
 #include "engine/surface.hpp"
 #include "inv.h"
 #include "items.h"
 #include "msg.h"
 #include "player.h"
 #include "runs_mod.h"
+#include "scroll_mods.h"
 #include "utils/is_of.hpp"
 #include "utils/language.h"
 #include "utils/log.hpp"
@@ -527,6 +530,131 @@ void EnsureGemSprites()
 	BuildGemSprites();
 }
 
+// --- Socket art ---------------------------------------------------------------------
+//
+// Drawn, not shipped: a socket is a bevelled stone ring with a dark hole, and the gem in
+// it is the gem's own art shrunk to fit the hole. Both are quantised against the live
+// palette like the full-size gems, and for the same reason.
+
+/** Socket diameter in pixels: small enough to sit in a corner of a one-cell icon. */
+constexpr int SocketSize = 11;
+/** The gem shown inside a filled socket. */
+constexpr int MiniGemSize = 7;
+
+OptionalOwnedClxSpriteList SocketSprite;
+unsigned SocketSpritePaletteGeneration = 0;
+std::array<OptionalOwnedClxSpriteList, NumGems> MiniGemSprites;
+unsigned MiniGemSpritesPaletteGeneration = 0;
+bool MiniGemSpritesBuilt = false;
+
+void EnsureSocketSprite()
+{
+	if (SocketSprite && SocketSpritePaletteGeneration == PaletteGeneration)
+		return;
+	const uint8_t light = NearestPaletteIndex(SDL_Color { 176, 164, 140, 255 });
+	const uint8_t dark = NearestPaletteIndex(SDL_Color { 84, 74, 62, 255 });
+	const uint8_t hole = NearestPaletteIndex(SDL_Color { 18, 14, 10, 255 });
+	OwnedSurface surface { SocketSize, SocketSize };
+	const float centre = (SocketSize - 1) / 2.0F;
+	for (int y = 0; y < SocketSize; y++) {
+		for (int x = 0; x < SocketSize; x++) {
+			const float dx = x - centre;
+			const float dy = y - centre;
+			const float distance = std::sqrt(dx * dx + dy * dy);
+			uint8_t index = 0; // transparent outside the ring
+			if (distance <= centre - 1.5F)
+				index = hole;
+			else if (distance <= centre + 0.5F)
+				index = dx + dy < 0 ? light : dark; // lit from the top left, like the UI
+			*surface.at(x, y) = index;
+		}
+	}
+	SocketSprite.emplace(SurfaceToClx(surface, 1, 0));
+	SocketSpritePaletteGeneration = PaletteGeneration;
+}
+
+/** Shrinks one gem's art to MiniGemSize square: crop to the opaque pixels, then average
+ * each output pixel's share of them. Mostly-transparent cells stay transparent so the
+ * gem keeps its outline instead of growing a muddy halo. */
+void BuildMiniGemSprite(int gemIndex)
+{
+	const GemArt &art = GemArtwork[gemIndex];
+	int minX = art.width, minY = art.height, maxX = -1, maxY = -1;
+	for (int y = 0; y < art.height; y++) {
+		for (int x = 0; x < art.width; x++) {
+			if (art.pixels[static_cast<size_t>(y) * art.width + x] == 0)
+				continue;
+			minX = std::min(minX, x);
+			minY = std::min(minY, y);
+			maxX = std::max(maxX, x);
+			maxY = std::max(maxY, y);
+		}
+	}
+	if (maxX < 0)
+		return;
+	const int side = std::max(maxX - minX, maxY - minY) + 1;
+	minX -= (side - (maxX - minX + 1)) / 2;
+	minY -= (side - (maxY - minY + 1)) / 2;
+
+	OwnedSurface surface { MiniGemSize, MiniGemSize };
+	for (int ty = 0; ty < MiniGemSize; ty++) {
+		for (int tx = 0; tx < MiniGemSize; tx++) {
+			const int x0 = minX + tx * side / MiniGemSize;
+			const int x1 = std::max(x0 + 1, minX + (tx + 1) * side / MiniGemSize);
+			const int y0 = minY + ty * side / MiniGemSize;
+			const int y1 = std::max(y0 + 1, minY + (ty + 1) * side / MiniGemSize);
+			int r = 0, g = 0, b = 0, opaque = 0, total = 0;
+			for (int y = y0; y < y1; y++) {
+				for (int x = x0; x < x1; x++) {
+					total++;
+					if (x < 0 || y < 0 || x >= art.width || y >= art.height)
+						continue;
+					const uint16_t value = art.pixels[static_cast<size_t>(y) * art.width + x];
+					if (value == 0)
+						continue;
+					const SDL_Color &c = GemArtColors[value - 1];
+					r += c.r;
+					g += c.g;
+					b += c.b;
+					opaque++;
+				}
+			}
+			uint8_t index = 0;
+			if (opaque * 5 >= total * 2) {
+				index = NearestPaletteIndex(SDL_Color { static_cast<uint8_t>(r / opaque),
+				    static_cast<uint8_t>(g / opaque), static_cast<uint8_t>(b / opaque), 255 });
+			}
+			*surface.at(tx, ty) = index;
+		}
+	}
+	MiniGemSprites[gemIndex].emplace(SurfaceToClx(surface, 1, 0));
+}
+
+void EnsureMiniGemSprites()
+{
+	if (MiniGemSpritesBuilt && MiniGemSpritesPaletteGeneration == PaletteGeneration)
+		return;
+	LoadGemArt();
+	if (!GemArtLoaded)
+		return;
+	for (int i = 0; i < NumGems; i++)
+		BuildMiniGemSprite(i);
+	MiniGemSpritesBuilt = true;
+	MiniGemSpritesPaletteGeneration = PaletteGeneration;
+}
+
+/** A stable 0-99 roll from an item seed (see RollSocket for why not the game RNG). */
+int SocketRoll(uint32_t seed)
+{
+	uint32_t x = seed ^ 0x50C4E7EDU;
+	x ^= x >> 16;
+	x *= 0x7FEB352DU;
+	x ^= x >> 15;
+	x *= 0x846CA68BU;
+	x ^= x >> 16;
+	return static_cast<int>(x % 100);
+}
+
 } // namespace
 
 GemType GemTypeFromBuff(uint32_t dwBuff)
@@ -707,13 +835,88 @@ void ReapplyFusedGem(Item &item)
 	ApplyBonus(item, BonusForItem(effect, item));
 }
 
-void GetFusedGemLines(const Item &item, std::vector<std::string> &out)
+bool CanHaveSocket(const Item &item)
 {
+	return !item.isEmpty() && (item._iClass == ICLASS_WEAPON || item._iClass == ICLASS_ARMOR);
+}
+
+bool HasSocket(const Item &item)
+{
+	// CF_GEMMED counts: gear gemmed before sockets existed keeps its gem, and its socket.
+	return RunsModEnabled && CanHaveSocket(item) && (item.dwBuff & (CF_SOCKETED | CF_GEMMED)) != 0;
+}
+
+void RollSocket(Item &item, int chancePct)
+{
+	if (!RunsModEnabled || !CanHaveSocket(item))
+		return;
+	int pct = item._iMagical == ITEM_QUALITY_UNIQUE ? SocketChanceUniquePct : chancePct;
+	// ActiveRunMods is zeroed outside a run level, so town stock never sees the bonus.
+	pct += ActiveRunMods.socketPct;
+	if (SocketRoll(item._iSeed) < pct)
+		item.dwBuff |= CF_SOCKETED;
+}
+
+int GemRemovalCost(const Item &item)
+{
+	// A quarter of the gem's value: what selling the gem would have fetched.
+	return std::max(GemValues[static_cast<size_t>(FusedGemQuality(item))] / 4, 1);
+}
+
+void RemoveFusedGem(const Player &player, Item &item)
+{
+	// The gem's bonus is baked into the _iPL* fields (capped, so it cannot be subtracted
+	// back out exactly), so rebuild the item from its seed without the gem instead. The
+	// rebuild restores the base item, so carry over what wear and use changed.
+	const _item_indexes idx = item.IDidx;
+	const uint16_t createInfo = item._iCreateInfo;
+	const uint32_t seed = item._iSeed;
+	const int value = item._ivalue;
+	const uint32_t dwBuff = (item.dwBuff & ~static_cast<uint32_t>(CF_GEMMED | CF_GEMTYPE | CF_GEMQUALITY)) | CF_SOCKETED;
+	const int durability = item._iDurability;
+	const int charges = item._iCharges;
+	const bool identified = item._iIdentified;
+	RecreateItem(player, item, idx, createInfo, seed, value, dwBuff);
+	item._iDurability = std::min(durability, static_cast<int>(item._iMaxDur));
+	item._iCharges = charges;
+	item._iIdentified = identified;
+	item.updateRequiredStatsCacheForPlayer(player);
+}
+
+void ExtractFusedGem(const Item &item, Item &gem)
+{
+	CreateGem(gem, FusedGemType(item), FusedGemQuality(item));
+}
+
+void DrawItemSocket(const Surface &out, const Item &item, Point position, ClxSprite itemSprite)
+{
+	if (!HasSocket(item))
+		return;
+	EnsureSocketSprite();
+	// Bottom-right corner of the icon, one pixel in so the hover outline stays visible.
+	const Point socketPosition { position.x + itemSprite.width() - SocketSize - 1, position.y - 1 };
+	ClxDraw(out, socketPosition, (*SocketSprite)[0]);
 	if (!HasGem(item))
 		return;
+	EnsureMiniGemSprites();
+	const int index = GemCurs(FusedGemType(item), FusedGemQuality(item)) - GemCursFirst;
+	if (!MiniGemSprites[index])
+		return;
+	const int inset = (SocketSize - MiniGemSize) / 2;
+	ClxDraw(out, socketPosition + Displacement { inset, -inset }, (*MiniGemSprites[index])[0]);
+}
+
+void GetFusedGemLines(const Item &item, std::vector<std::string> &out)
+{
+	if (!HasSocket(item))
+		return;
+	if (!HasGem(item)) {
+		out.emplace_back(_("Socket: empty"));
+		return;
+	}
 	const GemType type = FusedGemType(item);
 	const GemQuality quality = FusedGemQuality(item);
-	out.push_back(fmt::format(fmt::runtime(_(/* TRANSLATORS: {:s} is a gem name */ "{:s} fused")), GemName(type, quality)));
+	out.push_back(fmt::format(fmt::runtime(_(/* TRANSLATORS: {:s} is a gem name */ "Socket: {:s}")), GemName(type, quality)));
 	const GemEffect effect = GetGemEffect(type, quality);
 	const std::string text = BonusText(BonusForItem(effect, item));
 	if (!text.empty())
@@ -762,6 +965,10 @@ bool DoGem(Player &player, int cii)
 	if (HasGem(*target)) {
 		InitDiabloMsg(fmt::format(fmt::runtime(_(/* TRANSLATORS: {:s} is a gem name */ "This item already holds a {:s}.")),
 		    GemName(FusedGemType(*target), FusedGemQuality(*target))));
+		return false;
+	}
+	if (!HasSocket(*target)) {
+		InitDiabloMsg(_("This item has no socket."));
 		return false;
 	}
 

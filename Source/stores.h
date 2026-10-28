@@ -85,6 +85,10 @@ enum class TalkID : uint8_t {
 	// [RUNS MOD] Cain's hero guides: class list, then one class's build primer.
 	StorytellerGuides,
 	StorytellerGuideShow,
+	// [RUNS MOD] Griswold's gem work: the menu, then the item list for each service.
+	SmithGems,
+	SmithGemRemove,  // destroy the gem, keep the item (and its socket)
+	SmithGemSalvage, // destroy the item, keep the gem
 };
 
 /** Currently active store */
