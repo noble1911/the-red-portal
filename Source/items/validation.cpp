@@ -11,6 +11,7 @@
 #include "items.h"
 #include "msg.h"
 #include "player.h"
+#include "runs_mod.h"
 #include "spells.h"
 #include "tables/monstdat.h"
 #include "utils/endian_swap.hpp"
@@ -79,6 +80,11 @@ bool IsUniqueMonsterItemValid(uint16_t iCreateInfo, uint32_t /*dwBuff*/)
 {
 	const uint8_t level = iCreateInfo & CF_LEVEL;
 
+	// [RUNS MOD] See IsDungeonItemValid: the run boss and its vault roll at the run's reward
+	// depth, which no unique monster's level fingerprints.
+	if (RunsModEnabled)
+		return true;
+
 	// Check all unique monster levels to see if they match the item level
 	for (const UniqueMonsterData &uniqueMonsterData : UniqueMonstersData) {
 		if (IsAnyOf(uniqueMonsterData.mtype, MT_DEFILER, MT_NAKRUL, MT_HORKDMN)) {
@@ -101,6 +107,16 @@ bool IsDungeonItemValid(uint16_t iCreateInfo, uint32_t dwBuff)
 {
 	const uint8_t level = iCreateInfo & CF_LEVEL;
 	const bool isHellfireItem = (dwBuff & CF_HELLFIRE) != 0;
+
+	// [RUNS MOD] Vanilla checks an item's level against what its dungeon could have made: a
+	// monster's base level, or twice the deepest container level. The mod's items follow
+	// its own rules -- the boss vault and drop roll at the run's reward depth (up to 62 on
+	// Hell), companion potions carry theirs, the run levels rebase Hellfire's depths -- so
+	// those checks threw out legitimate loot: in co-op a partner never saw a Hell vault item,
+	// only "sent an invalid packet". Any level the create-info can hold is a level the mod
+	// can make.
+	if (RunsModEnabled)
+		return true;
 
 	// Check all monster levels to see if they match the item level
 	int type = -1;
