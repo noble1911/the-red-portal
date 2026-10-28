@@ -1437,11 +1437,8 @@ _item_indexes GetItemIndexForDroppableItem(bool considerDropRate, tl::function_r
 	return std::upper_bound(ril.begin(), ril.end(), targetWeight, [](unsigned target, const WeightedItemIndex &value) { return target < value.cumulativeWeight; })->index;
 }
 
-_item_indexes RndUItem(Monster *monster)
+_item_indexes RndUItemUpTo(int itemMaxLevel)
 {
-	int itemMaxLevel = ItemsGetCurrlevel() * 2;
-	if (monster != nullptr)
-		itemMaxLevel = monster->level(sgGameInitInfo.nDifficulty);
 	return GetItemIndexForDroppableItem(false, [&itemMaxLevel](const ItemData &item) {
 		if (item.itype == ItemType::Misc && item.iMiscId == IMISC_BOOK)
 			return true;
@@ -1451,6 +1448,13 @@ _item_indexes RndUItem(Monster *monster)
 			return false;
 		return true;
 	});
+}
+
+_item_indexes RndUItem(Monster *monster)
+{
+	if (monster != nullptr)
+		return RndUItemUpTo(monster->level(sgGameInitInfo.nDifficulty));
+	return RndUItemUpTo(ItemsGetCurrlevel() * 2);
 }
 
 _item_indexes RndAllItems()
@@ -3435,11 +3439,30 @@ void DropPrizeItem(Item prize, Point position)
 	NetSendCmdPItem(false, CMD_SPAWNITEM, item.position, item);
 }
 
+/** [RUNS MOD] See RunRewardDepthBonus. */
+constexpr int NightmareRewardDepthBonus = 8;
+constexpr int HellRewardDepthBonus = 15;
+
+int RunRewardDepthBonus()
+{
+	if (!RunsModEnabled)
+		return 0;
+	switch (sgGameInitInfo.nDifficulty) {
+	case DIFF_NIGHTMARE:
+		return NightmareRewardDepthBonus;
+	case DIFF_HELL:
+		return HellRewardDepthBonus;
+	default:
+		return 0;
+	}
+}
+
 void DropBossGradeItem(Point position)
 {
 	// [RUNS MOD] One boss-vault item: a chest's level at this depth (2 x ItemsGetCurrlevel,
-	// which also rebases the Hellfire depths) rolled at boss grade, see RollGamblePrizeItem.
-	DropPrizeItem(RollGamblePrizeItem(std::clamp(ItemsGetCurrlevel() * 2, 1, 63)), position);
+	// which also rebases the Hellfire depths), lifted on the harder difficulties, rolled at
+	// boss grade -- see RollGamblePrizeItem.
+	DropPrizeItem(RollGamblePrizeItem(std::clamp((ItemsGetCurrlevel() + RunRewardDepthBonus()) * 2, 1, 63)), position);
 }
 
 Item RollGamblePrizeItem(int lvl)
@@ -4038,9 +4061,10 @@ void SpawnItem(Monster &monster, Point position, bool sendmsg, bool spawn /*= fa
 
 	if (monster.isUnique() || dropsSpecialTreasure) {
 		// Unique monster is killed => use better item base (for example no gold)
-		// [RUNS MOD] RndUItem(nullptr) caps the base pick at curlv*2 = twice the depth,
-		// matching the affix level below; RndUItem(&monster) would cap by monster level.
-		idx = isRunBoss ? RndUItem(nullptr) : RndUItem(&monster);
+		// [RUNS MOD] The base pick is capped at twice the reward depth (the depth, lifted on
+		// Nightmare/Hell), matching the affix level below; RndUItem(&monster) would cap by
+		// the boss's own monster level.
+		idx = isRunBoss ? RndUItemUpTo((ItemsGetCurrlevel() + RunRewardDepthBonus()) * 2) : RndUItem(&monster);
 	} else if (dropBrain && !gbIsMultiplayer) {
 		// Normal monster is killed => need to drop brain to progress the quest
 		Quests[Q_MUSHROOM]._qvar1 = QS_BRAINSPAWNED;
@@ -4081,7 +4105,7 @@ void SpawnItem(Monster &monster, Point position, bool sendmsg, bool spawn /*= fa
 	// Baked into the item's create-info via the level, so save/load + network
 	// recreation stay exact.
 	if (isRunBoss)
-		mLevel = static_cast<int8_t>(std::clamp(currlevel * 2, 1, 63));
+		mLevel = static_cast<int8_t>(std::clamp((currlevel + RunRewardDepthBonus()) * 2, 1, 63));
 	// [RUNS MOD] Scroll "magic find" raises the effective item level so drops roll
 	// higher-quality affixes. This is baked into the item's create-info (via the
 	// level, capped to CF_LEVEL=63) so save/load + network recreation stay exact.

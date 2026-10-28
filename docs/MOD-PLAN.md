@@ -476,7 +476,13 @@ A review of player options against the dungeon found four systemic problems, fix
    floor for shallow depths (depth-1 monsters average ~5 life). Those monsters carry depth,
    Hellfire's rosters and difficulty, so the boss follows all three; scroll modifiers stack
    on top as before. Deterministic: every client generates the same level.
-2. Nightmare/Hell rewards -- pending.
+2. **Nightmare/Hell paid what Normal did.** The vault, the boss's drop, relics, gems and
+   companion potions were keyed to depth alone, so a Hell run meant far tougher monsters for
+   the same rewards (only ordinary drops and XP rose, via the engine's monster level).
+   `RunRewardDepthBonus()` lifts them: +8 depths on Nightmare, +15 on Hell -- monster level
+   runs at about twice the depth, matching the engine's +15/+30. Applied to the boss drop's
+   base pick and affix level, the vault items' level, the relic window, gem quality and every
+   companion potion's level. Vault item COUNT and the next-depth scroll stay on the real depth.
 3. Modifier extremes -- pending.
 4. Companion supply -- pending.
 

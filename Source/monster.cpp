@@ -4391,6 +4391,9 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 		const int runDiff = sgGameInitInfo.nDifficulty;
 		const int maxUnlocked = std::min<int>(MyPlayer->pDiabloKillLevel, DIFF_HELL);
 		const int dropDiff = (runDiff < maxUnlocked && GenerateRnd(100) < 20) ? runDiff + 1 : runDiff;
+		// [RUNS MOD] The depth the run's own rewards pay at: deeper on Nightmare and Hell
+		// (see RunRewardDepthBonus). Depth-tied unlocks -- the next-depth scroll -- keep currlevel.
+		const int rewardDepth = static_cast<int>(currlevel) + RunRewardDepthBonus();
 		if (isRunBoss) {
 			DropDungeonScroll(NextRunDepth(static_cast<int>(currlevel)), monster.position.tile, dropDiff, true);
 			// [RUNS MOD] The boss guards the VAULT: a loot shower on top of the normal
@@ -4443,15 +4446,15 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 				DropGambleToken(monster.position.tile, true);
 			// [RUNS MOD] Rare vault relic: the retired quests' uniques (Harlequin
 			// Crest, Veil of Steel, ...) return as depth-gated chase drops.
-			TryDropRunRelic(static_cast<int>(currlevel), monster.position.tile);
+			TryDropRunRelic(rewardDepth, monster.position.tile);
 			// [RUNS MOD] The vault always pays a gem, and its quality is rolled at this
 			// depth -- the boss is the reliable way to move up the gem tiers, the same
 			// way it is the only way to move up depth. Spawned on peers, as above.
-			DropRandomGem(static_cast<int>(currlevel), monster.position.tile, /*sendmsg=*/true);
+			DropRandomGem(rewardDepth, monster.position.tile, /*sendmsg=*/true);
 			// [RUNS MOD] Companion potions are rare magic: a vault holds one now and then,
 			// at this depth's level (see runs_companion.h).
 			if (GenerateRnd(100) < CompanionVaultChancePct)
-				DropCompanionPotion(static_cast<int>(currlevel), monster.position.tile);
+				DropCompanionPotion(rewardDepth, monster.position.tile);
 		} else {
 			// [RUNS MOD] Tyrannical champions always pay out: one good item at the
 			// corpse (the pick is re-derived, so no champion state is stored).
@@ -4462,7 +4465,7 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 			// [RUNS MOD] Companion potion: a fair chance from a champion, a slim one from
 			// anything else, always at this depth's level.
 			if (isChampion ? GenerateRnd(100) < CompanionChampionChancePct : GenerateRnd(1000) < CompanionMonsterChancePerMille)
-				DropCompanionPotion(static_cast<int>(currlevel), monster.position.tile);
+				DropCompanionPotion(rewardDepth, monster.position.tile);
 			if (GenerateRnd(100) < 3)
 				DropDungeonScroll(ClampRunDepth(static_cast<int>(currlevel)), monster.position.tile, dropDiff, true);
 			// [RUNS MOD] No gem here: the vault is the only source (see DropRandomGem).

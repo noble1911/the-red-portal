@@ -700,6 +700,17 @@ Item RollGamblePrizeItem(int lvl);
 
 /** @brief [RUNS MOD] Rolls and drops one boss-vault item at `position` (synced like a monster drop). */
 void DropBossGradeItem(Point position);
+/**
+ * @brief [RUNS MOD] How many depths deeper the run's own rewards pay out than the run itself:
+ * 0 on Normal, more on Nightmare and Hell.
+ *
+ * The engine already lifts every monster's level on the harder difficulties (+15, +30), which
+ * lifts their ordinary drops. The mod's rewards -- the boss's drop, its vault, relics, gems
+ * and companion potions -- are keyed to depth instead, so without this a Hell run paid
+ * exactly what Normal did at the same depth for far more risk. Monster level runs at about
+ * twice the depth, so these match the engine's lift.
+ */
+int RunRewardDepthBonus();
 void SpawnBoy(int lvl);
 void SpawnHealer(int lvl);
 void MakeGoldStack(Item &goldItem, int value);
