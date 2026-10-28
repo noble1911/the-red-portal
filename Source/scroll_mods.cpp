@@ -7,11 +7,13 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <string_view>
 
 #include <fmt/format.h>
 
 #include "levels/gendung.h"
+#include "missiles.h"
 #include "monster.h"
 #include "multi.h"
 #include "portal.h"
@@ -31,10 +33,23 @@ constexpr int BossDmgPctPerLevel = 16;
 /** [RUNS MOD] Reference boss stats that every run boss is NORMALIZED to at level 1, then
  * scaled up by level -- so whichever boss is chosen is level-appropriate (a Warlord on
  * level 1 is scaled down, a Butcher on level 15 is scaled up). Tuned so a fresh character
- * can beat the level-1 boss: modest HP and low base damage, ramping up with level. */
+ * can beat the level-1 boss: modest HP and low base damage, ramping up with level.
+ *
+ * This curve is now only the FLOOR. On its own it fell far behind the monsters around the
+ * boss -- at depth 15 it hit for 6-19 beside monsters hitting 20-30, and it ignored
+ * Nightmare/Hell entirely (the engine's difficulty multipliers are overwritten here), so a
+ * Hell boss had less life than an ordinary monster. The boss now also measures the level
+ * it guards (see BossLifeMonsterMultiple) and takes whichever is stronger. */
 constexpr int ReferenceBossHp = 150;
 constexpr int ReferenceBossMinDmg = 2;
 constexpr int ReferenceBossMaxDmg = 6;
+
+/** [RUNS MOD] The boss has this many times the life of the average monster on its level...
+ * Those monsters already carry the depth, Hellfire's deeper rosters and the difficulty, so
+ * the boss follows all three; the scroll's modifiers stack on top as before. */
+constexpr int BossLifeMonsterMultiple = 8;
+/** ...and hits this percent as hard as that average monster. */
+constexpr int BossDamageMonsterPct = 130;
 
 /** A private, self-contained LCG so rolling never disturbs the game RNG. */
 struct ModRng {
@@ -355,6 +370,23 @@ void ScaleRunMonsters()
 {
 	const int runLevel = std::max(static_cast<int>(currlevel), 1);
 
+	// [RUNS MOD] The average ordinary monster on this level, measured before any scroll
+	// modifier touches it: what the boss is scaled against. Every client generates the
+	// same level, so every client measures the same average.
+	int64_t sumLife = 0;
+	int64_t sumMinDamage = 0;
+	int64_t sumMaxDamage = 0;
+	int ordinaryCount = 0;
+	for (size_t i = 0; i < ActiveMonsterCount; i++) {
+		const Monster &monster = Monsters[ActiveMonsters[i]];
+		if (monster.isPlayerMinion() || monster.isUnique() || monster.position.tile == GolemHoldingCell)
+			continue;
+		sumLife += monster.maxHitPoints >> 6;
+		sumMinDamage += monster.minDamage;
+		sumMaxDamage += monster.maxDamage;
+		ordinaryCount++;
+	}
+
 	for (size_t i = 0; i < ActiveMonsterCount; i++) {
 		Monster &monster = Monsters[ActiveMonsters[i]];
 		if (monster.isPlayerMinion())
@@ -366,18 +398,24 @@ void ScaleRunMonsters()
 		// matches the engine's own unique-monster init.
 		if (monster.isUnique() && monster.uniqueType == RunBossType) {
 			int hp = ReferenceBossHp * (100 + (runLevel - 1) * BossHpPctPerLevel) / 100;
-			hp = ApplyPct(hp, ActiveRunMods.bossHpPct + ActiveRunMods.monsterHpPct);
+			// The single-player halving the engine gives every monster: the floor curve is
+			// a multiplayer figure, the measured average already has it.
 			if (!gbIsMultiplayer)
-				hp = std::max(hp / 2, 64);
-			monster.maxHitPoints = hp << 6;
+				hp = std::max(hp / 2, 1);
+			if (ordinaryCount > 0)
+				hp = std::max<int>(hp, static_cast<int>(sumLife * BossLifeMonsterMultiple / ordinaryCount));
+			hp = ApplyPct(hp, ActiveRunMods.bossHpPct + ActiveRunMods.monsterHpPct);
+			monster.maxHitPoints = std::max(hp, 1) << 6;
 			monster.hitPoints = monster.maxHitPoints;
 
-			const auto bossDmg = [runLevel](int base) {
-				const int d = base * (100 + (runLevel - 1) * BossDmgPctPerLevel) / 100;
+			const auto bossDmg = [runLevel, ordinaryCount](int base, int64_t levelSum) {
+				int d = base * (100 + (runLevel - 1) * BossDmgPctPerLevel) / 100;
+				if (ordinaryCount > 0)
+					d = std::max<int>(d, static_cast<int>(levelSum * BossDamageMonsterPct / 100 / ordinaryCount));
 				return static_cast<uint8_t>(std::clamp(ApplyPct(d, ActiveRunMods.monsterDmgPct), 0, 255));
 			};
-			monster.minDamage = monster.minDamageSpecial = bossDmg(ReferenceBossMinDmg);
-			monster.maxDamage = monster.maxDamageSpecial = bossDmg(ReferenceBossMaxDmg);
+			monster.minDamage = monster.minDamageSpecial = bossDmg(ReferenceBossMinDmg, sumMinDamage);
+			monster.maxDamage = monster.maxDamageSpecial = std::max(bossDmg(ReferenceBossMaxDmg, sumMaxDamage), monster.minDamage);
 			continue;
 		}
 

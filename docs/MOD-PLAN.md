@@ -465,6 +465,21 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
 - Open: whether difficulty (Nightmare/Hell) should lift a potion found there; Switch
   memory with five companion types loaded per level.
 
+**Balance review** (2026-10-28; one commit per fix, NOT yet playtested)
+A review of player options against the dungeon found four systemic problems, fixed in order:
+1. **Bosses were far too weak, and ignored difficulty.** ScaleRunMonsters replaced the boss's
+   life/damage with a fixed curve (150 life +25%/depth, 2-6 damage +16%/depth) that also
+   overwrote the engine's Nightmare/Hell multipliers: at depth 15 the boss hit for 6-19 beside
+   monsters hitting 20-30, and on Hell it had less life than an ordinary monster. Now the boss
+   measures the level it guards: life = 8x the average ordinary monster's, damage = 130% of
+   theirs (BossLifeMonsterMultiple / BossDamageMonsterPct), with the old curve kept as a
+   floor for shallow depths (depth-1 monsters average ~5 life). Those monsters carry depth,
+   Hellfire's rosters and difficulty, so the boss follows all three; scroll modifiers stack
+   on top as before. Deterministic: every client generates the same level.
+2. Nightmare/Hell rewards -- pending.
+3. Modifier extremes -- pending.
+4. Companion supply -- pending.
+
 **Floating numbers on by default, with icons** (2026-10-28)
 - The stock "Floating Numbers - Damage/XP" Lua mods are switched on once for every
   install (a [RunsMod] marker in the INI; turning them off afterwards sticks).
