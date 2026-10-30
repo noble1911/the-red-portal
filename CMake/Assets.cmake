@@ -185,6 +185,30 @@ set(devilutionx_assets
   "lua/mods/Floating Numbers - Damage/init.lua"
   "lua/mods/Floating Numbers - XP/init.lua"
   lua/repl_prelude.lua
+  # [RUNS MOD] Farnham's fruit-machine barks (tools/voice/render_farnham.ps1).
+  sfx/farnham/greet01.wav
+  sfx/farnham/greet02.wav
+  sfx/farnham/greet03.wav
+  sfx/farnham/pull01.wav
+  sfx/farnham/pull02.wav
+  sfx/farnham/pull03.wav
+  sfx/farnham/lose01.wav
+  sfx/farnham/lose02.wav
+  sfx/farnham/lose03.wav
+  sfx/farnham/pair01.wav
+  sfx/farnham/pair02.wav
+  sfx/farnham/nearmiss01.wav
+  sfx/farnham/nearmiss02.wav
+  sfx/farnham/win01.wav
+  sfx/farnham/win02.wav
+  sfx/farnham/win03.wav
+  sfx/farnham/jackpot01.wav
+  sfx/farnham/jackpot02.wav
+  sfx/farnham/skull01.wav
+  sfx/farnham/broke01.wav
+  sfx/farnham/broke02.wav
+  sfx/farnham/goodbye01.wav
+  sfx/farnham/goodbye02.wav
   # [RUNS MOD] The Healer companion: art and sounds from The Hell 4.
   monsters/myconid/a1.wav
   monsters/myconid/a2.wav

@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <cstdint>
 #include <functional>
+#include <iterator>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -31,6 +33,7 @@
 #include "engine/render/clx_render.hpp"
 #include "engine/render/primitive_render.hpp"
 #include "engine/render/text_render.hpp"
+#include "engine/sound.h"
 #include "engine/trn.hpp"
 #include "game_mode.hpp"
 #include "lua/lua_event.hpp"
@@ -1256,7 +1259,76 @@ bool GambleWon;
 uint32_t GambleSpinStartTicks;
 int GambleReelStopsPlayed;
 bool GambleSpinDone;
-constexpr uint32_t GambleReelStopMs[3] = { 750, 1250, 1750 };
+/** When each reel lands. The third waits longer when the first two match: the
+ * slot-machine tease, set per spin by StartGambleSpin. */
+uint32_t GambleReelStopMs[3] = { 750, 1250, 1750 };
+constexpr uint32_t GambleTeaseStopMs = 2700;
+/** Net gold the machine has paid this session (negative = Farnham is up). Token
+ * pulls cost nothing, so they only ever add. */
+int GambleSessionNet;
+bool GamblePlayedThisSession;
+
+// [RUNS MOD] Farnham's voice. The clips (assets/sfx/farnham, rendered by
+// tools/voice/render_farnham.ps1) play through their own sound handle rather than
+// effects.tsv rows: SfxID is shared by the base and Hellfire tables, which differ in
+// length, so appended rows would not line up in both. A missing clip just stays quiet.
+enum class GambleBark : uint8_t { Greet, Pull, Lose, Pair, NearMiss, Win, Jackpot, Skull, Broke, Goodbye };
+struct GambleBarkSet {
+	const char *name;
+	int clips;
+	/** Out of 6: how often the bark plays. Pulls happen in streaks, and a line on
+	 * every one of them wears thin fast. */
+	int chance;
+};
+constexpr GambleBarkSet GambleBarks[] = {
+	{ "greet", 3, 6 },
+	{ "pull", 3, 2 },
+	{ "lose", 3, 3 },
+	{ "pair", 2, 2 },
+	{ "nearmiss", 2, 6 },
+	{ "win", 3, 6 },
+	{ "jackpot", 2, 6 },
+	{ "skull", 1, 6 },
+	{ "broke", 2, 6 },
+	{ "goodbye", 2, 6 },
+};
+std::unique_ptr<TSnd> GambleBarkSound;
+GambleBark GambleResultBark;
+int GambleLastClip[std::size(GambleBarks)];
+
+/** Presentation-only noise for picking lines: barks fire from draw code and must
+ * never advance the game RNG. */
+uint32_t GambleBarkNoise()
+{
+	static uint32_t state = static_cast<uint32_t>(SDL_GetTicks());
+	state = state * 1664525U + 1013904223U;
+	return state >> 16;
+}
+
+void PlayGambleBark(GambleBark bark)
+{
+	const auto kind = static_cast<size_t>(bark);
+	const GambleBarkSet &set = GambleBarks[kind];
+	if (static_cast<int>(GambleBarkNoise() % 6) >= set.chance)
+		return;
+	// A shrug never talks over Farnham; anything worth shouting about does.
+	const bool minor = bark == GambleBark::Lose || bark == GambleBark::Pair;
+	if (minor && GambleBarkSound != nullptr && GambleBarkSound->isPlaying())
+		return;
+	// Never the same line twice running.
+	int clip = 0;
+	if (set.clips > 1)
+		clip = (GambleLastClip[kind] + 1 + static_cast<int>(GambleBarkNoise() % (set.clips - 1))) % set.clips;
+	GambleLastClip[kind] = clip;
+	// Replacing the handle cuts off whatever Farnham was still saying.
+	GambleBarkSound = nullptr;
+	const std::string path = fmt::format("sfx\\farnham\\{}{:02d}.wav", set.name, clip + 1);
+	auto sound = SoundFileLoadWithStatus(path.c_str());
+	if (!sound.has_value() || *sound == nullptr)
+		return;
+	GambleBarkSound = std::move(*sound);
+	snd_play_snd(GambleBarkSound.get(), 0, 0, *GetOptions().Audio.soundVolume);
+}
 
 int GambleStake()
 {
@@ -1305,6 +1377,7 @@ void AwardGambleGold(int amount)
 	Player &myPlayer = *MyPlayer;
 	AddGoldToInventory(myPlayer, amount);
 	myPlayer._pGold += amount;
+	GambleSessionNet += amount;
 	// No sound here: payouts apply at pull time, but the reveal (and its jingle)
 	// waits for the last reel to land.
 	GambleWon = true;
@@ -1325,10 +1398,13 @@ void ResolveGamble(bool tokenSpin = false)
 	// [RUNS MOD] A token buys the pull outright; payouts still key off the full
 	// stake value, so a token is worth exactly one gold pull wherever you stand.
 	const int stake = GambleStake();
-	if (tokenSpin)
+	if (tokenSpin) {
 		ConsumeGambleToken(myPlayer);
-	else
+	} else {
 		TakePlrsMoney(stake);
+		GambleSessionNet -= stake;
+	}
+	GamblePlayedThisSession = true;
 	GambleWon = false;
 	for (GambleSymbol &reel : GambleReels)
 		reel = RollGambleSymbol();
@@ -1389,10 +1465,12 @@ void ResolveGamble(bool tokenSpin = false)
 	// Triple skull returning the stake is deliberate: three matching symbols paying
 	// literally nothing is the worst outcome a slot can show, and at the old weights it
 	// was as common as the potion triple. Farnham keeps the joke, not the money.
+	GambleResultBark = GambleBark::Win;
 	if (matched == 3) {
 		switch (symbol) {
 		case GambleSymbol::Crown:
 			if (!GamblerJackpot.isEmpty()) {
+				GambleResultBark = GambleBark::Jackpot;
 				GamblePendingDrops.push_back(GamblerJackpot);
 				GambleResultLine = fmt::format(fmt::runtime(_("JACKPOT! {:s} is yours!")), GamblerJackpot.getName().str());
 				GamblerJackpot.clear(); // claimed at pull time so a mashed re-pull can't double-claim
@@ -1433,19 +1511,23 @@ void ResolveGamble(bool tokenSpin = false)
 			GambleResultLine = fmt::format(fmt::runtime(_("Three potions! A round for the house, and {:s} gold!")), FormatInteger(stake * 3));
 			break;
 		case GambleSymbol::Skull:
+			GambleResultBark = GambleBark::Skull;
 			AwardGambleGold(stake);
 			GambleResultLine = _("Three skulls. Farnham laughs, then slides your stake back.");
 			break;
 		}
 	} else if (matched == 2) {
 		if (symbol == GambleSymbol::Crown) {
+			GambleResultBark = GambleBark::NearMiss;
 			AwardGambleGold(stake * 6);
 			GambleResultLine = fmt::format(fmt::runtime(_("Two crowns -- so close! {:s} gold.")), FormatInteger(stake * 6));
 		} else {
+			GambleResultBark = GambleBark::Pair;
 			AwardGambleGold(stake);
 			GambleResultLine = _("A pair. Your stake back.");
 		}
 	} else {
+		GambleResultBark = GambleBark::Lose;
 		GambleResultLine = _("Nothing. The house drinks well tonight.");
 	}
 }
@@ -1459,6 +1541,16 @@ void StartGamble()
 	HasScrollbar = false;
 	AddSText(0, 1, _("Farnham's One-Armed Bandit"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
 	AddSLine(3);
+	// [RUNS MOD] The verdict on tonight's play, once there is one. Token pulls count
+	// as free, so this is what the machine has cost (or paid) in gold.
+	if (GamblePlayedThisSession) {
+		if (GambleSessionNet > 0)
+			AddSText(0, 5, fmt::format(fmt::runtime(_("Tonight you're up {:s} gold")), FormatInteger(GambleSessionNet)), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
+		else if (GambleSessionNet < 0)
+			AddSText(0, 5, fmt::format(fmt::runtime(_("Tonight you're down {:s} gold")), FormatInteger(-GambleSessionNet)), UiFlags::ColorRed | UiFlags::AlignCenter, false);
+		else
+			AddSText(0, 5, _("Tonight you're dead even"), UiFlags::ColorWhite | UiFlags::AlignCenter, false);
+	}
 	if (!GamblerJackpot.isEmpty()) {
 		AddSText(0, 7, _("Tonight's jackpot:"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
 		AddSText(0, 9, GamblerJackpot.getName(), GamblerJackpot.getTextColorWithStatCheck() | UiFlags::AlignCenter, false);
@@ -1484,8 +1576,8 @@ void StartGambleSpin()
 	AddSText(0, 1, _("Farnham's One-Armed Bandit"), UiFlags::ColorWhitegold | UiFlags::AlignCenter, false);
 	AddSLine(3);
 	// Lines 8 (the reels) and 12 (the result) are deliberately left empty: they are
-	// drawn per-frame by DrawGambleReels so the reels spin. "Pull again" stays live
-	// during the show -- gamblers mash, and a re-pull just restarts the spin.
+	// drawn per-frame by DrawGambleReels so the reels spin. "Pull again" ignores input
+	// until the last reel lands (see GambleSpinEnter).
 	// [RUNS MOD] Token re-pulls sit above the gold pull, shown only while held.
 	if (const int tokens = CountGambleTokens(*MyPlayer); tokens > 0)
 		AddSText(0, 14, fmt::format(fmt::runtime(_("Pull again with a token ({:d} left)")), tokens), UiFlags::ColorWhite | UiFlags::AlignCenter, true);
@@ -1494,6 +1586,10 @@ void StartGambleSpin()
 	GambleSpinStartTicks = static_cast<uint32_t>(SDL_GetTicks());
 	GambleReelStopsPlayed = 0;
 	GambleSpinDone = false;
+	// Two matching reels hold the last one back: the outcome is already decided, but
+	// the wait is where the fun is.
+	GambleReelStopMs[2] = GambleReels[0] == GambleReels[1] ? GambleTeaseStopMs : 1750;
+	PlayGambleBark(GambleBark::Pull);
 }
 
 // [RUNS MOD] Each reel face is a real item icon from the cursor sheet -- text reels
@@ -1562,6 +1658,7 @@ void DrawGambleReels(const Surface &out)
 			FlushGamblePrizes();
 			if (GambleWon)
 				PlaySFX(SfxID::ItemGold);
+			PlayGambleBark(GambleResultBark);
 		}
 		PrintSString(out, 0, 12, GambleResultLine, (GambleWon ? UiFlags::ColorWhitegold : UiFlags::ColorWhite) | UiFlags::AlignCenter);
 	}
@@ -1599,6 +1696,7 @@ void GambleEnter()
 			OldTextLine = 12;
 			OldScrollPos = 0;
 			StartStore(TalkID::NoMoney);
+			PlayGambleBark(GambleBark::Broke);
 			return;
 		}
 		ResolveGamble();
@@ -1617,12 +1715,17 @@ void GambleEnter()
 		break;
 	case 18:
 		ActiveStore = TalkID::None;
+		PlayGambleBark(GambleBark::Goodbye);
 		break;
 	}
 }
 
 void GambleSpinEnter()
 {
+	// [RUNS MOD] No re-pull mid-spin: mashing used to restart the reels and skip
+	// the result (playtest). Back still works and delivers any queued prizes.
+	if ((CurrentTextLine == 14 || CurrentTextLine == 16) && !GambleSpinDone)
+		return;
 	// [RUNS MOD] Token re-pull: free spin while chips last.
 	if (CurrentTextLine == 14) {
 		if (CountGambleTokens(*MyPlayer) > 0) {
@@ -1637,6 +1740,7 @@ void GambleSpinEnter()
 			OldTextLine = 12;
 			OldScrollPos = 0;
 			StartStore(TalkID::NoMoney);
+			PlayGambleBark(GambleBark::Broke);
 			return;
 		}
 		ResolveGamble();
@@ -3529,6 +3633,11 @@ void DrawSelector(const Surface &out, const Rectangle &rect, std::string_view te
 }
 
 } // namespace
+
+void PlayGambleGreeting()
+{
+	PlayGambleBark(GambleBark::Greet);
+}
 
 bool StoreAutoPlace(Item &item, bool persistItem)
 {

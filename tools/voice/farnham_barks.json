@@ -1,0 +1,61 @@
+{
+  "voice": "Old English village drunk in a medieval tavern, hoarse and gravelly male voice, slurring slightly, jolly and theatrical like a carnival barker who has had too much ale.",
+  "reference_text": "Ah, there you are, friend. Pull up a stool, the old machine's been waiting all night for someone with gold in their pockets.",
+  "delivery": {
+    "greet": "Warm and welcoming, slightly slurred, a carnival barker calling a customer over.",
+    "pull": "Eager and hushed, rubbing hands together, building suspense.",
+    "lose": "Mock sympathy, chuckling, a little smug.",
+    "pair": "Shrugging and friendly, mildly amused.",
+    "nearmiss": "Groaning with exaggerated disappointment, almost wailing.",
+    "win": "Loud and delighted, laughing, slapping the table.",
+    "jackpot": "Shouting with total disbelief and joy, voice cracking.",
+    "skull": "Spooky and theatrical, then laughing it off.",
+    "broke": "Dismissive and drowsy, waving someone away.",
+    "goodbye": "Fond and tipsy, calling after someone who is leaving."
+  },
+  "barks": {
+    "greet": [
+      "Step right up! The old girl's feeling lucky tonight.",
+      "Gold in, glory out. Mostly.",
+      "Back again? I knew you couldn't stay away."
+    ],
+    "pull": [
+      "Round and round she goes...",
+      "Come on, come on...",
+      "Here we go!"
+    ],
+    "lose": [
+      "Ohh, unlucky. Again?",
+      "The house thanks you kindly.",
+      "Close! No. Not close at all."
+    ],
+    "pair": [
+      "Your gold back. Call it a draw.",
+      "Breaking even! In Tristram, that's a win."
+    ],
+    "nearmiss": [
+      "Two crowns! So close I can taste it!",
+      "Ohh, nearly! Nearly!"
+    ],
+    "win": [
+      "Ha! Would you look at that!",
+      "Drinks are on you, friend!",
+      "Well I'll be... she pays!"
+    ],
+    "jackpot": [
+      "The jackpot! In all my years... the jackpot!",
+      "Crowns! Three crowns! Somebody fetch me a drink!"
+    ],
+    "skull": [
+      "Three skulls... an omen, that is. Here, take your gold back."
+    ],
+    "broke": [
+      "No gold, no spin. Them's the rules.",
+      "Come back when your purse is heavier."
+    ],
+    "goodbye": [
+      "Leaving so soon? She'll miss you.",
+      "Mind the stairs. I never do."
+    ]
+  }
+}

@@ -361,8 +361,8 @@ Tarkov, no tagging/no safe items — "anything you bring in gets dropped")
 
 **Feature ideas (next slices)**
 - [x] Loot tuning pass (2026-10-25) — see below.
-- [ ] Fruit machine polish (remaining): Farnham win/lose voice barks, odds/EV tuning
-      after playtest.
+- [x] Fruit machine voice barks + tease + session tally (2026-10-30) — see below.
+- [ ] Fruit machine odds/EV tuning after playtest.
 
 **Loot tuning pass** ✅ 2026-10-25 (built, NOT yet playtested)
 - Audit: item level is already on the vanilla curve at every depth — trash drops at the
@@ -573,6 +573,25 @@ A review of player options against the dungeon found four systemic problems, fix
   `dev.hub.list()`, `dev.hub.reset(name)`, `dev.hub.reload()`. Edits save to
   <pref path>/txtdata/runs/hub_layout.tsv (overrides the shipped copy); copy it into
   assets/ and delete the pref copy to ship it.
+
+**Farnham finds his voice** (2026-10-30, built, NOT yet playtested)
+- 23 voice lines in 10 categories (greet, pull, lose, pair, near miss, win, jackpot,
+  skull, broke, goodbye), rendered with Breeze-TTS-2 in WSL by
+  `tools/voice/render_farnham.ps1` from `tools/voice/farnham_barks.json`. The voice
+  is designed once into `tools/voice/farnham_reference.wav` and every line is cloned
+  from it; delete that file to recast him, `--only <category> --force` to redo lines.
+  Clips are 22050 Hz mono WAVs in `assets/sfx/farnham/` (listed in CMake/Assets.cmake).
+- Played through a dedicated sound handle in stores.cpp (PlayGambleBark), NOT
+  effects.tsv: SfxID indexes both the base and Hellfire tables, which differ in
+  length, so appended rows can't line up in both. A missing clip is silent.
+- Pull/lose/pair lines play only sometimes (2/6, 3/6, 2/6) so streaks don't nag;
+  lose/pair never cut off a line still playing. Clip choice uses its own LCG, never
+  the game RNG, and never repeats the previous line.
+- **Tease**: when the first two reels match, the third lands at 2.7 s instead of 1.75 s.
+- **No mid-spin re-pull**: "Pull again" (gold or token) is ignored until the last reel
+  lands -- mashing restarted the reels and skipped the result. Back still works.
+- **Session tally**: the menu's line 5 shows "Tonight you're up/down N gold" once you
+  have pulled (gold pulls only; token pulls are free).
 
 **Gambler's Tokens** ✅ shipped 2026-07-21
 - New base item `IDI_GAMBLETOKEN` (itemdat.tsv last row + enum; BLOOD_STONE icon,

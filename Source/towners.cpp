@@ -512,6 +512,7 @@ void TalkToGambler(Player & /*player*/, Towner & /*gambler*/)
 	// [RUNS MOD] Opens Farnham's fruit machine. No gossip line (this NPC reuses the
 	// drunk's sprite but is a distinct vendor with no dialog text).
 	StartStore(TalkID::Gamble);
+	PlayGambleGreeting();
 }
 
 void TalkToStashChest(Player & /*player*/, Towner & /*chest*/)

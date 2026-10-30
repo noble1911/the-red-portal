@@ -128,6 +128,9 @@ extern DVL_API_FOR_TEST Item BoyItem;
  * Session state, rerolled with the vendor restock on boss kill; see SpawnGamblerJackpot. */
 extern DVL_API_FOR_TEST Item GamblerJackpot;
 
+/** [RUNS MOD] Farnham calls you over when you walk up to the machine. */
+void PlayGambleGreeting();
+
 /** Currently selected text line from TextLine */
 extern DVL_API_FOR_TEST int CurrentTextLine;
 /** Remember currently selected text line from TextLine while displaying a dialog */
