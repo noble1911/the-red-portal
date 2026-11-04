@@ -16,6 +16,7 @@
 #include "data/record_reader.hpp"
 #include "engine/random.hpp"
 #include "engine/sound.h"
+#include "run_voice.h"
 #include "engine/sound_defs.hpp"
 #include "engine/sound_position.hpp"
 #include "game_mode.hpp"
@@ -255,6 +256,7 @@ void sound_update()
 void effects_cleanup_sfx(bool fullUnload)
 {
 	sound_stop();
+	FreeVoiceChannels(); // [RUNS MOD] these must not outlive the audio device
 
 	if (fullUnload) {
 		sgSFX.clear();

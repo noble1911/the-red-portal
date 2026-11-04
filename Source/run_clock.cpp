@@ -21,6 +21,7 @@
 #include "multi.h"
 #include "player.h"
 #include "portal.h"
+#include "run_voice.h"
 #include "runs_mod.h"
 #include "scroll_mods.h"
 #include "utils/display.h"
@@ -58,8 +59,15 @@ int WavesSpawned = 0;
 int OvertimeWaves = 0;
 /** Ticks spent in overtime on the run level (drives the overtime tier). */
 int OvertimeTicks = 0;
+bool Warned60 = false;
 bool Warned30 = false;
 bool Warned10 = false;
+/** Ticks until the next stone-breaking stinger (presentation only). */
+int RumbleCooldown = 0;
+/** Tracks the walk out of a collapsing run, for the dungeon's parting line. */
+bool WasOnRunLevel = false;
+bool LeftRunAlive = false;
+bool EscapeLinePlayed = false;
 
 int TicksPerSecond()
 {
@@ -119,6 +127,50 @@ void SpawnWave(int size, uint8_t tier = 0, bool atExit = false)
 		SpawnRunWaveMonster(around, WaveRngNext(rng), tier);
 }
 
+/** The collapse gets louder and closer together the nearer the seal, and never lets up
+ * in overtime. Only heard from inside: the hub is the safe place to be. */
+void ProcessCollapseRumble(bool onRunLevel)
+{
+	if (!onRunLevel || !RunCollapseArmed) {
+		RumbleCooldown = 0;
+		return;
+	}
+	if (--RumbleCooldown > 0)
+		return;
+	const int tps = TicksPerSecond();
+	const int secondsLeft = RunCollapseTicksLeft / tps;
+	int intensity = 0;
+	int interval = 20;
+	if (RunCollapseTicksLeft == 0) {
+		intensity = 3;
+		interval = 9;
+	} else if (secondsLeft <= 10) {
+		intensity = 3;
+		interval = 3;
+	} else if (secondsLeft <= 30) {
+		intensity = 2;
+		interval = 8;
+	} else if (secondsLeft <= 60) {
+		intensity = 1;
+		interval = 14;
+	}
+	PlayCollapseRumble(intensity);
+	RumbleCooldown = interval * tps;
+}
+
+/** The dungeon begrudges a hero who made it out of a collapse on their feet, once a run. */
+void ProcessEscapeLine(bool onRunLevel)
+{
+	if (onRunLevel) {
+		LeftRunAlive = MyPlayer->_pmode != PM_DEATH && MyPlayer->_pHitPoints >> 6 > 0;
+	} else if (WasOnRunLevel && leveltype == DTYPE_TOWN && LeftRunAlive && !EscapeLinePlayed
+	    && RunCollapseArmed && RunCollapseTicksLeft > 0) {
+		EscapeLinePlayed = true;
+		PlayRunVoice(RunVoiceLine::Escape);
+	}
+	WasOnRunLevel = onRunLevel;
+}
+
 } // namespace
 
 void ProcessRunClock()
@@ -141,6 +193,9 @@ void ProcessRunClock()
 		return;
 	}
 
+	const bool onRunLevel = OnRunLevel();
+	ProcessEscapeLine(onRunLevel);
+
 	// Collapse countdown runs in real ticks once armed, everywhere (also while players
 	// shop in the hub -- the countdown is the window for looting and corpse runs).
 	// Each client seals locally when its own countdown expires, and a few ticks of
@@ -151,26 +206,33 @@ void ProcessRunClock()
 	if (RunCollapseArmed && RunCollapseTicksLeft > 0) {
 		RunCollapseTicksLeft--;
 		const int tps = TicksPerSecond();
+		if (!Warned60 && RunCollapseTicksLeft <= 60 * tps) {
+			Warned60 = true;
+			PlayRunVoice(RunVoiceLine::Minute);
+		}
 		if (!Warned30 && RunCollapseTicksLeft <= 30 * tps) {
 			Warned30 = true;
 			InitDiabloMsg(_("The dungeon collapses in 30 seconds!"));
+			PlayRunVoice(RunVoiceLine::Thirty);
 		}
 		if (!Warned10 && RunCollapseTicksLeft <= 10 * tps) {
 			Warned10 = true;
 			InitDiabloMsg(_("10 seconds! Get out!"));
+			PlayRunVoice(RunVoiceLine::Ten);
 		}
 		if (RunCollapseTicksLeft == 0 && DungeonPortalOpen) {
 			CloseDungeonPortal();
 			InitDiabloMsg(_("The dungeon has sealed itself!"));
+			PlayRunVoice(onRunLevel ? RunVoiceLine::SealedInside : RunVoiceLine::SealedOutside);
 		}
 	}
+	ProcessCollapseRumble(onRunLevel);
 
 	// [RUNS MOD] Fester: while the portal stands open the run's clock keeps accruing
 	// even with nobody inside -- grace burns down and wave sizes grow, though actual
 	// spawns only happen on the run level. Every potion trip to town means a hotter
 	// dungeon on return. Portal state is mirrored on every client, so accrual stays
 	// identical everywhere.
-	const bool onRunLevel = OnRunLevel();
 	if (!onRunLevel && !DungeonPortalOpen)
 		return;
 
@@ -187,6 +249,7 @@ void ProcessRunClock()
 		if (RunClockTicks % ScaledTicks(OvertimeWaveSeconds) == 0) {
 			const int tier = std::min<int>(OvertimeTicks / ScaledTicks(OvertimeTierSeconds), MaxRunWaveTier);
 			SpawnWave(WaveSizeCap, static_cast<uint8_t>(tier), OvertimeWaves % 2 == 1);
+			PlayRunVoice(RunVoiceLine::Overtime);
 			OvertimeWaves++;
 		}
 		return;
@@ -199,10 +262,15 @@ void ProcessRunClock()
 	const int nextWaveTick = ScaledTicks(GraceSeconds) + WavesSpawned * ScaledTicks(WaveIntervalSeconds);
 	if (RunClockTicks >= nextWaveTick) {
 		WavesSpawned++;
-		if (WavesSpawned == 1)
+		if (WavesSpawned == 1) {
 			InitDiabloMsg(_("The dungeon has noticed you..."));
-		if (onRunLevel)
+			PlayRunVoice(RunVoiceLine::Noticed);
+		}
+		if (onRunLevel) {
 			SpawnWave(std::min(WavesSpawned, WaveSizeCap));
+			if (WavesSpawned > 1)
+				PlayRunVoice(RunVoiceLine::Wave);
+		}
 	}
 }
 
@@ -230,9 +298,36 @@ void ArmRunCollapse()
 		return;
 	RunCollapseArmed = true;
 	RunCollapseTicksLeft = ScaledTicks(CollapseSeconds);
+	// A Volatile run's countdown can start near a minute: the opening shout says it all.
+	Warned60 = RunCollapseTicksLeft <= 75 * TicksPerSecond();
 	Warned30 = false;
 	Warned10 = false;
 	InitDiabloMsg(_("The dungeon begins to collapse!"));
+	PlayRunVoice(RunVoiceLine::Collapse);
+	if (OnRunLevel()) {
+		PlayCollapseRumble(2);
+		RumbleCooldown = 20 * TicksPerSecond();
+	}
+}
+
+RunClockState GetRunClockState()
+{
+	return { RunCollapseArmed, RunCollapseTicksLeft, RunClockTicks, WavesSpawned, OvertimeWaves, OvertimeTicks };
+}
+
+void RestoreRunClockState(const RunClockState &state)
+{
+	RunCollapseArmed = state.collapseArmed;
+	RunCollapseTicksLeft = state.collapseTicksLeft;
+	RunClockTicks = state.clockTicks;
+	WavesSpawned = state.wavesSpawned;
+	OvertimeWaves = state.overtimeWaves;
+	OvertimeTicks = state.overtimeTicks;
+	// Warnings already past were announced to everyone else; don't replay them on arrival.
+	const int tps = TicksPerSecond();
+	Warned60 = state.collapseArmed && state.collapseTicksLeft <= 60 * tps;
+	Warned30 = state.collapseArmed && state.collapseTicksLeft <= 30 * tps;
+	Warned10 = state.collapseArmed && state.collapseTicksLeft <= 10 * tps;
 }
 
 void ResetRunClock()
@@ -243,8 +338,13 @@ void ResetRunClock()
 	OvertimeTicks = 0;
 	RunCollapseArmed = false;
 	RunCollapseTicksLeft = 0;
+	Warned60 = false;
 	Warned30 = false;
 	Warned10 = false;
+	RumbleCooldown = 0;
+	WasOnRunLevel = false;
+	LeftRunAlive = false;
+	EscapeLinePlayed = false;
 }
 
 } // namespace devilution

@@ -3638,6 +3638,12 @@ void EnsureStarterDungeonScroll(Player &player)
 	// safety net rather than a stream of free scrolls.
 	if (PlayerHasDungeonScroll(player))
 		return;
+	// A scroll in the stash is a scroll on hand; otherwise stashing them and reloading is a
+	// free level-1 scroll every time.
+	for (const Item &stashed : Stash.stashList) {
+		if (stashed._iMiscId == IMISC_DUNGEONSCROLL)
+			return;
+	}
 	// An open dungeon portal is also a way into a run -- no scroll needed yet.
 	if (DungeonPortalOpen)
 		return;

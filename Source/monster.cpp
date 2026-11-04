@@ -129,6 +129,11 @@ bool sgbSaveSoundOn;
 // PlaceQuestMonsters; used to identify the boss for scaling, loot and completion.
 UniqueMonsterType RunBossType = UniqueMonsterType::Butcher;
 
+/** [RUNS MOD] Set while a kill by another client's minion resolves here. Vanilla's own loot
+ * is identical on every client, but the mod's drops are rolled by whoever pays them, so only
+ * the minion's owner may: anyone else would add a second vault. */
+static bool KilledByPeersMinion = false;
+
 namespace {
 
 // [RUNS MOD] Per-tileset boss pools, so each tileset has its own cast instead of the
@@ -309,6 +314,7 @@ void InitMonster(Monster &monster, Direction rd, size_t typeIndex, Point positio
 	monster.enemy = 0;
 	monster.isInvalid = false;
 	monster.runWaveTier = 0;
+	monster.runChampion = false;
 	monster.chillTicks = 0;
 	monster.uniqueType = UniqueMonsterType::None;
 	monster.activeForTicks = 0;
@@ -1144,7 +1150,10 @@ void MonsterHitMonster(Monster &attacker, Monster &target, int dam)
 void StartDeathFromMonster(Monster &attacker, Monster &target)
 {
 	const Direction md = GetDirection(target.position.tile, attacker.position.tile);
+	// [RUNS MOD] Minions simulate on every client, so each of them lands this kill.
+	KilledByPeersMinion = attacker.isPlayerMinion() && attacker.goalVar3 != static_cast<int8_t>(MyPlayerId);
 	MonsterDeath(target, md, true);
+	KilledByPeersMinion = false;
 
 	if (gbIsHellfire)
 		M_StartStand(attacker, attacker.direction);
@@ -4365,7 +4374,7 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 		// identical thing. With the Twinned affix both bosses come through here; it is
 		// idempotent where that matters.
 		const bool unlockedNewTier = ApplyRunBossKill(static_cast<int>(currlevel));
-		if (sendmsg) {
+		if (sendmsg && !KilledByPeersMinion) {
 			// The broadcast is the load-bearing half. This block only runs where
 			// MonsterDeath does, and OnMonstDeath only reaches MonsterDeath when the
 			// sender is on the receiver's active level -- so a partner waiting in the hub,
@@ -4387,7 +4396,7 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 	// with a small chance to bump one tier when a higher difficulty is already unlocked --
 	// the organic way to pick up your first harder-tier scrolls. Gated on sendmsg like the
 	// normal loot so co-op only drops (and broadcasts) once.
-	if (RunsModEnabled && sendmsg && leveltype != DTYPE_TOWN && !monster.isPlayerMinion()) {
+	if (RunsModEnabled && sendmsg && !KilledByPeersMinion && leveltype != DTYPE_TOWN && !monster.isPlayerMinion()) {
 		const int runDiff = sgGameInitInfo.nDifficulty;
 		const int maxUnlocked = std::min<int>(MyPlayer->pDiabloKillLevel, DIFF_HELL);
 		const int dropDiff = (runDiff < maxUnlocked && GenerateRnd(100) < 20) ? runDiff + 1 : runDiff;
@@ -4456,10 +4465,11 @@ void MonsterDeath(Monster &monster, Direction md, bool sendmsg)
 			if (GenerateRnd(100) < CompanionVaultChancePct)
 				DropCompanionPotion(rewardDepth, monster.position.tile);
 		} else {
-			// [RUNS MOD] Tyrannical champions always pay out: one good item at the
-			// corpse (the pick is re-derived, so no champion state is stored).
-			// Spawned, not sendmsg, and never delta -- see the vault drop above.
-			const bool isChampion = IsRunChampion(static_cast<unsigned>(monster.getId()));
+			// [RUNS MOD] Tyrannical champions always pay out: one good item at the corpse.
+			// Spawned, not sendmsg, and never delta -- see the vault drop above. Stored at
+			// generation rather than re-rolled here: a wave monster landing in a lucky id
+			// has none of the buffs, and paying it out made the waves a loot farm.
+			const bool isChampion = monster.runChampion;
 			if (isChampion)
 				CreateRndItem(monster.position.tile, /*onlygood=*/true, /*sendmsg=*/false, /*delta=*/false, /*spawn=*/true);
 			// [RUNS MOD] Companion potion: a fair chance from a champion, a slim one from

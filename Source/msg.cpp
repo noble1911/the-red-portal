@@ -273,9 +273,29 @@ struct MultiQuests {
 	int16_t qmsg;
 };
 
+/** [RUNS MOD] The live run, for a player joining mid-game. Without it a reconnecting hero has
+ * no portal and the wrong seed, and their only way back in was a scroll of their own. */
+struct DRunState {
+	uint8_t valid;
+	uint8_t depth;
+	uint8_t portalLevel;
+	uint8_t modCount;
+	uint8_t difficulty;
+	uint8_t bossDefeated;
+	uint8_t collapseArmed;
+	uint32_t runSeed;
+	uint32_t portalSeed;
+	int32_t collapseTicksLeft;
+	int32_t clockTicks;
+	int32_t wavesSpawned;
+	int32_t overtimeWaves;
+	int32_t overtimeTicks;
+};
+
 struct DJunk {
 	DPortal portal[MAXPORTAL];
 	MultiQuests quests[MAXQUESTS];
+	DRunState run;
 };
 #pragma pack(pop)
 
@@ -730,6 +750,29 @@ std::byte *DeltaExportJunk(std::byte *dst)
 		q++;
 	}
 
+	// [RUNS MOD] A sealed run has no way in, so only an open portal is worth sending.
+	DRunState &run = sgJunk.run;
+	memset(&run, 0, sizeof(run));
+	if (RunsModEnabled && DungeonPortalOpen) {
+		const RunClockState clock = GetRunClockState();
+		run.valid = 1;
+		run.depth = static_cast<uint8_t>(RunDepth);
+		run.portalLevel = static_cast<uint8_t>(DungeonPortalLevel);
+		run.modCount = static_cast<uint8_t>(DungeonPortalModCount);
+		run.difficulty = static_cast<uint8_t>(DungeonPortalDifficulty);
+		run.bossDefeated = RunBossDefeated ? 1 : 0;
+		run.collapseArmed = clock.collapseArmed ? 1 : 0;
+		run.runSeed = Swap32LE(DungeonSeeds[RunDepth]);
+		run.portalSeed = Swap32LE(DungeonPortalSeed);
+		run.collapseTicksLeft = Swap32LE(clock.collapseTicksLeft);
+		run.clockTicks = Swap32LE(clock.clockTicks);
+		run.wavesSpawned = Swap32LE(clock.wavesSpawned);
+		run.overtimeWaves = Swap32LE(clock.overtimeWaves);
+		run.overtimeTicks = Swap32LE(clock.overtimeTicks);
+	}
+	memcpy(dst, &run, sizeof(run));
+	dst += sizeof(run);
+
 	return dst;
 }
 
@@ -766,6 +809,11 @@ const std::byte *DeltaImportJunk(const std::byte *src, const std::byte *end)
 		src += sizeof(MultiQuests);
 		q++;
 	}
+
+	if (src + sizeof(DRunState) > end)
+		return nullptr;
+	memcpy(&sgJunk.run, src, sizeof(DRunState));
+	src += sizeof(DRunState);
 
 	return src;
 }
@@ -961,7 +1009,7 @@ void DeltaLoadItems(const DLevel &deltaLevel)
 			// so without this the overflow reads past the array and writes Items[] out of
 			// bounds. Match the floor-drop helpers and just stop placing.
 			if (ActiveItemCount >= MAXITEMS)
-				break;
+				continue; // later entries may be pickups, which still have to apply
 			const int ii = AllocateItem();
 			auto &item = Items[ii];
 			RecreateItem(*MyPlayer, deltaItem, item);
@@ -1312,7 +1360,8 @@ bool IsPItemValid(const TCmdPItem &message, const Player &player)
 
 	auto idx = static_cast<_item_indexes>(Swap16LE(message.def.wIndx));
 
-	if (idx != IDI_EAR) {
+	// [RUNS MOD] A scroll's wCI is not vanilla's creation flags; see IsItemValid.
+	if (idx != IDI_EAR && idx != IDI_DUNGEONSCROLL) {
 		const uint16_t creationFlags = Swap16LE(message.item.wCI);
 		// [RUNS MOD] Swap32LE: dwBuff is a 32-bit field and Swap16LE silently truncated it
 		// to its low half. Harmless while CF_HELLFIRE (bit 0) was all the validators read,
@@ -2961,6 +3010,30 @@ void delta_sync_monster(const TSyncMonster &monsterSync, uint8_t level)
 	monster.mWhoHit = monsterSync.mWhoHit;
 }
 
+void DeltaSyncRunState()
+{
+	// Applied as a snapshot, not through ApplyRunSeed: the level deltas that arrived with it
+	// describe exactly this run, and a reseed would throw them away.
+	const DRunState &run = sgJunk.run;
+	if (!RunsModEnabled || run.valid != 1)
+		return;
+	const int depth = ClampRunDepth(run.depth);
+	RunDepth = depth;
+	DungeonSeeds[depth] = Swap32LE(run.runSeed);
+	LevelSeeds[depth] = std::nullopt;
+	MyPlayer->_pLvlVisited[depth] = false;
+	RestoreDungeonPortal(ClampRunDepth(run.portalLevel), Swap32LE(run.portalSeed), run.modCount & 0x0F, run.difficulty & 0x03);
+	RunBossDefeated = run.bossDefeated != 0;
+	RunClockState clock;
+	clock.collapseArmed = run.collapseArmed != 0;
+	clock.collapseTicksLeft = std::max<int>(Swap32LE(run.collapseTicksLeft), 0);
+	clock.clockTicks = std::max<int>(Swap32LE(run.clockTicks), 0);
+	clock.wavesSpawned = std::max<int>(Swap32LE(run.wavesSpawned), 0);
+	clock.overtimeWaves = std::max<int>(Swap32LE(run.overtimeWaves), 0);
+	clock.overtimeTicks = std::max<int>(Swap32LE(run.overtimeTicks), 0);
+	RestoreRunClockState(clock);
+}
+
 void DeltaSyncJunk()
 {
 	for (int i = 0; i < MAXPORTAL; i++) {
@@ -3023,6 +3096,9 @@ void DeltaAddItem(int ii)
 	}
 }
 
+/** [RUNS MOD] The seed of the level as DeltaLoadLevel found it; see DeltaSaveLevel. */
+uint32_t DeltaLoadedSeed;
+
 void DeltaSaveLevel()
 {
 	if (!gbIsMultiplayer)
@@ -3038,6 +3114,13 @@ void DeltaSaveLevel()
 		MyPlayer->_pSLvlVisited[static_cast<uint8_t>(setlvlnum)] = true;
 	} else {
 		localLevel = GetLevelForMultiplayer(currlevel, setlevel);
+		// [RUNS MOD] The level was reseeded while we stood on it (a scroll read in the same
+		// moment we entered): what we would save describes a layout that no longer exists,
+		// and DeltaLoadLevel would stamp it by index onto the new run's monsters.
+		if (RunsModEnabled && DungeonSeeds[currlevel] != DeltaLoadedSeed) {
+			DeltaClearLevel(localLevel);
+			return;
+		}
 		MyPlayer->_pLvlVisited[currlevel] = true;
 	}
 	DeltaLeaveSync(localLevel);
@@ -3062,6 +3145,7 @@ bool IsValidLevel(uint8_t level, bool isSetLevel)
 
 void DeltaLoadLevel()
 {
+	DeltaLoadedSeed = DungeonSeeds[currlevel];
 	if (!gbIsMultiplayer)
 		return;
 

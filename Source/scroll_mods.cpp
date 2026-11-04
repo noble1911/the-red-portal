@@ -458,6 +458,7 @@ void ScaleRunMonsters()
 		// any stored state. HP/damage/resistance are all delta-saved fields, so buffs
 		// applied here survive save/resume (this only runs on fresh generation).
 		const bool champion = IsRunChampion(static_cast<unsigned>(monster.getId()));
+		monster.runChampion = champion;
 		const int hpPct = ActiveRunMods.monsterHpPct + (champion ? ChampionHpBonusPct : 0);
 		const int dmgPct = ActiveRunMods.monsterDmgPct + (champion ? ChampionDmgBonusPct : 0);
 		if (hpPct != 0) {

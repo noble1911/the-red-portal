@@ -456,6 +456,12 @@ bool UnPackNetItem(const Player &player, const ItemNetPack &packedItem, Item &it
 		return true;
 	}
 
+	// [RUNS MOD] A scroll's wCI is not vanilla's creation flags; see IsItemValid.
+	if (idx == IDI_DUNGEONSCROLL) {
+		RecreateItem(player, packedItem.item, item);
+		return true;
+	}
+
 	const uint16_t creationFlags = Swap16LE(packedItem.item.wCI);
 	// [RUNS MOD] Swap32LE, not Swap16LE -- see the matching note in IsPItemValid.
 	const uint32_t dwBuff = Swap32LE(packedItem.item.dwBuff);

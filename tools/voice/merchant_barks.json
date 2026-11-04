@@ -1,0 +1,36 @@
+{
+  "voice": "A huge old demon working as a shopkeeper, deep rasping male voice, smooth, unhurried and scrupulously polite, with menace under the courtesy, like an undertaker who enjoys his work.",
+  "reference_text": "Ah, welcome back. Do come closer, I have kept the good scrolls aside. Every one of them leads somewhere you will not enjoy.",
+  "effect": { "pitch_semitones": -2.0, "reverb_mix": 0.10, "reverb_seconds": 0.5 },
+  "delivery": {
+    "greet": "Courteous and sinister, a slow rasping welcome.",
+    "buy": "Pleased and silky, sealing a bargain.",
+    "craft": "Intent and low, working something over with care.",
+    "broke": "Politely disappointed, faintly contemptuous.",
+    "goodbye": "Dryly amused, seeing off a customer he expects never to see again."
+  },
+  "barks": {
+    "greet": [
+      "Back again. Still breathing, I see.",
+      "Welcome, welcome. Which door shall it be today?",
+      "Ah, my favourite customer. The last one was also my favourite."
+    ],
+    "buy": [
+      "An excellent choice. Try not to die before the door closes.",
+      "Sold. No refunds, as you will appreciate.",
+      "That one has a lovely view. Briefly."
+    ],
+    "craft": [
+      "There. Stronger. Whether you are is another matter.",
+      "Burned and bound. Mind the fingers."
+    ],
+    "broke": [
+      "I do not deal in promises. Bring gold.",
+      "Your purse is lighter than your courage."
+    ],
+    "goodbye": [
+      "Do leave your gold to someone. It is so often wasted.",
+      "Run along. The dark is waiting."
+    ]
+  }
+}

@@ -57,6 +57,15 @@ void OpenDungeonPortal(int level, uint32_t scrollSeed, int modCount, int difficu
 void CloseDungeonPortal();
 /** @brief [RUNS MOD] Adopt a co-op peer's portal state (no reseed/rebroadcast). */
 void SetDungeonPortalRemote(int level, uint32_t scrollSeed, int modCount, int difficulty);
+/** [RUNS MOD] Sets the portal's state for a client joining a live run, quietly and before any
+ * level has loaded. */
+void RestoreDungeonPortal(int level, uint32_t scrollSeed, int modCount, int difficulty);
+/** [RUNS MOD] True while any hero is on a dungeon level or on the way to one. Every level
+ * message keys on the level number alone, so a new run must not replace one in progress. */
+bool IsAnyPlayerInDungeon();
+/** [RUNS MOD] Closes every town portal: they lead to coordinates in a layout that a new run
+ * has just replaced, and possibly to a different tileset. */
+void CloseRunTownPortals();
 /** @brief [RUNS MOD] Re-spawn the dungeon-portal visual on hub load if it is open. */
 void SyncDungeonPortal();
 /** @brief [RUNS MOD] True if stepping into player `portalIndex`'s town portal from the hub

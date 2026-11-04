@@ -577,7 +577,7 @@ A review of player options against the dungeon found four systemic problems, fix
 **Farnham finds his voice** (2026-10-30, built, NOT yet playtested)
 - 23 voice lines in 10 categories (greet, pull, lose, pair, near miss, win, jackpot,
   skull, broke, goodbye), rendered with Breeze-TTS-2 in WSL by
-  `tools/voice/render_farnham.ps1` from `tools/voice/farnham_barks.json`. The voice
+  `tools/voice/render_voice.ps1 farnham` from `tools/voice/farnham_barks.json`. The voice
   is designed once into `tools/voice/farnham_reference.wav` and every line is cloned
   from it; delete that file to recast him, `--only <category> --force` to redo lines.
   Clips are 22050 Hz mono WAVs in `assets/sfx/farnham/` (listed in CMake/Assets.cmake).
@@ -592,6 +592,40 @@ A review of player options against the dungeon found four systemic problems, fix
   lands -- mashing restarted the reels and skipped the result. Back still works.
 - **Session tally**: the menu's line 5 shows "Tonight you're up/down N gold" once you
   have pulled (gold pulls only; token pulls are free).
+
+**The dungeon speaks, and co-op runs stay in step** (2026-11-02, built, NOT yet playtested)
+- `Source/run_voice.*`: every voiced line plays on a per-speaker channel (Dungeon, Merchant,
+  Gambler, Rumble), released before the audio device closes. Rendered by
+  `tools/voice/render_voice.ps1 <cast>` from `tools/voice/<cast>_barks.json`; a manifest's
+  `effect` block pitches the voice down and adds a cave reverb.
+- The dungeon has a voice (27 lines): portal opened, noticed, later waves (1 in 3), collapse,
+  60/30/10 s, sealed (inside vs in the hub), overtime (1 in 3), and a grudging line when you
+  walk out alive before the seal. The 60 s warning is voice only.
+- Stone-breaking stingers (`--cast rumble`, synthesised, no Breeze) play on the run level during
+  a collapse: every 20 s, then 14 s under a minute, 8 s under 30 s, 3 s under 10 s, 9 s in overtime.
+- The Dungeon Merchant has a voice (12 lines): greet, buy, craft, broke, goodbye.
+- **A scroll no longer opens while any hero is in a dungeon** (not spent, says why). Every level
+  message keys on the level number alone, so a replaced run mixed two layouts' monsters. Opening
+  during a countdown with everyone in the hub still works and ends the old run: that decides
+  the corpse window for the whole party.
+- `ApplyRunSeed` now does the run reset on every client, not just the one reading the scroll.
+  Peers used to keep the old clock, which sealed the new portal for them alone or left them
+  in overtime. It also closes town portals, which led into the replaced layout.
+- **Reconnecting rejoins the run**: the portal, seed and clock travel in the junk delta
+  (`DRunState`), applied as a snapshot by `DeltaSyncRunState` so the level deltas that came with
+  it survive. A client leaving a level reseeded under it discards its state (`DeltaLoadedSeed`).
+- `l2_rp1.pal` removed: indices 16-79 were black, so 1 in 8 catacombs levels had invisible
+  walls and floor. That pick now uses vanilla `l2_1.pal`, so co-op peers still match.
+- Known gaps: two scrolls read within a ping of each other still swap state (and both are
+  spent); preservation marks and gem fusions don't update a partner's mirror of your gear
+  until the item moves.
+- Also fixed from the review: Rare Nightmare scrolls failing co-op validation; a companion's
+  killing blow paying the vault once per client; craft paying before removing materials, which
+  could hit the wrong items; merchant lists not redrawing on scroll; jackpot gold lost on a full
+  pack (now stashed); merchant stock and jackpot leaking between heroes; craft confirm showing
+  the wrong price; gem targeting surviving a controller cancel; wave monsters paying champion
+  loot; the stash-and-reload free scroll; extended items lost on a newer save file or a short
+  screen (now stashed); Normal-tier credit for a Hell kill while standing in the hub.
 
 **Gambler's Tokens** ✅ shipped 2026-07-21
 - New base item `IDI_GAMBLETOKEN` (itemdat.tsv last row + enum; BLOOD_STONE icon,

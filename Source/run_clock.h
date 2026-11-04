@@ -40,4 +40,17 @@ void ArmRunCollapse();
 /** @brief Clears all clock state (new run primed, or portal manually closed). */
 void ResetRunClock();
 
+/** @brief What a client joining a live run needs in order to count along with everyone else. */
+struct RunClockState {
+	bool collapseArmed;
+	int collapseTicksLeft;
+	int clockTicks;
+	int wavesSpawned;
+	int overtimeWaves;
+	int overtimeTicks;
+};
+
+RunClockState GetRunClockState();
+void RestoreRunClockState(const RunClockState &state);
+
 } // namespace devilution

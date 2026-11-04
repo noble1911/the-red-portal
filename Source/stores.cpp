@@ -33,7 +33,7 @@
 #include "engine/render/clx_render.hpp"
 #include "engine/render/primitive_render.hpp"
 #include "engine/render/text_render.hpp"
-#include "engine/sound.h"
+#include "run_voice.h"
 #include "engine/trn.hpp"
 #include "game_mode.hpp"
 #include "lua/lua_event.hpp"
@@ -1157,6 +1157,7 @@ void DungeonVendorEnter()
 		break;
 	case 20:
 		ActiveStore = TalkID::None;
+		PlayRunVoice(RunVoiceLine::MerchantGoodbye);
 		break;
 	}
 }
@@ -1168,6 +1169,7 @@ void DungeonVendorBuyItem(Item &item)
 		return;
 	TakePlrsMoney(item._iIvalue);
 	StoreAutoPlace(item, true);
+	PlayRunVoice(RunVoiceLine::MerchantBuy);
 	// [RUNS MOD] The Scroll of Preservation is always in stock: buying it refreshes
 	// the slot with a fresh one (its 50,000g price is the limiter, not scarcity).
 	if (item._iMiscId == IMISC_PRESERVE) {
@@ -1183,7 +1185,9 @@ void DungeonVendorBuyItem(Item &item)
 	// Stock shrinks as you buy, down to a floor of one: while more than one remains,
 	// remove the purchased scroll; the last scroll instead refreshes to a new one, so
 	// a run can always be started. A full restock happens after a dungeon is completed.
-	if (DungeonVendorItems.size() > 1) {
+	const auto scrollsLeft = std::count_if(DungeonVendorItems.begin(), DungeonVendorItems.end(),
+	    [](const Item &stock) { return stock._iMiscId == IMISC_DUNGEONSCROLL; });
+	if (scrollsLeft > 1) {
 		DungeonVendorItems.erase(DungeonVendorItems.begin() + idx);
 	} else {
 		Item restock = {};
@@ -1212,6 +1216,7 @@ void DungeonVendorBuyEnter()
 
 	if (!PlayerCanAfford(DungeonVendorItems[idx]._iIvalue)) {
 		StartStore(TalkID::NoMoney);
+		PlayRunVoice(RunVoiceLine::MerchantBroke);
 		return;
 	}
 
@@ -1269,9 +1274,7 @@ int GambleSessionNet;
 bool GamblePlayedThisSession;
 
 // [RUNS MOD] Farnham's voice. The clips (assets/sfx/farnham, rendered by
-// tools/voice/render_farnham.ps1) play through their own sound handle rather than
-// effects.tsv rows: SfxID is shared by the base and Hellfire tables, which differ in
-// length, so appended rows would not line up in both. A missing clip just stays quiet.
+// tools/voice/render_voice.ps1) play on their own channel; see run_voice.h.
 enum class GambleBark : uint8_t { Greet, Pull, Lose, Pair, NearMiss, Win, Jackpot, Skull, Broke, Goodbye };
 struct GambleBarkSet {
 	const char *name;
@@ -1292,7 +1295,6 @@ constexpr GambleBarkSet GambleBarks[] = {
 	{ "broke", 2, 6 },
 	{ "goodbye", 2, 6 },
 };
-std::unique_ptr<TSnd> GambleBarkSound;
 GambleBark GambleResultBark;
 int GambleLastClip[std::size(GambleBarks)];
 
@@ -1313,21 +1315,14 @@ void PlayGambleBark(GambleBark bark)
 		return;
 	// A shrug never talks over Farnham; anything worth shouting about does.
 	const bool minor = bark == GambleBark::Lose || bark == GambleBark::Pair;
-	if (minor && GambleBarkSound != nullptr && GambleBarkSound->isPlaying())
+	if (minor && IsVoiceChannelPlaying(VoiceChannel::Gambler))
 		return;
 	// Never the same line twice running.
 	int clip = 0;
 	if (set.clips > 1)
 		clip = (GambleLastClip[kind] + 1 + static_cast<int>(GambleBarkNoise() % (set.clips - 1))) % set.clips;
 	GambleLastClip[kind] = clip;
-	// Replacing the handle cuts off whatever Farnham was still saying.
-	GambleBarkSound = nullptr;
-	const std::string path = fmt::format("sfx\\farnham\\{}{:02d}.wav", set.name, clip + 1);
-	auto sound = SoundFileLoadWithStatus(path.c_str());
-	if (!sound.has_value() || *sound == nullptr)
-		return;
-	GambleBarkSound = std::move(*sound);
-	snd_play_snd(GambleBarkSound.get(), 0, 0, *GetOptions().Audio.soundVolume);
+	PlayVoiceClip(VoiceChannel::Gambler, fmt::format("sfx\\farnham\\{}{:02d}.wav", set.name, clip + 1));
 }
 
 int GambleStake()
@@ -1375,8 +1370,13 @@ GambleSymbol RollGambleSymbol()
 void AwardGambleGold(int amount)
 {
 	Player &myPlayer = *MyPlayer;
-	AddGoldToInventory(myPlayer, amount);
-	myPlayer._pGold += amount;
+	const int overflow = AddGoldToInventory(myPlayer, amount);
+	myPlayer._pGold += amount - overflow;
+	// A big prize can outgrow a full pack; the stash holds the rest.
+	if (overflow > 0) {
+		Stash.gold += overflow;
+		Stash.dirty = true;
+	}
 	GambleSessionNet += amount;
 	// No sound here: payouts apply at pull time, but the reveal (and its jingle)
 	// waits for the last reel to land.
@@ -1952,7 +1952,7 @@ void CraftApply()
 			return;
 	}
 
-	TakePlrsMoney(CraftGoldCost(target));
+	const int cost = CraftGoldCost(target);
 	switch (CraftOp) {
 	case ScrollCraftOp::Reroll:
 		GenerateNewSeed(target); // new seed => new affixes (same level and count)
@@ -1976,9 +1976,13 @@ void CraftApply()
 	std::sort(sorted, sorted + CraftMaterialsLocked, std::greater<>());
 	for (int i = 0; i < CraftMaterialsLocked; i++)
 		player.RemoveInvItem(sorted[i]);
+	// Paid last: spending a whole gold pile compacts InvList too, which would leave the
+	// target and every material index above pointing at the wrong item.
+	TakePlrsMoney(cost);
 	CraftMaterialCount = 0;
 	CraftMaterialsLocked = 0;
 	CalcPlrInv(player, true);
+	PlayRunVoice(RunVoiceLine::MerchantCraft);
 }
 
 void DungeonVendorCraftTargetEnter()
@@ -2018,8 +2022,13 @@ void DungeonVendorCraftMaterialEnter()
 	const int idx = ScrollPos + ((CurrentTextLine - PreviousScrollPos) / 4);
 	if (idx < 0 || idx >= CurrentItemIndex)
 		return;
+	// Where the "not enough gold" notice and a cancelled confirm return to.
+	OldTextLine = CurrentTextLine;
+	OldScrollPos = ScrollPos;
+	OldActiveStore = TalkID::DungeonVendorCraftMaterial;
 	if (!PlayerCanAfford(CraftGoldCost(MyPlayer->InvList[CraftTargetInv]))) {
 		StartStore(TalkID::NoMoney);
+		PlayRunVoice(RunVoiceLine::MerchantBroke);
 		return;
 	}
 	CraftMaterialInvs[CraftMaterialCount++] = PlayerItemIndexes[idx];
@@ -2030,8 +2039,9 @@ void DungeonVendorCraftMaterialEnter()
 	// Snapshot the full pick count NOW: the confirm's own render clamps
 	// CraftMaterialCount back down (see CraftMaterialsLocked).
 	CraftMaterialsLocked = CraftMaterialCount;
-	OldActiveStore = TalkID::DungeonVendorCraftMaterial;
 	TempItem = MyPlayer->InvList[CraftTargetInv]; // the confirm shows the target scroll
+	// ...at what the craft costs, not what the scroll is worth.
+	TempItem._iIvalue = TempItem._ivalue = CraftGoldCost(MyPlayer->InvList[CraftTargetInv]);
 	StartStore(TalkID::Confirm);
 }
 
@@ -3697,6 +3707,12 @@ void InitStores()
 
 	BoyItem.clear();
 	BoyItemLevel = 0;
+
+	// [RUNS MOD] Stock is earned per hero. It persists between hub visits, so without this
+	// a fresh hero loaded after a deep one could buy that hero's scrolls.
+	DungeonVendorItems.clear();
+	GamblerJackpot.clear();
+	DungeonVendorRestockPending = true;
 }
 
 void SetupTownStores()
@@ -4071,6 +4087,13 @@ void DrawSText(const Surface &out)
 			break;
 		case TalkID::SmithPremiumBuy:
 			ScrollSmithPremiumBuy(ScrollPos);
+			break;
+		case TalkID::DungeonVendorBuy:
+			ScrollDungeonVendorBuy(ScrollPos);
+			break;
+		case TalkID::DungeonVendorCraftTarget:
+		case TalkID::DungeonVendorCraftMaterial:
+			ScrollVendorStore(PlayerItems, CurrentItemIndex, ScrollPos, false);
 			break;
 		default:
 			break;

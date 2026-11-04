@@ -478,6 +478,10 @@ std::string RunLevelPalettePath()
 	// the mod, picked from the seed rather than the game RNG so co-op peers match.
 	const int n = static_cast<int>(leveltype);
 	const int pick = static_cast<int>(RunSeedHash(currlevel, 0x5BD1E995u) % 8);
+	// The first catacombs recolour blacks out indices 16-79, which is nearly all of that
+	// tileset's walls and floor: only the red void between rooms stayed visible.
+	if (leveltype == DTYPE_CATACOMBS && pick == 4)
+		return StrCat("levels\\l", n, "data\\l", n, "_1.pal");
 	if (pick < 4)
 		return StrCat("levels\\l", n, "data\\l", n, "_", pick + 1, ".pal");
 	return StrCat("levels\\l", n, "data\\l", n, "_rp", pick - 3, ".pal");

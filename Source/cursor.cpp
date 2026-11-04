@@ -624,6 +624,9 @@ void NewCursor(int cursId)
 	// Preservation targeting (covers every cancel path in one place).
 	if (cursId != CURSOR_IDENTIFY)
 		PreserveTargetingActive = false;
+	// Gem targeting borrows the oil art the same way. Controllers cancel through here only.
+	if (cursId != CURSOR_OIL)
+		CancelGemTargeting();
 
 	if (pcurs >= CURSOR_FIRSTITEM && cursId > CURSOR_HAND && cursId < CURSOR_HOURGLASS) {
 		if (!TryDropItem()) {

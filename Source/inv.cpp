@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <iterator>
 #include <optional>
 #include <utility>
 
@@ -1931,9 +1932,15 @@ void CheckInvSwap(Player &player, const Item &item, int invGridIndex)
 					return std::abs(player.InvGrid[gridIndex]);
 			}
 		}
+		// [RUNS MOD] A remote mirror can drift when its owner sorts (cells stop lining up,
+		// so orphaned entries pile up); never let that write past InvList.
+		if (player._pNumInv >= static_cast<int>(std::size(player.InvList)))
+			return 0;
 		player._pNumInv++;
 		return player._pNumInv;
 	}();
+	if (invListIndex == 0)
+		return;
 
 	if (invListIndex < player._pNumInv) {
 		for (int8_t &itemIndex : player.InvGrid) {
@@ -2529,6 +2536,14 @@ bool UseInvItem(int cii)
 		// the level stored on it (everyone can step through), and consumes it.
 		if (!player.isOnLevel(0)) {
 			player.Say(HeroSpeech::ThatWontWorkHere);
+			return true;
+		}
+		// [RUNS MOD] A new run reuses level numbers and every level message keys on the
+		// number alone, so replacing a run with a hero still inside mixes the two layouts'
+		// monsters on both clients. Wait until everyone is out; the scroll is not spent.
+		if (IsAnyPlayerInDungeon()) {
+			player.Say(HeroSpeech::ThatWontWorkHere);
+			EventPlrMsg(_("The scroll won't open while a hero is still in the dungeon."), UiFlags::ColorWhite);
 			return true;
 		}
 		const int level = DungeonScrollLevel(*item);

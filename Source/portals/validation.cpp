@@ -12,6 +12,7 @@
 #include "levels/gendung.h"
 #include "levels/setmaps.h"
 #include "quests.h"
+#include "runs_mod.h"
 
 namespace devilution {
 
@@ -43,6 +44,10 @@ bool IsPortalDeltaValid(WorldTilePosition location, uint8_t level, uint8_t ltype
 		return false;
 	if (isOnSetLevel)
 		return levelType == GetSetLevelType(static_cast<_setlevels>(level));
+	// [RUNS MOD] A run level's tileset comes from its seed, which a client joining the game
+	// has not adopted yet when it validates the portals sent with its deltas.
+	if (RunsModEnabled)
+		return levelType <= DTYPE_CRYPT;
 	return levelType == GetLevelType(level);
 }
 

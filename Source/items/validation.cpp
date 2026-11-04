@@ -184,6 +184,11 @@ bool IsItemValid(const Player &player, const Item &item)
 
 	if (item.IDidx == IDI_EAR)
 		return true;
+	// [RUNS MOD] A scroll's _iCreateInfo packs level, modifier count and difficulty, not
+	// vanilla's creation flags: a Rare Nightmare scroll would read as CF_USEFUL plus a stray
+	// bit. Everything read from it is clamped where it is used.
+	if (item.IDidx == IDI_DUNGEONSCROLL)
+		return true;
 	if (item.IDidx != IDI_GOLD && !IsCreationFlagComboValid(item._iCreateInfo))
 		return false;
 	if ((item._iCreateInfo & CF_TOWN) != 0)

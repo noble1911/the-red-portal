@@ -289,6 +289,8 @@ struct Monster { // note: missing field _mAFNum
 	uint8_t packSize;
 	/** [RUNS MOD] Overtime escalation tier of a run wave monster; 0 for everything else. */
 	uint8_t runWaveTier;
+	/** [RUNS MOD] Tyrannical buffed this one at generation, so it pays out when it dies. */
+	bool runChampion;
 	/** [RUNS MOD] Ticks left of an Elemental companion's chill: animates at half speed. */
 	uint8_t chillTicks;
 	int8_t lightId;

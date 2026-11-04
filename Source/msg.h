@@ -758,6 +758,8 @@ bool IsValidLevel(uint8_t level, bool isSetLevel);
 void DeltaAddItem(int ii);
 void DeltaSaveLevel();
 void DeltaLoadLevel();
+/** [RUNS MOD] Adopts the live run a joining client received with its deltas. */
+void DeltaSyncRunState();
 /** @brief Clears last sent player command for the local player. This is used when a game tick changes. */
 void ClearLastSentPlayerCmd();
 void NetSendCmd(bool bHiPri, _cmd_id bCmd);

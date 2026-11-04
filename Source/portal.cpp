@@ -10,6 +10,7 @@
 #include "msg.h"
 #include "multi.h"
 #include "player.h"
+#include "run_voice.h"
 #include "runs_hub.h"
 #include "runs_mod.h"
 #include "tables/misdat.h"
@@ -144,6 +145,7 @@ void SetDungeonPortalRemote(int level, uint32_t scrollSeed, int modCount, int di
 	DungeonPortalPos = HubPosition(HubSpot::DungeonPortal);
 	if (leveltype == DTYPE_TOWN)
 		AddMissile(DungeonPortalPos, DungeonPortalPos, Direction::South, MissileID::RedPortal, TARGET_MONSTERS, *MyPlayer, 0, 0);
+	PlayRunVoice(RunVoiceLine::Open);
 }
 
 void OpenDungeonPortal(int level, uint32_t scrollSeed, int modCount, int difficulty)
@@ -166,6 +168,38 @@ void SyncDungeonPortal()
 {
 	if (DungeonPortalOpen && leveltype == DTYPE_TOWN)
 		AddMissile(DungeonPortalPos, DungeonPortalPos, Direction::South, MissileID::RedPortal, TARGET_MONSTERS, *MyPlayer, 0, 0);
+}
+
+void RestoreDungeonPortal(int level, uint32_t scrollSeed, int modCount, int difficulty)
+{
+	// The missile follows from SyncDungeonPortal when the hub loads.
+	DungeonPortalOpen = true;
+	DungeonPortalLevel = level;
+	DungeonPortalSeed = scrollSeed;
+	DungeonPortalModCount = modCount;
+	DungeonPortalDifficulty = difficulty;
+	DungeonPortalPos = HubPosition(HubSpot::DungeonPortal);
+}
+
+bool IsAnyPlayerInDungeon()
+{
+	for (const Player &player : Players) {
+		if (player.plractive && (player.plrlevel != 0 || player._pLvlChanging || player._pmode == PM_NEWLVL))
+			return true;
+	}
+	return false;
+}
+
+void CloseRunTownPortals()
+{
+	for (const Player &player : Players) {
+		if (!Portals[player.getId()].open)
+			continue;
+		if (PortalOnLevel(player))
+			RemovePortalMissile(player);
+		DeactivatePortal(player);
+		delta_close_portal(player);
+	}
 }
 
 bool CanEnterTownPortal(size_t portalIndex)

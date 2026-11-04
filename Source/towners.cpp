@@ -16,6 +16,7 @@
 #include "inv.h"
 #include "minitext.h"
 #include "qol/stash.h"
+#include "run_voice.h"
 #include "runs_hub.h"
 #include "runs_mod.h"
 #include "stores.h"
@@ -505,6 +506,7 @@ void TalkToDungeonVendor(Player & /*player*/, Towner & /*vendor*/)
 	// [RUNS MOD] Opens the dedicated dungeon-scroll store. No gossip line (this NPC
 	// reuses Wirt's sprite but is a distinct merchant with no dialog text).
 	StartStore(TalkID::DungeonVendor);
+	PlayRunVoice(RunVoiceLine::MerchantGreet);
 }
 
 void TalkToGambler(Player & /*player*/, Towner & /*gambler*/)

@@ -1,0 +1,76 @@
+{
+  "voice": "An ancient, inhuman voice speaking from deep underground, very low and gravelly, slow and patient, cruel and quietly amused, like a buried god whispering through stone.",
+  "reference_text": "So, something small has come crawling down into my halls. Walk on, little thief. Every step you take, I feel it in the stone.",
+  "effect": { "pitch_semitones": -3.5, "reverb_mix": 0.28, "reverb_seconds": 1.1 },
+  "effect_by_category": {
+    "ten": { "pitch_semitones": -1.0, "reverb_mix": 0.12, "reverb_seconds": 0.6 },
+    "thirty": { "pitch_semitones": -1.5, "reverb_mix": 0.15, "reverb_seconds": 0.7 },
+    "collapse": { "pitch_semitones": -1.5, "reverb_mix": 0.18, "reverb_seconds": 0.8 },
+    "noticed": { "pitch_semitones": -2.0, "reverb_mix": 0.22, "reverb_seconds": 1.0 },
+    "wave": { "pitch_semitones": -2.0, "reverb_mix": 0.22, "reverb_seconds": 1.0 }
+  },
+  "delivery": {
+    "open": "Low and inviting, patient, a hungry whisper.",
+    "noticed": "A sudden, quiet, chilling realisation. Slow.",
+    "wave": "Low and commanding, calling something up out of the dark.",
+    "collapse": "Furious and thunderous, shouting in rage and pain, the voice of a dying thing.",
+    "minute": "Cold and taunting, unhurried, enjoying the fear.",
+    "thirty": "Urgent and menacing, raising the voice, savage.",
+    "ten": "Screaming and urgent, very fast, a roar over falling rock.",
+    "sealed_in": "Quiet, final and satisfied, a door closing forever.",
+    "sealed_out": "Calm, gloating, keeping what was left behind.",
+    "overtime": "Mocking and delighted, a slow cruel laugh in the voice.",
+    "escape": "Bitter and grudging, a low growl of disappointment."
+  },
+  "barks": {
+    "open": [
+      "A door opens. Come down to me.",
+      "Come in, little thief. Come in.",
+      "Yes... another one for the dark."
+    ],
+    "noticed": [
+      "I see you.",
+      "You have lingered. Now I have noticed you.",
+      "There you are."
+    ],
+    "wave": [
+      "Rise, my children. Find it.",
+      "My children are coming.",
+      "Up, up from the dark."
+    ],
+    "collapse": [
+      "You killed my keeper! Now these halls come down on you!",
+      "It falls! All of it falls! Run, little thief!",
+      "My heart is dead, and I will bury you with it!"
+    ],
+    "minute": [
+      "One minute, little thief.",
+      "One minute. Listen to the ceiling."
+    ],
+    "thirty": [
+      "Thirty seconds! Do you hear the stone breaking?",
+      "Thirty seconds, and the roof comes down!"
+    ],
+    "ten": [
+      "Ten seconds! Get out!",
+      "Ten seconds! Run, or stay forever!"
+    ],
+    "sealed_in": [
+      "The door is shut. Only the stairs remain, if you can reach them.",
+      "Sealed. Nobody is coming for you now."
+    ],
+    "sealed_out": [
+      "Sealed. What you left behind is mine.",
+      "The door is shut. I keep what I am given."
+    ],
+    "overtime": [
+      "Still here? Then stay.",
+      "You should have run.",
+      "Stay a while. They are almost upon you."
+    ],
+    "escape": [
+      "You got out. Keep what you stole, for now.",
+      "Run, then. I will still be here."
+    ]
+  }
+}

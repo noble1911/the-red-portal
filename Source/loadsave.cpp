@@ -2784,7 +2784,12 @@ void RestoreExtensionItem(Player &player, const Item &item, int anchorGridIndex)
 		return;
 	if (PlaceItemAtInvGridIndex(player, item, anchorGridIndex))
 		return;
-	AutoPlaceItemInInventory(player, item);
+	if (AutoPlaceItemInInventory(player, item))
+		return;
+	// No room, say on a screen too short for the extended rows. The next save would write
+	// the item out of existence, so the stash takes it instead.
+	if (AutoPlaceItemInStash(item, true))
+		Stash.dirty = true;
 }
 
 void LoadInventoryExtension()
@@ -2792,6 +2797,13 @@ void LoadInventoryExtension()
 	Player &player = *MyPlayer;
 	player.pExtraInvRows = InitialExtraInventoryRows;
 	player.pDeepestBeatenDepth = 0;
+
+	LoadHelper file(OpenSaveArchive(gSaveNumber), "herobag");
+	// A file from a newer build: leave everything alone rather than strip items we can't
+	// restore. Checked before the strip below for exactly that reason.
+	const uint8_t version = file.IsValid() ? file.NextLE<uint8_t>() : 0;
+	if (version > InventoryExtensionVersion)
+		return;
 
 	// Idempotence: strip anything already sitting on the extended rows before
 	// re-reading them (the loader may run again on a reload).
@@ -2804,11 +2816,7 @@ void LoadInventoryExtension()
 		}
 	}
 
-	LoadHelper file(OpenSaveArchive(gSaveNumber), "herobag");
 	if (!file.IsValid())
-		return;
-	const uint8_t version = file.NextLE<uint8_t>();
-	if (version > InventoryExtensionVersion)
 		return;
 	gbIsHellfireSaveGame = file.NextBool8();
 
@@ -2821,7 +2829,7 @@ void LoadInventoryExtension()
 			// (each row required a boss kill at depth 2k) so veterans keep vendor access.
 			player.pDeepestBeatenDepth = static_cast<uint8_t>((player.pExtraInvRows - InitialExtraInventoryRows) * 2);
 		}
-		const uint32_t itemCount = file.NextLE<uint32_t>();
+		const uint32_t itemCount = std::min<uint32_t>(file.NextLE<uint32_t>(), InventoryGridCells);
 		for (uint32_t i = 0; i < itemCount; i++) {
 			const uint8_t anchor = file.NextLE<uint8_t>();
 			Item item;
@@ -2831,7 +2839,7 @@ void LoadInventoryExtension()
 	} else {
 		// v0/v1: migrate the old separate 10x8 bag. Its row r becomes extended row r
 		// (grid cell 40 + r*10), and rows past the new cap fall back to auto-placement.
-		const uint32_t itemCount = file.NextLE<uint32_t>();
+		const uint32_t itemCount = std::min<uint32_t>(file.NextLE<uint32_t>(), InventoryGridCells);
 		std::vector<Item> bagItems(itemCount);
 		for (uint32_t i = 0; i < itemCount; i++)
 			LoadAndValidateItemData(file, bagItems[i]);

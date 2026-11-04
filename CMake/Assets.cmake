@@ -163,7 +163,6 @@ set(devilutionx_assets
   levels/l1data/l1_rp4.pal
   levels/l1data/sklkngt.dun
   levels/l2data/bonechat.dun
-  levels/l2data/l2_rp1.pal
   levels/l2data/l2_rp2.pal
   levels/l2data/l2_rp3.pal
   levels/l2data/l2_rp4.pal
@@ -185,7 +184,51 @@ set(devilutionx_assets
   "lua/mods/Floating Numbers - Damage/init.lua"
   "lua/mods/Floating Numbers - XP/init.lua"
   lua/repl_prelude.lua
-  # [RUNS MOD] Farnham's fruit-machine barks (tools/voice/render_farnham.ps1).
+  # [RUNS MOD] The dungeon, the Dungeon Merchant and the collapse (tools/voice/render_voice.ps1).
+  sfx/dungeon/open01.wav
+  sfx/dungeon/open02.wav
+  sfx/dungeon/open03.wav
+  sfx/dungeon/noticed01.wav
+  sfx/dungeon/noticed02.wav
+  sfx/dungeon/noticed03.wav
+  sfx/dungeon/wave01.wav
+  sfx/dungeon/wave02.wav
+  sfx/dungeon/wave03.wav
+  sfx/dungeon/collapse01.wav
+  sfx/dungeon/collapse02.wav
+  sfx/dungeon/collapse03.wav
+  sfx/dungeon/minute01.wav
+  sfx/dungeon/minute02.wav
+  sfx/dungeon/thirty01.wav
+  sfx/dungeon/thirty02.wav
+  sfx/dungeon/ten01.wav
+  sfx/dungeon/ten02.wav
+  sfx/dungeon/sealed_in01.wav
+  sfx/dungeon/sealed_in02.wav
+  sfx/dungeon/sealed_out01.wav
+  sfx/dungeon/sealed_out02.wav
+  sfx/dungeon/overtime01.wav
+  sfx/dungeon/overtime02.wav
+  sfx/dungeon/overtime03.wav
+  sfx/dungeon/escape01.wav
+  sfx/dungeon/escape02.wav
+  sfx/merchant/greet01.wav
+  sfx/merchant/greet02.wav
+  sfx/merchant/greet03.wav
+  sfx/merchant/buy01.wav
+  sfx/merchant/buy02.wav
+  sfx/merchant/buy03.wav
+  sfx/merchant/craft01.wav
+  sfx/merchant/craft02.wav
+  sfx/merchant/broke01.wav
+  sfx/merchant/broke02.wav
+  sfx/merchant/goodbye01.wav
+  sfx/merchant/goodbye02.wav
+  sfx/rumble/rumble01.wav
+  sfx/rumble/rumble02.wav
+  sfx/rumble/rumble03.wav
+  sfx/rumble/rumble04.wav
+  # [RUNS MOD] Farnham's fruit-machine barks (tools/voice/render_voice.ps1).
   sfx/farnham/greet01.wav
   sfx/farnham/greet02.wav
   sfx/farnham/greet03.wav

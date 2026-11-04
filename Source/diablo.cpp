@@ -2795,8 +2795,11 @@ bool StartGame(bool bNewGame, bool bSinglePlayer)
 		// session-only portal/run globals leak across quit-to-menu into the next
 		// game in this process (the "ghost portal" loop). LoadGame resets again
 		// after reading the save, but new games only pass through here.
-		if (RunsModEnabled)
+		if (RunsModEnabled) {
 			ResetRunSession();
+			if (gbIsMultiplayer)
+				DeltaSyncRunState();
+		}
 		giNumberOfLevels = gbIsHellfire ? 25 : 17;
 		interface_mode uMsg = WM_DIABNEWGAME;
 		if (gbValidSaveFile && gbLoadGame) {
@@ -3293,7 +3296,8 @@ bool ApplyRunBossKill(int depth)
 	if (depth < DifficultyUnlockDepth)
 		return false;
 	Player &mp = *MyPlayer;
-	const auto cleared = static_cast<uint8_t>(sgGameInitInfo.nDifficulty + 1);
+	// The portal's difficulty, not nDifficulty: that is Normal for a hero standing in the hub.
+	const auto cleared = static_cast<uint8_t>(DungeonPortalDifficulty + 1);
 	if (mp.pDiabloKillLevel >= cleared)
 		return false;
 	mp.pDiabloKillLevel = cleared;
@@ -3333,6 +3337,13 @@ void ApplyRunSeed(int depth, uint32_t seed)
 	// a malformed or out-of-range value would index DungeonSeeds/_pLvlVisited out of bounds.
 	depth = ClampRunDepth(depth);
 	RunDepth = depth;
+	// [RUNS MOD] Everything that belonged to the previous run ends here, the one point both
+	// the initiator and the peers pass through. Peers once kept the old clock, which sealed
+	// the new portal on that client alone or stuck it in overtime for a run nobody had
+	// finished.
+	RunBossDefeated = false;
+	ResetRunClock();
+	CloseRunTownPortals();
 	// [RUNS MOD] A new layout is a new run, so this hero has not been in it yet. Cleared
 	// here rather than in PrimeScrollRun/StartNewRun because this is the one point both
 	// the initiator and the peers receiving CMD_RUNSEED pass through.
@@ -3356,10 +3367,6 @@ void ApplyRunSeed(int depth, uint32_t seed)
 
 void StartNewRun()
 {
-	// [RUNS MOD] A new run starts with its boss undefeated; you must kill it to
-	// progress deeper.
-	RunBossDefeated = false;
-
 	// [RUNS MOD] If a co-op run is already in progress (another player is on the
 	// run level), join it on the already-shared seed rather than reseeding and
 	// desyncing them; just force a fresh regeneration locally.
@@ -3394,8 +3401,6 @@ void PrimeScrollRun(int level)
 	// player enters by stepping into the portal; the dungeon then persists (resume)
 	// until the portal is replaced or closed.
 	level = ClampRunDepth(level);
-	RunBossDefeated = false;
-	ResetRunClock(); // [RUNS MOD] a fresh run starts with a fresh clock
 	const uint32_t seed = GenerateSeed();
 	ApplyRunSeed(level, seed); // sets DungeonSeeds/LevelSeeds/_pLvlVisited + RunDepth
 	if (gbIsMultiplayer) {
